@@ -1,8 +1,9 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, Menu, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerAuthHandlers } from './auth'
+import { registerFsHandlers } from './fs'
 
 function createWindow(): void {
   // Create the browser window.
@@ -51,6 +52,35 @@ app.whenReady().then(() => {
   })
 
   registerAuthHandlers()
+  registerFsHandlers()
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Open Folder...',
+          accelerator: 'CmdOrCtrl+O',
+          click: async () => {
+            const window = BrowserWindow.getFocusedWindow()
+            if (!window) return
+            const result = await dialog.showOpenDialog(window, {
+              properties: ['openDirectory']
+            })
+            if (result.canceled || result.filePaths.length === 0) return
+            window.webContents.send('menu:open-folder', result.filePaths[0])
+          }
+        },
+        { type: 'separator' },
+        { role: 'close' }
+      ]
+    },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' }
+  ])
+  Menu.setApplicationMenu(menu)
+
   createWindow()
 
   app.on('activate', () => {

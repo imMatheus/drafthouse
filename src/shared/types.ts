@@ -18,5 +18,29 @@ export interface GitHubRepo {
 
 export interface AuthData {
   token: string
+  scopes: string[]
   user: GitHubUser
+}
+
+export interface FileEntry {
+  name: string
+  path: string
+  isDirectory: boolean
+}
+
+export interface GitRepoInfo {
+  owner: string
+  repo: string
+}
+
+export interface PullRequest {
+  number: number
+  title: string
+  state: string
+  html_url: string
+  created_at: string
+  user: {
+    login: string
+    avatar_url: string
+  }
 }

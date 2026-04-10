@@ -34,9 +34,11 @@ export function useAuthProvider(): AuthContextValue {
       setState((s) => ({ ...s, user: data?.user ?? null, loading: false }))
     })
 
-    window.api.auth.onDeviceCode(({ userCode }) => {
+    const unsubscribe = window.api.auth.onDeviceCode(({ userCode }) => {
       setState((s) => ({ ...s, deviceCode: userCode }))
     })
+
+    return unsubscribe
   }, [])
 
   const login = useCallback(async () => {

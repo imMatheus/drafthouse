@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../hooks/useTheme'
 
-export default function Sidebar() {
+export default function RepoSidebar() {
   const { user, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
