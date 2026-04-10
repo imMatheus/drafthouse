@@ -1,4 +1,5 @@
 import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
+import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
 import Login from './pages/Login'
 
@@ -13,7 +14,14 @@ function AppContent(): React.JSX.Element {
     )
   }
 
-  return user ? <Home /> : <Login />
+  if (!user) return <Login />
+
+  return (
+    <div className="flex h-screen bg-background">
+      <Sidebar />
+      <Home />
+    </div>
+  )
 }
 
 function App(): React.JSX.Element {

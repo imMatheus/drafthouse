@@ -95,7 +95,17 @@ async function fetchGitHubUser(token: string): Promise<GitHubUser> {
   return res.json()
 }
 
-async function fetchUserRepos(token: string): Promise<GitHubRepo[]> {
+async function fetchRepos(token: string, query?: string): Promise<GitHubRepo[]> {
+  if (query) {
+    const res = await fetch(
+      `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&per_page=10&affiliation=owner,collaborator,organization_member`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (!res.ok) throw new Error('Failed to search repos')
+    const data = await res.json()
+    return data.items
+  }
+
   const res = await fetch(
     'https://api.github.com/user/repos?sort=pushed&per_page=10&affiliation=owner,collaborator,organization_member',
     { headers: { Authorization: `Bearer ${token}` } }
@@ -129,9 +139,9 @@ export function registerAuthHandlers(): void {
     return loadAuth()
   })
 
-  ipcMain.handle('auth:get-repos', async () => {
+  ipcMain.handle('auth:get-repos', async (_event, query?: string) => {
     const auth = loadAuth()
     if (!auth) return null
-    return fetchUserRepos(auth.token)
+    return fetchRepos(auth.token, query)
   })
 }

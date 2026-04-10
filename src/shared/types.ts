@@ -10,6 +10,10 @@ export interface GitHubRepo {
   full_name: string
   description: string | null
   html_url: string
+  owner: {
+    login: string
+    avatar_url: string
+  }
 }
 
 export interface AuthData {

@@ -6,7 +6,7 @@ interface AuthAPI {
   logout: () => Promise<null>
   getUser: () => Promise<AuthData | null>
   onDeviceCode: (callback: (data: { userCode: string }) => void) => void
-  getRepos: () => Promise<GitHubRepo[] | null>
+  getRepos: (query?: string) => Promise<GitHubRepo[] | null>
 }
 
 declare global {

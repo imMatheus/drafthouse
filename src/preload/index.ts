@@ -9,7 +9,7 @@ const api = {
     onDeviceCode: (callback: (data: { userCode: string }) => void): void => {
       ipcRenderer.on('auth:device-code', (_event, data) => callback(data))
     },
-    getRepos: (): Promise<unknown> => ipcRenderer.invoke('auth:get-repos')
+    getRepos: (query?: string): Promise<unknown> => ipcRenderer.invoke('auth:get-repos', query)
   }
 }
 
