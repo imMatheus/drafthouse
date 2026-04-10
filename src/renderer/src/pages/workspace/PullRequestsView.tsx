@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { GitPullRequest } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import type { GitRepoInfo, PullRequest } from '../../../../shared/types'
 import PlaceholderView from './PlaceholderView'
 
@@ -8,11 +7,15 @@ interface PullRequestsViewProps {
   gitInfo: GitRepoInfo | null | undefined
   gitInfoError: Error | null
   isLoadingGitInfo: boolean
+  onOpenPullRequest: (number: number) => void
 }
 
-export default function PullRequestsView({ gitInfo, gitInfoError, isLoadingGitInfo }: PullRequestsViewProps) {
-  const navigate = useNavigate()
-
+export default function PullRequestsView({
+  gitInfo,
+  gitInfoError,
+  isLoadingGitInfo,
+  onOpenPullRequest
+}: PullRequestsViewProps) {
   const {
     data: prs,
     isLoading,
@@ -70,7 +73,7 @@ export default function PullRequestsView({ gitInfo, gitInfoError, isLoadingGitIn
         {prs.map((pr) => (
           <button
             key={pr.number}
-            onClick={() => navigate(`/workspace/pulls/${pr.number}`)}
+            onClick={() => onOpenPullRequest(pr.number)}
             className="flex items-start gap-3 rounded-lg border border-border bg-surface p-4 text-left hover:bg-surface-hover"
           >
             <GitPullRequest size={16} className="mt-0.5 shrink-0 text-success" />

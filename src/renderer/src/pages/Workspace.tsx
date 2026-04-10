@@ -1,31 +1,41 @@
+import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ClipboardCheck, CircleDot, GitPullRequest, Home } from 'lucide-react'
-import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import type { GitRepoInfo, PullRequest } from '../../../shared/types'
+import { Files, GitPullRequest } from 'lucide-react'
+import { Navigate } from 'react-router-dom'
+import type { GitRepoInfo } from '../../../shared/types'
 import ActivityBar from '../components/ActivityBar'
 import ExplorerPanel from '../components/ExplorerPanel'
+import WorkspaceTabBar from '../components/WorkspaceTabBar'
 import type { WorkspaceSession } from '../lib/workspaceSession'
+import {
+  createFileTab,
+  createPullRequestListTab,
+  createPullRequestTab,
+  isPullRequestWorkspaceTab,
+  type PullRequestSubview,
+  type WorkspaceTab
+} from '../lib/workspaceTabs'
 import FilesView from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
 import PullRequestDetailView from './workspace/PullRequestDetailView'
 import PullRequestsView from './workspace/PullRequestsView'
+import WelcomeView from './workspace/WelcomeView'
 
 interface WorkspaceProps {
   session: WorkspaceSession | null
   onCloseWorkspace: () => void
-  onOpenWorkspace: (folderPath: string) => void
   onUpdateSession: (patch: Partial<WorkspaceSession>) => void
 }
 
 export default function Workspace({ session, onCloseWorkspace, onUpdateSession }: WorkspaceProps) {
-  const navigate = useNavigate()
-
   if (!session) {
     return <Navigate to="/" replace />
   }
 
-  const { folderPath, explorerVisible, selectedFilePath } = session
+  const { folderPath, sidebar, tabs, activeTabId } = session
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
+  const activeFilePath = activeTab?.kind === 'file' ? activeTab.path : null
   const {
     data: gitInfo,
     isLoading: isLoadingGitInfo,
@@ -33,12 +43,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   } = useQuery<GitRepoInfo | null, Error>({
     queryKey: ['git-info', folderPath],
     queryFn: () => window.api.fs.getGitInfo(folderPath),
-    retry: false
-  })
-  const { data: pullRequests } = useQuery<PullRequest[], Error>({
-    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo],
-    queryFn: () => window.api.auth.getPullRequests(gitInfo!.owner, gitInfo!.repo),
-    enabled: gitInfo !== null && gitInfo !== undefined,
     retry: false
   })
 
@@ -51,8 +55,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
         if (cancelled || resolvedFolderPath === folderPath) return
 
         onUpdateSession({
-          folderPath: resolvedFolderPath,
-          selectedFilePath: null
+          folderPath: resolvedFolderPath
         })
       })
       .catch((error: unknown) => {
@@ -66,120 +69,204 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
   }, [folderPath, onCloseWorkspace, onUpdateSession])
 
-  const handleSelectFile = (filePath: string): void => {
-    onUpdateSession({ selectedFilePath: filePath })
-    navigate('/workspace/overview')
+  const openOrFocusTab = (nextTab: WorkspaceTab): void => {
+    const existingTab = tabs.find((tab) => tab.id === nextTab.id)
+
+    onUpdateSession({
+      ...session,
+      tabs: existingTab ? tabs : [...tabs, nextTab],
+      activeTabId: nextTab.id
+    })
   }
 
-  return (
-    <div className="flex flex-1">
-      <ActivityBar
-        explorerVisible={explorerVisible}
-        onToggleExplorer={() => onUpdateSession({ explorerVisible: !explorerVisible })}
-      />
+  const handleSelectTab = (tabId: WorkspaceTab['id']): void => {
+    if (tabId === activeTabId) return
 
-      {explorerVisible ? (
-        <ExplorerPanel folderPath={folderPath} selectedFilePath={selectedFilePath} onSelectFile={handleSelectFile} />
+    onUpdateSession({
+      ...session,
+      activeTabId: tabId
+    })
+  }
+
+  const handleCloseTab = (tabId: WorkspaceTab['id']): void => {
+    const tabIndex = tabs.findIndex((tab) => tab.id === tabId)
+
+    if (tabIndex === -1) {
+      return
+    }
+
+    const nextTabs = tabs.filter((tab) => tab.id !== tabId)
+
+    if (activeTabId !== tabId) {
+      onUpdateSession({
+        ...session,
+        tabs: nextTabs
+      })
+      return
+    }
+
+    const nextActiveTabId =
+      nextTabs[tabIndex - 1]?.id ?? nextTabs[tabIndex]?.id ?? null
+
+    onUpdateSession({
+      ...session,
+      tabs: nextTabs,
+      activeTabId: nextActiveTabId
+    })
+  }
+
+  const handleOpenFile = (filePath: string): void => {
+    openOrFocusTab(createFileTab(filePath))
+  }
+
+  const handleOpenPullRequestList = (): void => {
+    openOrFocusTab(createPullRequestListTab())
+  }
+
+  const handleOpenPullRequest = (number: number): void => {
+    openOrFocusTab(createPullRequestTab(number))
+  }
+
+  const handleToggleExplorer = (): void => {
+    const isExplorerActive = sidebar.visible && sidebar.activePanel === 'explorer'
+
+    onUpdateSession({
+      ...session,
+      sidebar: isExplorerActive
+        ? {
+            visible: false,
+            activePanel: null
+          }
+        : {
+            visible: true,
+            activePanel: 'explorer'
+          }
+    })
+  }
+
+  const handlePullRequestSubviewChange = (tabId: WorkspaceTab['id'], subview: PullRequestSubview): void => {
+    onUpdateSession({
+      ...session,
+      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, subview } : tab))
+    })
+  }
+
+  const handlePullRequestTitleChange = (tabId: WorkspaceTab['id'], title: string): void => {
+    const currentTab = tabs.find((tab) => tab.id === tabId)
+
+    if (!currentTab || currentTab.kind !== 'pull-request' || currentTab.title === title) {
+      return
+    }
+
+    onUpdateSession({
+      ...session,
+      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, title } : tab))
+    })
+  }
+
+  const activityItems = [
+    {
+      id: 'explorer',
+      label: 'Explorer',
+      icon: Files,
+      active: sidebar.visible && sidebar.activePanel === 'explorer',
+      onClick: handleToggleExplorer
+    },
+    {
+      id: 'pull-requests',
+      label: 'Pull Requests',
+      icon: GitPullRequest,
+      active: isPullRequestWorkspaceTab(activeTab),
+      onClick: handleOpenPullRequestList
+    }
+  ]
+
+  return (
+    <div className="flex flex-1 bg-background">
+      <ActivityBar items={activityItems} />
+
+      {sidebar.visible && sidebar.activePanel === 'explorer' ? (
+        <ExplorerPanel folderPath={folderPath} selectedFilePath={activeFilePath} onSelectFile={handleOpenFile} />
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border bg-background">
-          <nav className="flex min-h-12 items-center gap-1 overflow-x-auto px-5">
-            <WorkspaceNavLink to="/workspace/overview" icon={<Home size={16} strokeWidth={1.8} />}>
-              Overview
-            </WorkspaceNavLink>
-            <WorkspaceNavLink
-              to="/workspace/pulls"
-              icon={<GitPullRequest size={16} strokeWidth={1.8} />}
-              count={pullRequests?.length}
-            >
-              Pull Requests
-            </WorkspaceNavLink>
-            <WorkspaceNavLink to="/workspace/issues" icon={<CircleDot size={16} strokeWidth={1.8} />}>
-              Issues
-            </WorkspaceNavLink>
-            <WorkspaceNavLink to="/workspace/reviews" icon={<ClipboardCheck size={16} strokeWidth={1.8} />}>
-              Reviews
-            </WorkspaceNavLink>
-          </nav>
-        </header>
+        <WorkspaceTabBar
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onSelectTab={handleSelectTab}
+          onCloseTab={handleCloseTab}
+        />
 
-        <main className="min-h-0 flex-1 overflow-y-auto p-6">
-          <Routes>
-            <Route index element={<Navigate to="overview" replace />} />
-            <Route
-              path="overview"
-              element={<FilesView folderPath={folderPath} selectedFilePath={selectedFilePath} />}
-            />
-            <Route path="files" element={<Navigate to="/workspace/overview" replace />} />
-            <Route
-              path="pulls"
-              element={
-                <PullRequestsView gitInfo={gitInfo} gitInfoError={gitInfoError} isLoadingGitInfo={isLoadingGitInfo} />
-              }
-            />
-            <Route
-              path="pulls/:number/*"
-              element={
-                gitInfo ? (
-                  <PullRequestDetailView owner={gitInfo.owner} repo={gitInfo.repo} />
-                ) : (
-                  <PlaceholderView title="Pull Request" description="Repository metadata is not available." />
-                )
-              }
-            />
-            <Route
-              path="issues"
-              element={
-                <PlaceholderView
-                  title="Issues"
-                  description="Repository issues can live in this workspace area next to files and pull requests."
-                />
-              }
-            />
-            <Route
-              path="reviews"
-              element={
-                <PlaceholderView
-                  title="Reviews"
-                  description="Review activity can live in this workspace area next to pull requests and issues."
-                />
-              }
-            />
-            <Route path="users" element={<Navigate to="/workspace/reviews" replace />} />
-            <Route path="*" element={<Navigate to="overview" replace />} />
-          </Routes>
-        </main>
+        <main className="min-h-0 flex-1 overflow-y-auto p-6">{renderWorkspaceTabContent({
+          activeTab,
+          gitInfo,
+          gitInfoError,
+          isLoadingGitInfo,
+          onOpenPullRequest: handleOpenPullRequest,
+          onPullRequestSubviewChange: handlePullRequestSubviewChange,
+          onPullRequestTitleChange: handlePullRequestTitleChange
+        })}</main>
       </div>
     </div>
   )
 }
 
-function WorkspaceNavLink({
-  to,
-  children,
-  icon,
-  count
+function renderWorkspaceTabContent({
+  activeTab,
+  gitInfo,
+  gitInfoError,
+  isLoadingGitInfo,
+  onOpenPullRequest,
+  onPullRequestSubviewChange,
+  onPullRequestTitleChange
 }: {
-  to: string
-  children: React.ReactNode
-  icon: React.ReactNode
-  count?: number
-}) {
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        `inline-flex h-12 items-center gap-2 border-b-2 px-3 text-[13px] font-medium whitespace-nowrap transition-colors ${
-          isActive
-            ? 'border-foreground-muted text-foreground'
-            : 'border-transparent text-foreground-muted hover:text-foreground'
-        }`
+  activeTab: WorkspaceTab | null
+  gitInfo: GitRepoInfo | null | undefined
+  gitInfoError: Error | null
+  isLoadingGitInfo: boolean
+  onOpenPullRequest: (number: number) => void
+  onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void
+  onPullRequestTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
+}): ReactNode {
+  if (!activeTab) {
+    return (
+      <PlaceholderView
+        title="Nothing open"
+        description="Open a file from the explorer or a pull request from the left action bar."
+      />
+    )
+  }
+
+  switch (activeTab.kind) {
+    case 'welcome':
+      return <WelcomeView />
+    case 'file':
+      return <FilesView filePath={activeTab.path} />
+    case 'pull-request-list':
+      return (
+        <PullRequestsView
+          gitInfo={gitInfo}
+          gitInfoError={gitInfoError}
+          isLoadingGitInfo={isLoadingGitInfo}
+          onOpenPullRequest={onOpenPullRequest}
+        />
+      )
+    case 'pull-request':
+      if (isLoadingGitInfo) {
+        return <p className="text-sm text-foreground-muted">Checking repository metadata...</p>
       }
-    >
-      <span className="shrink-0">{icon}</span>
-      {children}
-      {typeof count === 'number' ? <span className="text-foreground-muted">{count}</span> : null}
-    </NavLink>
-  )
+
+      return gitInfo ? (
+        <PullRequestDetailView
+          owner={gitInfo.owner}
+          repo={gitInfo.repo}
+          number={activeTab.number}
+          subview={activeTab.subview}
+          onSubviewChange={(subview) => onPullRequestSubviewChange(activeTab.id, subview)}
+          onTitleChange={(title) => onPullRequestTitleChange(activeTab.id, title)}
+        />
+      ) : (
+        <PlaceholderView title="Pull Request" description="Repository metadata is not available." />
+      )
+  }
 }

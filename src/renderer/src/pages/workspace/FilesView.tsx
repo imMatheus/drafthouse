@@ -1,32 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { getPathBasename } from '../../lib/path'
-import PlaceholderView from './PlaceholderView'
 
 interface FilesViewProps {
-  folderPath: string
-  selectedFilePath: string | null
+  filePath: string
 }
 
-export default function FilesView({ folderPath, selectedFilePath }: FilesViewProps) {
+export default function FilesView({ filePath }: FilesViewProps) {
   const {
     data: fileContents,
     isLoading,
     error
   } = useQuery<string, Error>({
-    queryKey: ['read-file', selectedFilePath],
-    queryFn: () => window.api.fs.readFile(selectedFilePath!),
-    enabled: selectedFilePath !== null,
+    queryKey: ['read-file', filePath],
+    queryFn: () => window.api.fs.readFile(filePath),
     retry: false
   })
-
-  if (!selectedFilePath) {
-    return (
-      <PlaceholderView
-        title="Files"
-        description={`Choose a file from ${getPathBasename(folderPath)} to open it in the workspace.`}
-      />
-    )
-  }
 
   if (isLoading) {
     return <p className="text-sm text-foreground-muted">Loading file...</p>
@@ -44,8 +32,8 @@ export default function FilesView({ folderPath, selectedFilePath }: FilesViewPro
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
       <div className="border-b border-border px-4 py-3">
-        <p className="text-sm font-medium text-foreground">{getPathBasename(selectedFilePath)}</p>
-        <p className="truncate text-xs text-foreground-subtle">{selectedFilePath}</p>
+        <p className="text-sm font-medium text-foreground">{getPathBasename(filePath)}</p>
+        <p className="truncate text-xs text-foreground-subtle">{filePath}</p>
       </div>
       <pre className="overflow-x-auto p-4 text-sm leading-6 text-foreground">
         <code>{fileContents}</code>

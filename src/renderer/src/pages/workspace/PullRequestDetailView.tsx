@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bold,
@@ -16,7 +16,6 @@ import {
   MessageSquare,
   Quote
 } from 'lucide-react'
-import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import type {
   AuthData,
   PullRequestComment,
@@ -25,28 +24,42 @@ import type {
   PullRequestReviewComment
 } from '../../../../shared/types'
 import Markdown from 'react-markdown'
+import type { PullRequestSubview } from '../../lib/workspaceTabs'
 import MarkdownBody from './MarkdownBody'
 import PlaceholderView from './PlaceholderView'
 
 interface PullRequestDetailViewProps {
   owner: string
   repo: string
+  number: number
+  subview: PullRequestSubview
+  onSubviewChange: (subview: PullRequestSubview) => void
+  onTitleChange?: (title: string) => void
 }
 
-export default function PullRequestDetailView({ owner, repo }: PullRequestDetailViewProps) {
-  const { number } = useParams<{ number: string }>()
-
+export default function PullRequestDetailView({
+  owner,
+  repo,
+  number,
+  subview,
+  onSubviewChange,
+  onTitleChange
+}: PullRequestDetailViewProps) {
   const {
     data: pr,
     isLoading,
     error
   } = useQuery<PullRequestDetail, Error>({
     queryKey: ['pull-request', owner, repo, number],
-    queryFn: () => window.api.auth.getPullRequest(owner, repo, Number(number)),
+    queryFn: () => window.api.auth.getPullRequest(owner, repo, number),
     retry: false
   })
 
-  console.log({ pr })
+  useEffect(() => {
+    if (pr?.title) {
+      onTitleChange?.(pr.title)
+    }
+  }, [onTitleChange, pr?.title])
 
   if (isLoading) return <p className="text-sm text-foreground-muted">Loading pull request...</p>
 
@@ -70,7 +83,6 @@ export default function PullRequestDetailView({ owner, repo }: PullRequestDetail
         : 'text-success bg-success/10'
 
   const statusLabel = pr.draft ? 'Draft' : pr.merged ? 'Merged' : pr.state === 'closed' ? 'Closed' : 'Open'
-  const basePath = `/workspace/pulls/${pr.number}`
 
   return (
     <div>
@@ -95,95 +107,98 @@ export default function PullRequestDetailView({ owner, repo }: PullRequestDetail
       </div>
 
       <nav className="mt-4 flex gap-1 border-b border-border">
-        <PRDetailTabLink to={basePath} end icon={<MessageSquare size={14} />}>
+        <PRDetailTabButton
+          active={subview === 'conversation'}
+          onClick={() => onSubviewChange('conversation')}
+          icon={<MessageSquare size={14} />}
+        >
           Conversation
-        </PRDetailTabLink>
-        <PRDetailTabLink to={`${basePath}/commits`} icon={<GitCommit size={14} />} count={pr.commits}>
+        </PRDetailTabButton>
+        <PRDetailTabButton
+          active={subview === 'commits'}
+          onClick={() => onSubviewChange('commits')}
+          icon={<GitCommit size={14} />}
+          count={pr.commits}
+        >
           Commits
-        </PRDetailTabLink>
-        <PRDetailTabLink to={`${basePath}/checks`} icon={<Check size={14} />}>
+        </PRDetailTabButton>
+        <PRDetailTabButton
+          active={subview === 'checks'}
+          onClick={() => onSubviewChange('checks')}
+          icon={<Check size={14} />}
+        >
           Checks
-        </PRDetailTabLink>
-        <PRDetailTabLink to={`${basePath}/files`} icon={<FileCode size={14} />} count={pr.changed_files}>
+        </PRDetailTabButton>
+        <PRDetailTabButton
+          active={subview === 'files'}
+          onClick={() => onSubviewChange('files')}
+          icon={<FileCode size={14} />}
+          count={pr.changed_files}
+        >
           Files changed
-        </PRDetailTabLink>
+        </PRDetailTabButton>
       </nav>
 
       <div className="mt-6">
-        <Routes>
-          <Route
-            index
-            element={
-              <div className="flex gap-6">
-                <div className="min-w-0 flex-1">
-                  <PRConversationTab pr={pr} owner={owner} repo={repo} />
-                </div>
-                <div className="hidden w-48 shrink-0 lg:block">
-                  <PRDetailSidebar pr={pr} />
-                </div>
-              </div>
-            }
+        {subview === 'conversation' ? (
+          <div className="flex gap-6">
+            <div className="min-w-0 flex-1">
+              <PRConversationTab pr={pr} owner={owner} repo={repo} />
+            </div>
+            <div className="hidden w-48 shrink-0 lg:block">
+              <PRDetailSidebar pr={pr} />
+            </div>
+          </div>
+        ) : null}
+
+        {subview === 'commits' ? (
+          <PlaceholderView
+            title="Commits"
+            description={`${pr.commits} commit${pr.commits !== 1 ? 's' : ''} in this pull request.`}
           />
-          <Route
-            path="commits"
-            element={
-              <PlaceholderView
-                title="Commits"
-                description={`${pr.commits} commit${pr.commits !== 1 ? 's' : ''} in this pull request.`}
-              />
-            }
+        ) : null}
+
+        {subview === 'checks' ? (
+          <PlaceholderView title="Checks" description="Status checks for this pull request will appear here." />
+        ) : null}
+
+        {subview === 'files' ? (
+          <PlaceholderView
+            title="Files changed"
+            description={`${pr.changed_files} file${pr.changed_files !== 1 ? 's' : ''} changed with ${pr.additions} additions and ${pr.deletions} deletions.`}
           />
-          <Route
-            path="checks"
-            element={
-              <PlaceholderView title="Checks" description="Status checks for this pull request will appear here." />
-            }
-          />
-          <Route
-            path="files"
-            element={
-              <PlaceholderView
-                title="Files changed"
-                description={`${pr.changed_files} file${pr.changed_files !== 1 ? 's' : ''} changed with ${pr.additions} additions and ${pr.deletions} deletions.`}
-              />
-            }
-          />
-          <Route path="*" element={<Navigate to={basePath} replace />} />
-        </Routes>
+        ) : null}
       </div>
     </div>
   )
 }
 
-function PRDetailTabLink({
-  to,
-  end,
+function PRDetailTabButton({
+  active,
+  onClick,
   children,
   icon,
   count
 }: {
-  to: string
-  end?: boolean
+  active: boolean
+  onClick: () => void
   children: React.ReactNode
   icon: React.ReactNode
   count?: number
 }) {
   return (
-    <NavLink
-      to={to}
-      end={end}
-      className={({ isActive }) =>
-        `inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
-          isActive
-            ? 'border-foreground-muted text-foreground'
-            : 'border-transparent text-foreground-muted hover:text-foreground'
-        }`
-      }
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
+        active
+          ? 'border-foreground-muted text-foreground'
+          : 'border-transparent text-foreground-muted hover:text-foreground'
+      }`}
     >
       {icon}
       {children}
       {typeof count === 'number' ? <span className="text-foreground-subtle">{count}</span> : null}
-    </NavLink>
+    </button>
   )
 }
 
@@ -215,8 +230,6 @@ function PRConversationTab({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
     queryFn: () => window.api.auth.getPullRequestReviews(owner, repo, pr.number),
     retry: false
   })
-
-  console.log({ reviews, reviewComments, comments })
 
   const timelineItems = buildPullRequestTimelineItems(comments ?? [], reviewComments ?? [], reviews ?? [])
   const conversationError = commentsError ?? reviewCommentsError ?? reviewsError
@@ -359,9 +372,7 @@ function PullRequestTimelineCard({ item }: { item: PullRequestTimelineItem }) {
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <img src={item.user.avatar_url} alt={item.user.login} className="h-6 w-6 rounded-full" />
           <span className="text-sm font-medium text-foreground">{item.user.login}</span>
-          <span className="text-xs text-foreground-subtle">
-            {getTimelineItemHeading(item)} {formatRelativeTime(item.createdAt)}
-          </span>
+          <span className="text-xs text-foreground-subtle">{getTimelineItemHeading()} {formatRelativeTime(item.createdAt)}</span>
         </div>
         <MarkdownBody>{item.body}</MarkdownBody>
       </div>
@@ -408,13 +419,8 @@ function PullRequestTimelineCard({ item }: { item: PullRequestTimelineItem }) {
   )
 }
 
-function getTimelineItemHeading(item: Extract<PullRequestTimelineItem, { type: 'issue-comment' }>): string {
+function getTimelineItemHeading(): string {
   return 'commented'
-}
-
-function formatReviewCommentLocation(path: string, line: number | null): string {
-  if (line === null) return path
-  return `${path}:${line}`
 }
 
 function ReviewThreadCard({ thread }: { thread: PullRequestReviewThread }) {

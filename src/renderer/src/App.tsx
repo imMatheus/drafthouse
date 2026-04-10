@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
 import RepoSidebar from './components/RepoSidebar'
 import { ThemeProvider } from './hooks/useTheme'
@@ -7,7 +7,9 @@ import Home from './pages/Home'
 import Login from './pages/Login'
 import Workspace from './pages/Workspace'
 import {
+  createInitialWorkspaceSession,
   clearWorkspaceSession,
+  loadWorkspaceSessionForFolder,
   loadWorkspaceSession,
   saveWorkspaceSession,
   type WorkspaceSession
@@ -16,7 +18,6 @@ import {
 function AppContent(): React.JSX.Element {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
   const [workspaceSession, setWorkspaceSession] = useState<WorkspaceSession | null>(() =>
     loadWorkspaceSession()
   )
@@ -43,18 +44,10 @@ function AppContent(): React.JSX.Element {
 
   const openWorkspace = useCallback(
     (folderPath: string) => {
-      persistWorkspaceSession((currentSession) => ({
-        folderPath,
-        explorerVisible: currentSession?.explorerVisible ?? true,
-        selectedFilePath: null
-      }))
-
-      const nextPath =
-        location.pathname.startsWith('/workspace/') ? location.pathname : '/workspace/files'
-
-      navigate(nextPath)
+      persistWorkspaceSession(loadWorkspaceSessionForFolder(folderPath) ?? createInitialWorkspaceSession(folderPath))
+      navigate('/workspace')
     },
-    [location.pathname, navigate, persistWorkspaceSession]
+    [navigate, persistWorkspaceSession]
   )
 
   const updateWorkspaceSession = useCallback(
@@ -115,7 +108,6 @@ function AppContent(): React.JSX.Element {
             <Workspace
               session={workspaceSession}
               onCloseWorkspace={closeWorkspace}
-              onOpenWorkspace={openWorkspace}
               onUpdateSession={updateWorkspaceSession}
             />
           </div>
