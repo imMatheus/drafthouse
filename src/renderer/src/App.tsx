@@ -1,11 +1,28 @@
-import { Routes, Route } from 'react-router-dom'
+import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
 import Home from './pages/Home'
+import Login from './pages/Login'
+
+function AppContent(): React.JSX.Element {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-neutral-900">
+        <p className="text-neutral-400">Loading...</p>
+      </div>
+    )
+  }
+
+  return user ? <Home /> : <Login />
+}
 
 function App(): React.JSX.Element {
+  const auth = useAuthProvider()
+
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-    </Routes>
+    <AuthContext value={auth}>
+      <AppContent />
+    </AuthContext>
   )
 }
 
