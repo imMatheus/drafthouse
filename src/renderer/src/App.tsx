@@ -7,8 +7,8 @@ function AppContent(): React.JSX.Element {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-neutral-900">
-        <p className="text-neutral-400">Loading...</p>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <p className="text-foreground-muted">Loading...</p>
       </div>
     )
   }
