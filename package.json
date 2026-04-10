@@ -25,6 +25,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@tailwindcss/vite": "^4.2.2",
     "electron-updater": "^6.3.9",
+    "react-router-dom": "^7.14.0",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {

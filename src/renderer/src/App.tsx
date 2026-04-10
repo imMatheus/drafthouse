@@ -1,8 +1,11 @@
+import { Routes, Route } from 'react-router-dom'
+import Home from './pages/Home'
+
 function App(): React.JSX.Element {
   return (
-    <div className="flex h-screen items-center justify-center bg-neutral-900">
-      <h1 className="text-4xl font-bold text-white">Drafthouse 2</h1>
-    </div>
+    <Routes>
+      <Route path="/" element={<Home />} />
+    </Routes>
   )
 }
 
