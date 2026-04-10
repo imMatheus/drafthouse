@@ -14,7 +14,21 @@ const api = {
     },
     getRepos: (query?: string): Promise<unknown> => ipcRenderer.invoke('auth:get-repos', query),
     getPullRequests: (owner: string, repo: string): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-requests', owner, repo)
+      ipcRenderer.invoke('auth:get-pull-requests', owner, repo),
+    getPullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
+      ipcRenderer.invoke('auth:get-pull-request', owner, repo, number),
+    getPullRequestComments: (owner: string, repo: string, number: number): Promise<unknown> =>
+      ipcRenderer.invoke('auth:get-pull-request-comments', owner, repo, number),
+    getPullRequestReviewComments: (owner: string, repo: string, number: number): Promise<unknown> =>
+      ipcRenderer.invoke('auth:get-pull-request-review-comments', owner, repo, number),
+    getPullRequestReviews: (owner: string, repo: string, number: number): Promise<unknown> =>
+      ipcRenderer.invoke('auth:get-pull-request-reviews', owner, repo, number),
+    createPullRequestComment: (
+      owner: string,
+      repo: string,
+      number: number,
+      body: string
+    ): Promise<unknown> => ipcRenderer.invoke('auth:create-pull-request-comment', owner, repo, number, body)
   },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),

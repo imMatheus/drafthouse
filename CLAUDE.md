@@ -16,3 +16,10 @@ All colors in the frontend must use the token-based design system defined in `sr
 - `border` — borders and dividers
 - `interactive` / `interactive-hover` — secondary buttons, clickable elements
 - `accent` / `accent-hover` — primary CTA buttons, key actions
+- `success` — positive states (open PRs, confirmations)
+- `danger` — destructive/negative states (closed PRs, errors, deletions)
+- `purple` — merged state (merged PRs)
+
+## Icons
+
+Always use `lucide-react` for icons. Never use inline SVGs — import the icon component from `lucide-react` instead.

@@ -1,9 +1,19 @@
 import { BrowserWindow, ipcMain, app, shell } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-import type { AuthData, GitHubRepo, GitHubUser, PullRequest } from '../shared/types'
+import type {
+  AuthData,
+  GitHubRepo,
+  GitHubUser,
+  PullRequest,
+  PullRequestComment,
+  PullRequestReview,
+  PullRequestReviewComment,
+  PullRequestDetail
+} from '../shared/types'
 
 const GITHUB_CLIENT_ID = import.meta.env.MAIN_VITE_GITHUB_CLIENT_ID
+const GITHUB_API_VERSION = '2026-03-10'
 
 function getAuthPath(): string {
   return join(app.getPath('userData'), 'auth.json')
@@ -101,30 +111,83 @@ async function pollForToken(
 }
 
 async function fetchGitHubUser(token: string): Promise<GitHubUser> {
-  const res = await fetch('https://api.github.com/user', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  if (!res.ok) throw new Error('Failed to fetch user')
-  return res.json()
+  return fetchGitHubJson<GitHubUser>(token, 'https://api.github.com/user', 'Failed to fetch user')
 }
 
 async function fetchRepos(token: string, query?: string): Promise<GitHubRepo[]> {
   if (query) {
-    const res = await fetch(
+    const data = await fetchGitHubJson<{ items: GitHubRepo[] }>(
+      token,
       `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&per_page=10&affiliation=owner,collaborator,organization_member`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      'Failed to search repos'
     )
-    if (!res.ok) throw new Error('Failed to search repos')
-    const data = await res.json()
     return data.items
   }
 
-  const res = await fetch(
+  return fetchGitHubJson<GitHubRepo[]>(
+    token,
     'https://api.github.com/user/repos?sort=pushed&per_page=10&affiliation=owner,collaborator,organization_member',
-    { headers: { Authorization: `Bearer ${token}` } }
+    'Failed to fetch repos'
   )
-  if (!res.ok) throw new Error('Failed to fetch repos')
-  return res.json()
+}
+
+function getGitHubHeaders(token: string, extraHeaders: Record<string, string> = {}): Record<string, string> {
+  return {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'X-GitHub-Api-Version': GITHUB_API_VERSION,
+    ...extraHeaders
+  }
+}
+
+async function readGitHubErrorMessage(response: Response): Promise<string> {
+  try {
+    const data = (await response.json()) as { message?: string }
+    if (typeof data.message === 'string' && data.message.length > 0) {
+      return data.message
+    }
+  } catch {
+    // Ignore parse failures and fall back to the HTTP status below.
+  }
+
+  return `GitHub returned ${response.status}`
+}
+
+async function fetchGitHubJson<T>(
+  token: string,
+  url: string,
+  errorContext: string,
+  options?: {
+    method?: string
+    body?: string
+    headers?: Record<string, string>
+  }
+): Promise<T> {
+  const response = await fetch(url, {
+    method: options?.method,
+    body: options?.body,
+    headers: getGitHubHeaders(token, options?.headers)
+  })
+
+  if (!response.ok) {
+    const githubMessage = await readGitHubErrorMessage(response)
+
+    if (response.status === 401) {
+      throw new Error('GitHub authentication expired. Log out and sign in again.')
+    }
+
+    if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+      throw new Error('GitHub API rate limit exceeded. Try again later.')
+    }
+
+    if (response.status === 403 || response.status === 404) {
+      throw new Error(errorContext)
+    }
+
+    throw new Error(`${errorContext}: ${githubMessage}`)
+  }
+
+  return response.json() as Promise<T>
 }
 
 export function registerAuthHandlers(): void {
@@ -164,39 +227,111 @@ export function registerAuthHandlers(): void {
       throw new Error('GitHub authentication is missing. Log in again to load pull requests.')
     }
 
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=25`, {
-      headers: { Authorization: `Bearer ${auth.token}` }
-    })
-
-    if (!res.ok) {
-      let githubMessage = `GitHub returned ${res.status}`
-
-      try {
-        const data = (await res.json()) as { message?: string }
-        if (typeof data.message === 'string' && data.message.length > 0) {
-          githubMessage = data.message
-        }
-      } catch {
-        // Fall back to the HTTP status when the response body is unavailable.
-      }
-
-      if (res.status === 401) {
-        throw new Error('GitHub authentication expired. Log out and sign in again.')
-      }
-
-      if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') {
-        throw new Error('GitHub API rate limit exceeded. Try again later.')
-      }
-
-      if (res.status === 403 || res.status === 404) {
-        throw new Error(
-          `Unable to load pull requests for ${owner}/${repo}. If this is a private repository, log out and sign in again to grant repo access.`
-        )
-      }
-
-      throw new Error(`Failed to load pull requests for ${owner}/${repo}: ${githubMessage}`)
-    }
-
-    return res.json()
+    return fetchGitHubJson<PullRequest[]>(
+      auth.token,
+      `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=25`,
+      `Unable to load pull requests for ${owner}/${repo}. If this is a private repository, log out and sign in again to grant repo access.`
+    )
   })
+
+  ipcMain.handle(
+    'auth:get-pull-request',
+    async (_event, owner: string, repo: string, number: number): Promise<PullRequestDetail> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to load this pull request.')
+      }
+
+      return fetchGitHubJson<PullRequestDetail>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`,
+        `Failed to load pull request #${number}`
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:get-pull-request-comments',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number
+    ): Promise<PullRequestComment[]> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to load comments.')
+      }
+
+      return fetchGitHubJson<PullRequestComment[]>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments?per_page=100`,
+        `Failed to load comments for PR #${number}`
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:get-pull-request-review-comments',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number
+    ): Promise<PullRequestReviewComment[]> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to load review comments.')
+      }
+
+      return fetchGitHubJson<PullRequestReviewComment[]>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/comments?sort=created&direction=asc&per_page=100`,
+        `Failed to load review comments for PR #${number}`
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:get-pull-request-reviews',
+    async (_event, owner: string, repo: string, number: number): Promise<PullRequestReview[]> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to load reviews.')
+      }
+
+      return fetchGitHubJson<PullRequestReview[]>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`,
+        `Failed to load reviews for PR #${number}`
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:create-pull-request-comment',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number,
+      body: string
+    ): Promise<PullRequestComment> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to post a comment.')
+      }
+
+      return fetchGitHubJson<PullRequestComment>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/issues/${number}/comments`,
+        'Failed to post comment',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body })
+        }
+      )
+    }
+  )
 }

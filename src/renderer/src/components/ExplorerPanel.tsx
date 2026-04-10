@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { ChevronRight, File, Folder } from 'lucide-react'
 import { getPathBasename } from '../lib/path'
 
 export default function ExplorerPanel({
@@ -95,10 +96,7 @@ function FolderTree({
             }`}
             style={{ paddingLeft: depth * 12 + 16 }}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-foreground-subtle">
-              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-              <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-            </svg>
+            <File size={14} className="shrink-0 text-foreground-subtle" />
             <span className="truncate">{entry.name}</span>
           </button>
         )
@@ -127,23 +125,11 @@ function FolderNode({
         className="flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs text-foreground hover:bg-surface-hover"
         style={{ paddingLeft: depth * 12 + 8 }}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <ChevronRight
+          size={12}
           className={`shrink-0 text-foreground-subtle transition-transform ${open ? 'rotate-90' : ''}`}
-        >
-          <path d="m9 18 6-6-6-6" />
-        </svg>
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-accent">
-          <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-        </svg>
+        />
+        <Folder size={14} className="shrink-0 text-accent" />
         <span className="truncate">{entry.name}</span>
       </button>
       {open && (
