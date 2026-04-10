@@ -1,14 +1,18 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   AuthData,
-  GitHubRepo,
   FileEntry,
+  GitHubRepo,
   GitRepoInfo,
+  PaginatedPullRequestCommits,
   PullRequest,
   PullRequestComment,
+  PullRequestDetail,
+  PullRequestFile,
   PullRequestReview,
   PullRequestReviewComment,
-  PullRequestDetail
+  PullRequestReviewDraftComment,
+  PullRequestReviewEvent
 } from '../shared/types'
 
 interface AuthAPI {
@@ -19,19 +23,65 @@ interface AuthAPI {
   getRepos: (query?: string) => Promise<GitHubRepo[] | null>
   getPullRequests: (owner: string, repo: string) => Promise<PullRequest[]>
   getPullRequest: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
-  getPullRequestComments: (owner: string, repo: string, number: number) => Promise<PullRequestComment[]>
+  getPullRequestCommits: (
+    owner: string,
+    repo: string,
+    number: number,
+    page?: number,
+    perPage?: number
+  ) => Promise<PaginatedPullRequestCommits>
+  getPullRequestComments: (
+    owner: string,
+    repo: string,
+    number: number
+  ) => Promise<PullRequestComment[]>
   getPullRequestReviewComments: (
     owner: string,
     repo: string,
     number: number
   ) => Promise<PullRequestReviewComment[]>
-  getPullRequestReviews: (owner: string, repo: string, number: number) => Promise<PullRequestReview[]>
+  getPullRequestReviews: (
+    owner: string,
+    repo: string,
+    number: number
+  ) => Promise<PullRequestReview[]>
+  getPullRequestFiles: (owner: string, repo: string, number: number) => Promise<PullRequestFile[]>
   createPullRequestComment: (
     owner: string,
     repo: string,
     number: number,
     body: string
   ) => Promise<PullRequestComment>
+  createPullRequestReviewComment: (
+    owner: string,
+    repo: string,
+    number: number,
+    input: {
+      body: string
+      commitId: string
+      path: string
+      line: number
+      side: 'LEFT' | 'RIGHT'
+    }
+  ) => Promise<PullRequestReviewComment>
+  replyToPullRequestReviewComment: (
+    owner: string,
+    repo: string,
+    number: number,
+    commentId: number,
+    body: string
+  ) => Promise<PullRequestReviewComment>
+  submitPullRequestReview: (
+    owner: string,
+    repo: string,
+    number: number,
+    input: {
+      commitId: string
+      body: string
+      event: PullRequestReviewEvent
+      comments: PullRequestReviewDraftComment[]
+    }
+  ) => Promise<PullRequestReview>
 }
 
 interface FsAPI {

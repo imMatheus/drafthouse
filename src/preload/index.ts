@@ -17,18 +17,58 @@ const api = {
       ipcRenderer.invoke('auth:get-pull-requests', owner, repo),
     getPullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
       ipcRenderer.invoke('auth:get-pull-request', owner, repo, number),
+    getPullRequestCommits: (
+      owner: string,
+      repo: string,
+      number: number,
+      page = 1,
+      perPage = 10
+    ): Promise<unknown> =>
+      ipcRenderer.invoke('auth:get-pull-request-commits', owner, repo, number, page, perPage),
     getPullRequestComments: (owner: string, repo: string, number: number): Promise<unknown> =>
       ipcRenderer.invoke('auth:get-pull-request-comments', owner, repo, number),
     getPullRequestReviewComments: (owner: string, repo: string, number: number): Promise<unknown> =>
       ipcRenderer.invoke('auth:get-pull-request-review-comments', owner, repo, number),
     getPullRequestReviews: (owner: string, repo: string, number: number): Promise<unknown> =>
       ipcRenderer.invoke('auth:get-pull-request-reviews', owner, repo, number),
+    getPullRequestFiles: (owner: string, repo: string, number: number): Promise<unknown> =>
+      ipcRenderer.invoke('auth:get-pull-request-files', owner, repo, number),
     createPullRequestComment: (
       owner: string,
       repo: string,
       number: number,
       body: string
-    ): Promise<unknown> => ipcRenderer.invoke('auth:create-pull-request-comment', owner, repo, number, body)
+    ): Promise<unknown> =>
+      ipcRenderer.invoke('auth:create-pull-request-comment', owner, repo, number, body),
+    createPullRequestReviewComment: (
+      owner: string,
+      repo: string,
+      number: number,
+      input: unknown
+    ): Promise<unknown> =>
+      ipcRenderer.invoke('auth:create-pull-request-review-comment', owner, repo, number, input),
+    replyToPullRequestReviewComment: (
+      owner: string,
+      repo: string,
+      number: number,
+      commentId: number,
+      body: string
+    ): Promise<unknown> =>
+      ipcRenderer.invoke(
+        'auth:reply-to-pull-request-review-comment',
+        owner,
+        repo,
+        number,
+        commentId,
+        body
+      ),
+    submitPullRequestReview: (
+      owner: string,
+      repo: string,
+      number: number,
+      input: unknown
+    ): Promise<unknown> =>
+      ipcRenderer.invoke('auth:submit-pull-request-review', owner, repo, number, input)
   },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),

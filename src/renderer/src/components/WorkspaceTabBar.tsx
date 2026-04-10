@@ -22,7 +22,7 @@ export default function WorkspaceTabBar({
 
   return (
     <div className="border-b border-border bg-background">
-      <div className="flex min-h-12 items-stretch overflow-x-auto px-2 pt-2">
+      <div className="flex min-h-10 items-stretch overflow-x-auto px-2 pt-1.5">
         {tabs.map((tab) => {
           const { icon, label } = getWorkspaceTabPresentation(tab)
           const isActive = tab.id === activeTabId
@@ -38,7 +38,7 @@ export default function WorkspaceTabBar({
             >
               <button
                 onClick={() => onSelectTab(tab.id)}
-                className="flex min-w-0 flex-1 items-center gap-2 px-3.5 py-2.5 text-left"
+                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left"
               >
                 <span className={isActive ? 'text-foreground' : 'text-foreground-subtle'}>{icon}</span>
                 <span
@@ -50,7 +50,7 @@ export default function WorkspaceTabBar({
 
               <button
                 onClick={() => onCloseTab(tab.id)}
-                className={`mr-1.5 flex w-8 items-center justify-center rounded-md transition-colors ${
+                className={`mr-1 flex w-7 items-center justify-center rounded-md transition-colors ${
                   isActive
                     ? 'text-foreground-subtle hover:bg-background hover:text-foreground'
                     : 'text-foreground-subtle hover:bg-surface hover:text-foreground'

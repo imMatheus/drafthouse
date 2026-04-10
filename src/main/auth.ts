@@ -5,11 +5,15 @@ import type {
   AuthData,
   GitHubRepo,
   GitHubUser,
+  PullRequestFile,
   PullRequest,
   PullRequestComment,
+  PullRequestCommit,
   PullRequestReview,
   PullRequestReviewComment,
-  PullRequestDetail
+  PullRequestDetail,
+  PaginatedPullRequestCommits,
+  SubmitPullRequestReviewInput
 } from '../shared/types'
 
 const GITHUB_CLIENT_ID = import.meta.env.MAIN_VITE_GITHUB_CLIENT_ID
@@ -131,7 +135,10 @@ async function fetchRepos(token: string, query?: string): Promise<GitHubRepo[]> 
   )
 }
 
-function getGitHubHeaders(token: string, extraHeaders: Record<string, string> = {}): Record<string, string> {
+function getGitHubHeaders(
+  token: string,
+  extraHeaders: Record<string, string> = {}
+): Record<string, string> {
   return {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
@@ -190,6 +197,31 @@ async function fetchGitHubJson<T>(
   return response.json() as Promise<T>
 }
 
+async function fetchGitHubPaginatedCollection<T>(
+  token: string,
+  url: string,
+  errorContext: string
+): Promise<T[]> {
+  const items: T[] = []
+  let page = 1
+
+  while (true) {
+    const pageItems = await fetchGitHubJson<T[]>(
+      token,
+      `${url}${url.includes('?') ? '&' : '?'}per_page=100&page=${page}`,
+      errorContext
+    )
+
+    items.push(...pageItems)
+
+    if (pageItems.length < 100) {
+      return items
+    }
+
+    page += 1
+  }
+}
+
 export function registerAuthHandlers(): void {
   ipcMain.handle('auth:login', async (event) => {
     const { device_code, user_code, verification_uri, interval } = await requestDeviceCode()
@@ -221,18 +253,21 @@ export function registerAuthHandlers(): void {
     return fetchRepos(auth.token, query)
   })
 
-  ipcMain.handle('auth:get-pull-requests', async (_event, owner: string, repo: string): Promise<PullRequest[]> => {
-    const auth = loadAuth()
-    if (!auth) {
-      throw new Error('GitHub authentication is missing. Log in again to load pull requests.')
-    }
+  ipcMain.handle(
+    'auth:get-pull-requests',
+    async (_event, owner: string, repo: string): Promise<PullRequest[]> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to load pull requests.')
+      }
 
-    return fetchGitHubJson<PullRequest[]>(
-      auth.token,
-      `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=25`,
-      `Unable to load pull requests for ${owner}/${repo}. If this is a private repository, log out and sign in again to grant repo access.`
-    )
-  })
+      return fetchGitHubJson<PullRequest[]>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=25`,
+        `Unable to load pull requests for ${owner}/${repo}. If this is a private repository, log out and sign in again to grant repo access.`
+      )
+    }
+  )
 
   ipcMain.handle(
     'auth:get-pull-request',
@@ -251,13 +286,41 @@ export function registerAuthHandlers(): void {
   )
 
   ipcMain.handle(
-    'auth:get-pull-request-comments',
+    'auth:get-pull-request-commits',
     async (
       _event,
       owner: string,
       repo: string,
-      number: number
-    ): Promise<PullRequestComment[]> => {
+      number: number,
+      page = 1,
+      perPage = 10
+    ): Promise<PaginatedPullRequestCommits> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to load commits.')
+      }
+
+      const sanitizedPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1
+      const sanitizedPerPage =
+        Number.isFinite(perPage) && perPage > 0 ? Math.min(100, Math.floor(perPage)) : 10
+
+      const items = await fetchGitHubJson<PullRequestCommit[]>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/commits?page=${sanitizedPage}&per_page=${sanitizedPerPage}`,
+        `Failed to load commits for PR #${number}`
+      )
+
+      return {
+        items,
+        page: sanitizedPage,
+        perPage: sanitizedPerPage
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'auth:get-pull-request-comments',
+    async (_event, owner: string, repo: string, number: number): Promise<PullRequestComment[]> => {
       const auth = loadAuth()
       if (!auth) {
         throw new Error('GitHub authentication is missing. Log in again to load comments.')
@@ -309,6 +372,24 @@ export function registerAuthHandlers(): void {
   )
 
   ipcMain.handle(
+    'auth:get-pull-request-files',
+    async (_event, owner: string, repo: string, number: number): Promise<PullRequestFile[]> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error(
+          'GitHub authentication is missing. Log in again to load pull request files.'
+        )
+      }
+
+      return fetchGitHubPaginatedCollection<PullRequestFile>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/files`,
+        `Failed to load files for PR #${number}`
+      )
+    }
+  )
+
+  ipcMain.handle(
     'auth:create-pull-request-comment',
     async (
       _event,
@@ -330,6 +411,106 @@ export function registerAuthHandlers(): void {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ body })
+        }
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:create-pull-request-review-comment',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number,
+      input: { body: string; commitId: string; path: string; line: number; side: 'LEFT' | 'RIGHT' }
+    ): Promise<PullRequestReviewComment> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to post a review comment.')
+      }
+
+      return fetchGitHubJson<PullRequestReviewComment>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/comments`,
+        'Failed to post review comment',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            body: input.body,
+            commit_id: input.commitId,
+            path: input.path,
+            line: input.line,
+            side: input.side
+          })
+        }
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:reply-to-pull-request-review-comment',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number,
+      commentId: number,
+      body: string
+    ): Promise<PullRequestReviewComment> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error(
+          'GitHub authentication is missing. Log in again to reply to a review comment.'
+        )
+      }
+
+      return fetchGitHubJson<PullRequestReviewComment>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/comments/${commentId}/replies`,
+        'Failed to reply to review comment',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body })
+        }
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:submit-pull-request-review',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number,
+      input: SubmitPullRequestReviewInput
+    ): Promise<PullRequestReview> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to submit a review.')
+      }
+
+      return fetchGitHubJson<PullRequestReview>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/reviews`,
+        'Failed to submit review',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            commit_id: input.commitId,
+            body: input.body,
+            event: input.event,
+            comments: input.comments.map((comment) => ({
+              body: comment.body,
+              path: comment.path,
+              line: comment.line,
+              side: comment.side
+            }))
+          })
         }
       )
     }

@@ -62,10 +62,16 @@ export interface PullRequestReviewComment {
   body: string
   path: string
   diff_hunk: string | null
+  commit_id?: string
+  original_commit_id?: string
   line?: number | null
+  original_line?: number | null
   side?: string | null
   start_line?: number | null
+  original_start_line?: number | null
   start_side?: string | null
+  original_position?: number | null
+  position?: number | null
   in_reply_to_id?: number | null
   html_url: string
   created_at: string
@@ -87,6 +93,41 @@ export interface PullRequestReview {
   } | null
 }
 
+export interface PullRequestCommit {
+  sha: string
+  html_url: string
+  commit: {
+    message: string
+    author: {
+      name: string
+      email: string
+      date: string
+    } | null
+    committer: {
+      name: string
+      email: string
+      date: string
+    } | null
+  }
+  author: {
+    login: string
+    avatar_url: string
+  } | null
+  committer: {
+    login: string
+    avatar_url: string
+  } | null
+  parents: {
+    sha: string
+  }[]
+}
+
+export interface PaginatedPullRequestCommits {
+  items: PullRequestCommit[]
+  page: number
+  perPage: number
+}
+
 export interface PullRequestDetail extends PullRequest {
   body: string | null
   merged: boolean
@@ -98,10 +139,12 @@ export interface PullRequestDetail extends PullRequest {
   head: {
     ref: string
     label: string
+    sha: string
   }
   base: {
     ref: string
     label: string
+    sha: string
   }
   labels: {
     name: string
@@ -115,4 +158,36 @@ export interface PullRequestDetail extends PullRequest {
     login: string
     avatar_url: string
   }[]
+}
+
+export interface PullRequestFile {
+  sha: string | null
+  filename: string
+  status: string
+  additions: number
+  deletions: number
+  changes: number
+  blob_url: string
+  raw_url: string | null
+  contents_url: string
+  patch?: string
+  previous_filename?: string
+}
+
+export type PullRequestReviewLineSide = 'LEFT' | 'RIGHT'
+
+export interface PullRequestReviewDraftComment {
+  body: string
+  path: string
+  line: number
+  side: PullRequestReviewLineSide
+}
+
+export type PullRequestReviewEvent = 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
+
+export interface SubmitPullRequestReviewInput {
+  commitId: string
+  body: string
+  event: PullRequestReviewEvent
+  comments: PullRequestReviewDraftComment[]
 }
