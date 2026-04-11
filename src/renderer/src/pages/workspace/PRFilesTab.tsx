@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, FileCode, MessageSquarePlus, Search, X } from 'lucide-react'
+import { ChevronDown, ExternalLink, FileDiff, FileMinus, FilePlus, Folder, MessageSquarePlus, Search, X } from 'lucide-react'
 import type {
   AuthData,
   PullRequestDetail,
@@ -173,7 +173,7 @@ export default function PRFilesTab({
 
   const handleScrollToFile = (path: string): void => {
     setActiveFilePath(path)
-    fileSectionRefs.current.get(path)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    fileSectionRefs.current.get(path)?.scrollIntoView({ behavior: 'instant', block: 'start' })
   }
 
   const handleAddDraftComment = (comment: PullRequestReviewDraftComment): void => {
@@ -198,69 +198,45 @@ export default function PRFilesTab({
   return (
     <>
       <div className="flex gap-5">
-        <aside className="sticky top-1 hidden h-[calc(100vh-11rem)] w-72 shrink-0 overflow-hidden rounded-xl border border-border bg-surface lg:block">
-          <div className="border-b border-border px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Files changed</p>
-                <p className="mt-1 text-xs text-foreground-muted">
-                  {allFiles.length} file{allFiles.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-              {draftReviewComments.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setIsSubmitReviewOpen(true)}
-                  className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover"
-                >
-                  Submit review
-                </button>
-              ) : null}
-            </div>
-
-            <label className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
-              <Search size={14} className="text-foreground-subtle" />
-              <input
-                value={filterValue}
-                onChange={(event) => setFilterValue(event.target.value)}
-                placeholder="Filter files..."
-                className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
-              />
-            </label>
-          </div>
-
-          <div className="h-[calc(100%-5.75rem)] overflow-y-auto py-2">
-            {filteredFiles.map((file) => {
-              const depth = Math.max(0, file.filename.split('/').length - 1)
-              const fileName = getFileName(file.filename)
-              const parentPath = getParentPath(file.filename)
-
-              return (
-                <button
-                  key={file.filename}
-                  type="button"
-                  onClick={() => handleScrollToFile(file.filename)}
-                  className={`flex w-full items-start gap-2 px-3 py-2 text-left transition-colors ${
-                    activeFilePath === file.filename ? 'bg-surface-hover' : 'hover:bg-surface-hover'
-                  }`}
-                  style={{ paddingLeft: 12 + depth * 12 }}
-                >
-                  <FileCode size={14} className="mt-0.5 shrink-0 text-foreground-subtle" />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-medium text-foreground">{fileName}</div>
-                    {parentPath ? (
-                      <div className="truncate text-[11px] text-foreground-subtle">{parentPath}</div>
-                    ) : null}
-                  </div>
-                  <DiffStat additions={file.additions} deletions={file.deletions} />
-                </button>
-              )
-            })}
-
-            {!isLoading && filteredFiles.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-foreground-muted">No files match this filter.</div>
+        <aside className="sticky top-1 hidden h-[calc(100vh-11rem)] w-72 shrink-0 lg:block">
+          <div className="flex items-center gap-2 px-2 py-2">
+            <Search size={14} className="shrink-0 text-foreground-subtle" />
+            <input
+              value={filterValue}
+              onChange={(event) => setFilterValue(event.target.value)}
+              placeholder="Filter files..."
+              className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+            />
+            {filterValue ? (
+              <button type="button" onClick={() => setFilterValue('')} className="shrink-0 text-foreground-subtle hover:text-foreground">
+                <X size={14} />
+              </button>
             ) : null}
           </div>
+
+          <div className="h-[calc(100%-2.5rem)] overflow-y-auto">
+            {filteredFiles.length === 0 && !isLoading ? (
+              <div className="px-3 py-4 text-xs text-foreground-muted">No files match this filter.</div>
+            ) : (
+              <FileTree
+                files={filteredFiles}
+                activeFilePath={activeFilePath}
+                onSelectFile={handleScrollToFile}
+              />
+            )}
+          </div>
+
+          {draftReviewComments.length > 0 ? (
+            <div className="border-t border-border px-2 py-2">
+              <button
+                type="button"
+                onClick={() => setIsSubmitReviewOpen(true)}
+                className="w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover"
+              >
+                Submit review ({draftReviewComments.length})
+              </button>
+            </div>
+          ) : null}
         </aside>
 
         <div className="min-w-0 flex-1">
@@ -850,6 +826,190 @@ function DiffLineContent({
   )
 }
 
+interface FileTreeNode {
+  name: string
+  path: string
+  children: FileTreeNode[]
+  file: PullRequestFile | null
+}
+
+function buildFileTree(files: PullRequestFile[]): FileTreeNode[] {
+  const root: FileTreeNode = { name: '', path: '', children: [], file: null }
+
+  for (const file of files) {
+    const parts = file.filename.split('/')
+    let current = root
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]!
+      const isFile = i === parts.length - 1
+
+      if (isFile) {
+        current.children.push({ name: part, path: file.filename, children: [], file })
+      } else {
+        let folder = current.children.find((c) => c.file === null && c.name === part)
+        if (!folder) {
+          folder = { name: part, path: parts.slice(0, i + 1).join('/'), children: [], file: null }
+          current.children.push(folder)
+        }
+        current = folder
+      }
+    }
+  }
+
+  return collapseSingleChildFolders(root.children)
+}
+
+function collapseSingleChildFolders(nodes: FileTreeNode[]): FileTreeNode[] {
+  return nodes.map((node) => {
+    if (node.file) return node
+
+    let current = node
+    const segments = [current.name]
+
+    while (current.children.length === 1 && current.children[0]!.file === null) {
+      current = current.children[0]!
+      segments.push(current.name)
+    }
+
+    return {
+      ...current,
+      name: segments.join('/'),
+      children: collapseSingleChildFolders(current.children)
+    }
+  })
+}
+
+function FileTree({
+  files,
+  activeFilePath,
+  onSelectFile
+}: {
+  files: PullRequestFile[]
+  activeFilePath: string | null
+  onSelectFile: (path: string) => void
+}) {
+  const tree = buildFileTree(files)
+
+  return (
+    <div className="py-1">
+      {tree.map((node) =>
+        node.file ? (
+          <FileTreeFileButton
+            key={node.path}
+            file={node.file}
+            depth={0}
+            isActive={activeFilePath === node.path}
+            onClick={() => onSelectFile(node.path)}
+          />
+        ) : (
+          <FileTreeFolder
+            key={node.path}
+            node={node}
+            depth={0}
+            activeFilePath={activeFilePath}
+            onSelectFile={onSelectFile}
+          />
+        )
+      )}
+    </div>
+  )
+}
+
+function FileTreeFolder({
+  node,
+  depth,
+  activeFilePath,
+  onSelectFile
+}: {
+  node: FileTreeNode
+  depth: number
+  activeFilePath: string | null
+  onSelectFile: (path: string) => void
+}) {
+  const [isOpen, setIsOpen] = useState(true)
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center gap-1.5 py-1 text-left text-xs text-foreground hover:bg-surface-hover"
+        style={{ paddingLeft: 8 + depth * 16 }}
+      >
+        <ChevronDown
+          size={14}
+          className={`shrink-0 text-foreground-subtle transition-transform ${isOpen ? '' : '-rotate-90'}`}
+        />
+        <Folder size={14} className="shrink-0 text-foreground-subtle" />
+        <span className="truncate font-medium">{node.name}</span>
+      </button>
+      {isOpen ? (
+        <div>
+          {node.children.map((child) =>
+            child.file ? (
+              <FileTreeFileButton
+                key={child.path}
+                file={child.file}
+                depth={depth + 1}
+                isActive={activeFilePath === child.path}
+                onClick={() => onSelectFile(child.path)}
+              />
+            ) : (
+              <FileTreeFolder
+                key={child.path}
+                node={child}
+                depth={depth + 1}
+                activeFilePath={activeFilePath}
+                onSelectFile={onSelectFile}
+              />
+            )
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function FileTreeFileButton({
+  file,
+  depth,
+  isActive,
+  onClick
+}: {
+  file: PullRequestFile
+  depth: number
+  isActive: boolean
+  onClick: () => void
+}) {
+  const name = file.filename.split('/').pop() ?? file.filename
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-1.5 py-1 text-left text-xs transition-colors ${
+        isActive ? 'bg-surface-hover text-foreground' : 'text-foreground hover:bg-surface-hover'
+      }`}
+      style={{ paddingLeft: 8 + depth * 16 + 20 }}
+    >
+      <FileStatusIcon status={file.status} />
+      <span className="truncate">{name}</span>
+    </button>
+  )
+}
+
+function FileStatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case 'added':
+      return <FilePlus size={14} className="shrink-0 text-success" />
+    case 'removed':
+      return <FileMinus size={14} className="shrink-0 text-danger" />
+    default:
+      return <FileDiff size={14} className="shrink-0 text-foreground-subtle" />
+  }
+}
+
 function getFileStatusClassName(status: string): string {
   switch (status) {
     case 'added':
@@ -892,13 +1052,4 @@ function getFileDiffPrefix(kind: 'hunk' | 'addition' | 'deletion' | 'context' | 
   return ' '
 }
 
-function getFileName(path: string): string {
-  const parts = path.split('/')
-  return parts[parts.length - 1] ?? path
-}
 
-function getParentPath(path: string): string {
-  const parts = path.split('/')
-  parts.pop()
-  return parts.join('/')
-}
