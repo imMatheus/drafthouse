@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import type { GitHubUser } from '../../../shared/types'
 
 interface AuthState {
@@ -41,7 +41,7 @@ export function useAuthProvider(): AuthContextValue {
     return unsubscribe
   }, [])
 
-  const login = useCallback(async () => {
+  const login = async (): Promise<void> => {
     setState((s) => ({ ...s, loggingIn: true, deviceCode: null }))
     try {
       const data = await window.api.auth.login()
@@ -51,12 +51,12 @@ export function useAuthProvider(): AuthContextValue {
     } catch {
       setState((s) => ({ ...s, loggingIn: false, deviceCode: null }))
     }
-  }, [])
+  }
 
-  const logout = useCallback(async () => {
+  const logout = async (): Promise<void> => {
     await window.api.auth.logout()
     setState({ user: null, loading: false, loggingIn: false, deviceCode: null })
-  }, [])
+  }
 
   return {
     user: state.user,

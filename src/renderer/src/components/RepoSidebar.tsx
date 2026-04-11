@@ -125,9 +125,9 @@ export default function RepoSidebar() {
           {/* Footer */}
           <div className="border-t border-border p-2">
             <div className="flex items-center gap-2">
-              <img src={user!.avatar_url} alt={user!.login} className="h-6 w-6 shrink-0 rounded-full" />
+              <img src={user?.avatar_url} alt={user?.login} className="h-6 w-6 shrink-0 rounded-full" />
               <div className="flex-1 overflow-hidden">
-                <p className="truncate text-xs font-medium text-foreground">{user!.name ?? user!.login}</p>
+                <p className="truncate text-xs font-medium text-foreground">{user?.name ?? user?.login}</p>
               </div>
               <button
                 onClick={toggleTheme}
@@ -158,7 +158,7 @@ export default function RepoSidebar() {
           >
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
-          <img src={user!.avatar_url} alt={user!.login} className="h-6 w-6 rounded-full" />
+          <img src={user?.avatar_url} alt={user?.login} className="h-6 w-6 rounded-full" />
         </div>
       )}
     </aside>

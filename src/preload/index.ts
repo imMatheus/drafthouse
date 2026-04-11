@@ -81,6 +81,11 @@ const api = {
       const listener = (_event: IpcRendererEvent, path: string): void => callback(path)
       ipcRenderer.on('menu:open-folder', listener)
       return () => ipcRenderer.removeListener('menu:open-folder', listener)
+    },
+    onCloseTab: (callback: () => void): (() => void) => {
+      const listener = (): void => callback()
+      ipcRenderer.on('menu:close-tab', listener)
+      return () => ipcRenderer.removeListener('menu:close-tab', listener)
     }
   }
 }

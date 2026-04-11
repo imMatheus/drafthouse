@@ -72,7 +72,15 @@ app.whenReady().then(() => {
           }
         },
         { type: 'separator' },
-        { role: 'close' }
+        {
+          label: 'Close Tab',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => {
+            const window = BrowserWindow.getFocusedWindow()
+            if (!window) return
+            window.webContents.send('menu:close-tab')
+          }
+        }
       ]
     },
     { role: 'editMenu' },

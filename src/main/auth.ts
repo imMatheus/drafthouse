@@ -243,8 +243,19 @@ export function registerAuthHandlers(): void {
     return null
   })
 
-  ipcMain.handle('auth:get-user', () => {
-    return loadAuth()
+  ipcMain.handle('auth:get-user', async () => {
+    const auth = loadAuth()
+    if (!auth) return null
+
+    try {
+      const user = await fetchGitHubUser(auth.token)
+      const validated: AuthData = { ...auth, user }
+      saveAuth(validated)
+      return validated
+    } catch {
+      clearAuth()
+      return null
+    }
   })
 
   ipcMain.handle('auth:get-repos', async (_event, query?: string) => {

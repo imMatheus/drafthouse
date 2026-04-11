@@ -163,6 +163,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
+  useEffect(() => {
+    if (!activeTabId) return
+    return window.api.fs.onCloseTab(() => handleCloseTab(activeTabId))
+  }, [activeTabId, handleCloseTab])
+
   const activityItems = [
     {
       id: 'explorer',

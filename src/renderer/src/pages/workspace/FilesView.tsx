@@ -29,7 +29,7 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
       return
     }
     const lang = getLanguageFromPath(filePath)
-    tokenizeCode(fileContents, lang, theme).then(setTokens)
+    tokenizeCode(fileContents, lang, theme).then(setTokens).catch(() => {})
   }, [fileContents, filePath, theme])
 
   const relativePath = getRelativePath(filePath, folderPath)

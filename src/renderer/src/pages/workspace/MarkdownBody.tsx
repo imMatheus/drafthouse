@@ -19,7 +19,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
     let cancelled = false
     tokenizeCode(code, lang, theme).then((result) => {
       if (!cancelled) setTokens(result)
-    })
+    }).catch(() => {})
     return () => {
       cancelled = true
     }

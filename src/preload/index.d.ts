@@ -92,6 +92,7 @@ interface FsAPI {
   openRecent: (path: string) => Promise<string>
   getGitInfo: (path: string) => Promise<GitRepoInfo | null>
   onOpenFolder: (callback: (path: string) => void) => () => void
+  onCloseTab: (callback: () => void) => () => void
 }
 
 declare global {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
 import RepoSidebar from './components/RepoSidebar'
@@ -22,48 +22,40 @@ function AppContent(): React.JSX.Element {
     loadWorkspaceSession()
   )
 
-  const persistWorkspaceSession = useCallback(
-    (updater: WorkspaceSession | null | ((current: WorkspaceSession | null) => WorkspaceSession | null)) => {
-      setWorkspaceSession((currentSession) => {
-        const nextSession =
-          typeof updater === 'function'
-            ? updater(currentSession)
-            : updater
+  const persistWorkspaceSession = (
+    updater: WorkspaceSession | null | ((current: WorkspaceSession | null) => WorkspaceSession | null)
+  ): void => {
+    setWorkspaceSession((currentSession) => {
+      const nextSession = typeof updater === 'function' ? updater(currentSession) : updater
 
-        if (nextSession) {
-          saveWorkspaceSession(nextSession)
-        } else {
-          clearWorkspaceSession()
-        }
+      if (nextSession) {
+        saveWorkspaceSession(nextSession)
+      } else {
+        clearWorkspaceSession()
+      }
 
-        return nextSession
-      })
-    },
-    []
-  )
+      return nextSession
+    })
+  }
 
-  const openWorkspace = useCallback(
-    (folderPath: string) => {
-      persistWorkspaceSession(loadWorkspaceSessionForFolder(folderPath) ?? createInitialWorkspaceSession(folderPath))
-      navigate('/workspace')
-    },
-    [navigate, persistWorkspaceSession]
-  )
+  const openWorkspace = (folderPath: string): void => {
+    persistWorkspaceSession(
+      loadWorkspaceSessionForFolder(folderPath) ?? createInitialWorkspaceSession(folderPath)
+    )
+    navigate('/workspace')
+  }
 
-  const updateWorkspaceSession = useCallback(
-    (patch: Partial<WorkspaceSession>) => {
-      persistWorkspaceSession((currentSession) => {
-        if (!currentSession) return null
-        return { ...currentSession, ...patch }
-      })
-    },
-    [persistWorkspaceSession]
-  )
+  const updateWorkspaceSession = (patch: Partial<WorkspaceSession>): void => {
+    persistWorkspaceSession((currentSession) => {
+      if (!currentSession) return null
+      return { ...currentSession, ...patch }
+    })
+  }
 
-  const closeWorkspace = useCallback(() => {
+  const closeWorkspace = (): void => {
     persistWorkspaceSession(null)
     navigate('/')
-  }, [navigate, persistWorkspaceSession])
+  }
 
   useEffect(() => {
     const unsubscribe = window.api.fs.onOpenFolder((path) => {
@@ -78,7 +70,7 @@ function AppContent(): React.JSX.Element {
     })
 
     return unsubscribe
-  }, [openWorkspace])
+  }, [])
 
   if (loading) {
     return (
