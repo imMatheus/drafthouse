@@ -20,6 +20,7 @@ export type WorkspaceTab =
       number: number
       subview: PullRequestSubview
       title?: string
+      prState?: 'open' | 'closed' | 'merged' | 'draft'
     }
 
 export interface WorkspaceSidebarState {

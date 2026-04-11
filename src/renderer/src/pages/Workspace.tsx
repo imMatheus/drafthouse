@@ -163,6 +163,19 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
+  const handlePullRequestStateChange = (tabId: WorkspaceTab['id'], prState: 'open' | 'closed' | 'merged' | 'draft'): void => {
+    const currentTab = tabs.find((tab) => tab.id === tabId)
+
+    if (!currentTab || currentTab.kind !== 'pull-request' || currentTab.prState === prState) {
+      return
+    }
+
+    onUpdateSession({
+      ...session,
+      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, prState } : tab))
+    })
+  }
+
   useEffect(() => {
     if (!activeTabId) return
     return window.api.fs.onCloseTab(() => handleCloseTab(activeTabId))
@@ -210,7 +223,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
             isLoadingGitInfo,
             onOpenPullRequest: handleOpenPullRequest,
             onPullRequestSubviewChange: handlePullRequestSubviewChange,
-            onPullRequestTitleChange: handlePullRequestTitleChange
+            onPullRequestTitleChange: handlePullRequestTitleChange,
+            onPullRequestStateChange: handlePullRequestStateChange
           })}
         </main>
       </div>
@@ -226,7 +240,8 @@ function renderWorkspaceTabContent({
   isLoadingGitInfo,
   onOpenPullRequest,
   onPullRequestSubviewChange,
-  onPullRequestTitleChange
+  onPullRequestTitleChange,
+  onPullRequestStateChange
 }: {
   activeTab: WorkspaceTab | null
   folderPath: string
@@ -236,6 +251,7 @@ function renderWorkspaceTabContent({
   onOpenPullRequest: (number: number) => void
   onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void
   onPullRequestTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
+  onPullRequestStateChange: (tabId: WorkspaceTab['id'], prState: 'open' | 'closed' | 'merged' | 'draft') => void
 }): ReactNode {
   if (!activeTab) {
     return (
@@ -273,6 +289,7 @@ function renderWorkspaceTabContent({
           subview={activeTab.subview}
           onSubviewChange={(subview) => onPullRequestSubviewChange(activeTab.id, subview)}
           onTitleChange={(title) => onPullRequestTitleChange(activeTab.id, title)}
+          onStateChange={(prState) => onPullRequestStateChange(activeTab.id, prState)}
         />
       ) : (
         <PlaceholderView title="Pull Request" description="Repository metadata is not available." />

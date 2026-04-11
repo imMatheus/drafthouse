@@ -43,6 +43,7 @@ interface PullRequestDetailViewProps {
   subview: PullRequestSubview
   onSubviewChange: (subview: PullRequestSubview) => void
   onTitleChange?: (title: string) => void
+  onStateChange?: (prState: 'open' | 'closed' | 'merged' | 'draft') => void
 }
 
 export default function PullRequestDetailView({
@@ -51,7 +52,8 @@ export default function PullRequestDetailView({
   number,
   subview,
   onSubviewChange,
-  onTitleChange
+  onTitleChange,
+  onStateChange
 }: PullRequestDetailViewProps) {
   const [draftReviewComments, setDraftReviewComments] = useState<PullRequestReviewDraftComment[]>(
     []
@@ -76,6 +78,12 @@ export default function PullRequestDetailView({
       onTitleChange?.(pr.title)
     }
   }, [onTitleChange, pr?.title])
+
+  useEffect(() => {
+    if (!pr) return
+    const state = pr.draft ? 'draft' : pr.merged ? 'merged' : pr.state === 'closed' ? 'closed' : 'open'
+    onStateChange?.(state)
+  }, [onStateChange, pr?.draft, pr?.merged, pr?.state])
 
   useEffect(() => {
     setDraftReviewComments([])
