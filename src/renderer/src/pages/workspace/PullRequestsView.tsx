@@ -1,7 +1,12 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { GitPullRequest } from 'lucide-react'
+import { ArrowDownUp, Check, GitMerge, GitPullRequest, MessageSquare, Search, X } from 'lucide-react'
 import type { GitRepoInfo, PullRequest } from '../../../../shared/types'
+import { formatRelativeTime } from './pullRequestShared'
 import PlaceholderView from './PlaceholderView'
+
+type PrStateFilter = 'open' | 'closed'
+type SortKey = 'newest' | 'oldest' | 'recently-updated' | 'least-recently-updated'
 
 interface PullRequestsViewProps {
   gitInfo: GitRepoInfo | null | undefined
@@ -16,14 +21,19 @@ export default function PullRequestsView({
   isLoadingGitInfo,
   onOpenPullRequest
 }: PullRequestsViewProps) {
+  const [stateFilter, setStateFilter] = useState<PrStateFilter>('open')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('newest')
+  const [isSortOpen, setIsSortOpen] = useState(false)
+
   const {
     data: prs,
     isLoading,
     error
   } = useQuery<PullRequest[], Error>({
-    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo],
-    queryFn: () => window.api.auth.getPullRequests(gitInfo!.owner, gitInfo!.repo),
-    enabled: gitInfo !== null && gitInfo !== undefined,
+    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, stateFilter],
+    queryFn: () => window.api.auth.getPullRequests(gitInfo!.owner, gitInfo!.repo, stateFilter),
+    enabled: gitInfo != null,
     retry: false
   })
 
@@ -49,44 +59,232 @@ export default function PullRequestsView({
     )
   }
 
-  if (isLoading) {
-    return <p className="text-sm text-foreground-muted">Loading pull requests...</p>
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-xl rounded-lg border border-border bg-surface p-4">
-        <h2 className="text-sm font-semibold text-foreground">Pull requests unavailable</h2>
-        <p className="mt-2 text-sm text-foreground-muted">{error.message}</p>
-      </div>
-    )
-  }
-
-  if (!prs || prs.length === 0) {
-    return <p className="text-sm text-foreground-muted">No open pull requests</p>
-  }
+  const filtered = filterAndSort(prs ?? [], searchQuery, sortKey)
 
   return (
-    <div>
-      <h2 className="mb-4 text-sm font-semibold text-foreground">Open Pull Requests</h2>
-      <div className="flex flex-col gap-1">
-        {prs.map((pr) => (
-          <button
-            key={pr.number}
-            onClick={() => onOpenPullRequest(pr.number)}
-            className="flex items-start gap-3 rounded-lg border border-border bg-surface p-4 text-left hover:bg-surface-hover"
-          >
-            <GitPullRequest size={16} className="mt-0.5 shrink-0 text-success" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">{pr.title}</p>
-              <p className="mt-1 text-xs text-foreground-subtle">
-                #{pr.number} opened by {pr.user.login}
-              </p>
-            </div>
-            <img src={pr.user.avatar_url} alt={pr.user.login} className="h-6 w-6 shrink-0 rounded-full" />
-          </button>
-        ))}
+    <div className="mx-auto max-w-4xl">
+      <div className="flex items-center gap-3">
+        <label className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+          <Search size={15} className="shrink-0 text-foreground-subtle" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search pull requests..."
+            className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+          />
+          {searchQuery ? (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="shrink-0 text-foreground-subtle hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          ) : null}
+        </label>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-border">
+        <div className="flex items-center justify-between gap-3 bg-surface px-4 py-3">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setStateFilter('open')}
+              className={`inline-flex items-center gap-1.5 text-sm font-medium ${
+                stateFilter === 'open' ? 'text-foreground' : 'text-foreground-muted hover:text-foreground'
+              }`}
+            >
+              <GitPullRequest size={15} />
+              Open
+              {stateFilter === 'open' && prs ? <span className="text-foreground-muted">{prs.length}</span> : null}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStateFilter('closed')}
+              className={`inline-flex items-center gap-1.5 text-sm font-medium ${
+                stateFilter === 'closed' ? 'text-foreground' : 'text-foreground-muted hover:text-foreground'
+              }`}
+            >
+              <Check size={15} />
+              Closed
+              {stateFilter === 'closed' && prs ? <span className="text-foreground-muted">{prs.length}</span> : null}
+            </button>
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsSortOpen(!isSortOpen)}
+              className="inline-flex items-center gap-1.5 text-sm text-foreground-muted hover:text-foreground"
+            >
+              <ArrowDownUp size={14} />
+              Sort
+            </button>
+            {isSortOpen ? (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsSortOpen(false)} />
+                <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+                  <div className="border-b border-border px-3 py-2 text-xs font-medium text-foreground-muted">
+                    Sort by
+                  </div>
+                  {SORT_OPTIONS.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => {
+                        setSortKey(option.key)
+                        setIsSortOpen(false)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover"
+                    >
+                      <span className="inline-flex size-4 items-center justify-center">
+                        {sortKey === option.key ? <Check size={13} /> : null}
+                      </span>
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="px-4 py-8 text-center text-sm text-foreground-muted">Loading pull requests...</div>
+        ) : error ? (
+          <div className="px-4 py-8 text-center text-sm text-foreground-muted">{error.message}</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-4 py-8 text-center text-sm text-foreground-muted">
+            {searchQuery ? 'No pull requests match your search.' : `No ${stateFilter} pull requests.`}
+          </div>
+        ) : (
+          <div>
+            {filtered.map((pr) => (
+              <PullRequestRow key={pr.number} pr={pr} onClick={() => onOpenPullRequest(pr.number)} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+function PullRequestRow({ pr, onClick }: { pr: PullRequest; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-start gap-3 border-t border-border px-4 py-3 text-left transition-colors hover:bg-surface-hover"
+    >
+      <PullRequestStateIcon pr={pr} />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-foreground hover:text-accent">{pr.title}</span>
+          {pr.labels.map((label) => (
+            <span
+              key={label.name}
+              className="rounded-full border px-2 py-0.5 text-[11px] font-medium leading-tight"
+              style={{
+                borderColor: `#${label.color}60`,
+                backgroundColor: `#${label.color}18`,
+                color: `#${label.color}`
+              }}
+            >
+              {label.name}
+            </span>
+          ))}
+        </div>
+        <p className="mt-1 text-xs text-foreground-subtle">
+          #{pr.number} opened {formatRelativeTime(pr.created_at)} by {pr.user.login}
+          {pr.draft ? (
+            <>
+              {' '}
+              <span className="ml-1 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-foreground-muted">
+                Draft
+              </span>
+            </>
+          ) : null}
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3">
+        {pr.requested_reviewers.length > 0 ? (
+          <div className="flex -space-x-1.5">
+            {pr.requested_reviewers.slice(0, 3).map((reviewer) => (
+              <img
+                key={reviewer.login}
+                src={reviewer.avatar_url}
+                alt={reviewer.login}
+                title={reviewer.login}
+                className="size-5 rounded-full border border-background"
+              />
+            ))}
+            {pr.requested_reviewers.length > 3 ? (
+              <span className="flex size-5 items-center justify-center rounded-full border border-background bg-interactive text-[9px] text-foreground-muted">
+                +{pr.requested_reviewers.length - 3}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {pr.comments > 0 ? (
+          <span className="inline-flex items-center gap-1 text-xs text-foreground-muted">
+            <MessageSquare size={13} />
+            {pr.comments}
+          </span>
+        ) : null}
+      </div>
+    </button>
+  )
+}
+
+function PullRequestStateIcon({ pr }: { pr: PullRequest }) {
+  if (pr.state === 'closed') {
+    return <GitMerge size={16} className="mt-0.5 shrink-0 text-purple" />
+  }
+  if (pr.draft) {
+    return <GitPullRequest size={16} className="mt-0.5 shrink-0 text-foreground-muted" />
+  }
+  return <GitPullRequest size={16} className="mt-0.5 shrink-0 text-success" />
+}
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+  { key: 'recently-updated', label: 'Recently updated' },
+  { key: 'least-recently-updated', label: 'Least recently updated' }
+]
+
+function filterAndSort(prs: PullRequest[], query: string, sort: SortKey): PullRequest[] {
+  let result = prs
+
+  if (query.trim()) {
+    const lower = query.toLowerCase()
+    result = result.filter(
+      (pr) =>
+        pr.title.toLowerCase().includes(lower) ||
+        pr.user.login.toLowerCase().includes(lower) ||
+        String(pr.number).includes(lower) ||
+        pr.labels.some((l) => l.name.toLowerCase().includes(lower))
+    )
+  }
+
+  const sorted = [...result]
+  switch (sort) {
+    case 'newest':
+      sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      break
+    case 'oldest':
+      sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      break
+    case 'recently-updated':
+      sorted.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      break
+    case 'least-recently-updated':
+      sorted.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime())
+      break
+  }
+
+  return sorted
 }

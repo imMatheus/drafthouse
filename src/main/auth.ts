@@ -255,7 +255,8 @@ export function registerAuthHandlers(): void {
 
   ipcMain.handle(
     'auth:get-pull-requests',
-    async (_event, owner: string, repo: string): Promise<PullRequest[]> => {
+    async (_event, owner: string, repo: string, state?: string): Promise<PullRequest[]> => {
+      const resolvedState = state || 'open'
       const auth = loadAuth()
       if (!auth) {
         throw new Error('GitHub authentication is missing. Log in again to load pull requests.')
@@ -263,7 +264,7 @@ export function registerAuthHandlers(): void {
 
       return fetchGitHubJson<PullRequest[]>(
         auth.token,
-        `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=25`,
+        `https://api.github.com/repos/${owner}/${repo}/pulls?state=${resolvedState}&per_page=50&sort=updated&direction=desc`,
         `Unable to load pull requests for ${owner}/${repo}. If this is a private repository, log out and sign in again to grant repo access.`
       )
     }

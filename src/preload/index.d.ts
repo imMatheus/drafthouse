@@ -21,7 +21,7 @@ interface AuthAPI {
   getUser: () => Promise<AuthData | null>
   onDeviceCode: (callback: (data: { userCode: string }) => void) => () => void
   getRepos: (query?: string) => Promise<GitHubRepo[] | null>
-  getPullRequests: (owner: string, repo: string) => Promise<PullRequest[]>
+  getPullRequests: (owner: string, repo: string, state?: string) => Promise<PullRequest[]>
   getPullRequest: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
   getPullRequestCommits: (
     owner: string,

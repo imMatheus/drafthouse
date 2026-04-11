@@ -13,8 +13,8 @@ const api = {
       return () => ipcRenderer.removeListener('auth:device-code', listener)
     },
     getRepos: (query?: string): Promise<unknown> => ipcRenderer.invoke('auth:get-repos', query),
-    getPullRequests: (owner: string, repo: string): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-requests', owner, repo),
+    getPullRequests: (owner: string, repo: string, state?: string): Promise<unknown> =>
+      ipcRenderer.invoke('auth:get-pull-requests', owner, repo, state),
     getPullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
       ipcRenderer.invoke('auth:get-pull-request', owner, repo, number),
     getPullRequestCommits: (

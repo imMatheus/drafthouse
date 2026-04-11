@@ -4,6 +4,7 @@ import {
   Bold,
   Check,
   Code,
+  ExternalLink,
   Eye,
   FileCode,
   GitCommit,
@@ -115,9 +116,20 @@ export default function PullRequestDetailView({
 
   return (
     <div>
-      <h1 className="text-xl font-semibold text-foreground">
-        {pr.title} <span className="font-normal text-foreground-subtle">#{pr.number}</span>
-      </h1>
+      <div className="flex items-start justify-between gap-4">
+        <h1 className="text-xl font-semibold text-foreground">
+          {pr.title} <span className="font-normal text-foreground-subtle">#{pr.number}</span>
+        </h1>
+        <a
+          href={pr.html_url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-interactive px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+        >
+          View on GitHub
+          <ExternalLink size={13} />
+        </a>
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span

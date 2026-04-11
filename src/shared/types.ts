@@ -37,12 +37,27 @@ export interface PullRequest {
   number: number
   title: string
   state: string
+  draft: boolean
   html_url: string
   created_at: string
+  updated_at: string
+  comments: number
   user: {
     login: string
     avatar_url: string
   }
+  labels: {
+    name: string
+    color: string
+  }[]
+  assignees: {
+    login: string
+    avatar_url: string
+  }[]
+  requested_reviewers: {
+    login: string
+    avatar_url: string
+  }[]
 }
 
 export interface PullRequestComment {
