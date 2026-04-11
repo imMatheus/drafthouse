@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Files, GitPullRequest } from 'lucide-react'
+import { Files, GitGraph } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import type { GitRepoInfo } from '../../../shared/types'
 import ActivityBar from '../components/ActivityBar'
@@ -163,7 +163,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
-  const handlePullRequestStateChange = (tabId: WorkspaceTab['id'], prState: 'open' | 'closed' | 'merged' | 'draft'): void => {
+  const handlePullRequestStateChange = (
+    tabId: WorkspaceTab['id'],
+    prState: 'open' | 'closed' | 'merged' | 'draft'
+  ): void => {
     const currentTab = tabs.find((tab) => tab.id === tabId)
 
     if (!currentTab || currentTab.kind !== 'pull-request' || currentTab.prState === prState) {
@@ -192,7 +195,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     {
       id: 'pull-requests',
       label: 'Pull Requests',
-      icon: GitPullRequest,
+      icon: GitGraph,
       active: isPullRequestWorkspaceTab(activeTab),
       onClick: handleOpenPullRequestList
     }

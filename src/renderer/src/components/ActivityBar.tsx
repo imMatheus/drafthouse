@@ -34,11 +34,6 @@ export default function ActivityBar({ items }: ActivityBarProps) {
               }`}
               title={item.label}
             >
-              <span
-                className={`absolute inset-y-2 left-0 w-0.5 rounded-r-full ${
-                  item.active ? 'bg-accent' : 'bg-transparent'
-                }`}
-              />
               <Icon size={18} strokeWidth={1.75} />
             </button>
           )

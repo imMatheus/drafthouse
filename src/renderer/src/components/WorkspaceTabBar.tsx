@@ -34,7 +34,7 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
           return (
             <div
               key={tab.id}
-              className={`group mr-1.5 flex min-w-0 max-w-60 shrink-0 items-stretch rounded-t-lg border border-b-0 transition-colors ${
+              className={`group cursor-pointer mr-1.5 flex min-w-0 max-w-60 shrink-0 items-stretch rounded-t-lg border border-b-0 transition-colors ${
                 isActive ? 'border-border bg-surface' : 'border-transparent bg-background hover:bg-surface-hover/60'
               }`}
             >
@@ -52,10 +52,10 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
 
               <button
                 onClick={() => onCloseTab(tab.id)}
-                className={`mr-1 flex w-7 items-center justify-center rounded-md transition-colors ${
+                className={`flex px-2 items-center justify-center rounded-md transition-colors ${
                   isActive
-                    ? 'text-foreground-subtle hover:bg-background hover:text-foreground'
-                    : 'text-foreground-subtle hover:bg-surface hover:text-foreground'
+                    ? 'text-foreground-subtle hover:text-foreground'
+                    : 'text-foreground-subtle hover:text-foreground'
                 }`}
                 title={`Close ${label}`}
               >
