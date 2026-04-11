@@ -20,12 +20,17 @@ All colors in the frontend must use the token-based design system defined in `sr
 - `danger` — destructive/negative states (closed PRs, errors, deletions)
 - `purple` — merged state (merged PRs)
 
+## Code Rendering
+
+Use `shiki` for all syntax highlighting. The highlighter is set up in `src/renderer/src/lib/shiki.ts` using the JavaScript regex engine (`@shikijs/engine-javascript`) with vitesse-dark / vitesse-light themes. Use `tokenizeCode` for full files, `tokenizeDiffHunks` for PR diffs, and `tokenizeReviewPreviewLines` for review thread previews. Detect the language from file paths with `getLanguageFromPath`. Never render raw code in `<pre><code>` without highlighting.
+
 ## Icons
 
 Always use `lucide-react` for icons. Never use inline SVGs — import the icon component from `lucide-react` instead.
 
 ## General guidelines
 
+Always ask me question if you are unclear about anything.
 Avoid throwing when possible, unless they're in very local cases.
 Avoid useMemo and useCallback. We try not to cache. Bad for memory usage, perf predictability and debugging.
 Avoid observer patterns. They promote an illusion of loose coupling within a codebase where nothing's actually loose. They also cause all sorts of asynchronicity problems. Prefer regular functions at the right call sites.

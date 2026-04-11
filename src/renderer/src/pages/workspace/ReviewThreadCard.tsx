@@ -1,7 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Reply } from 'lucide-react'
 import type { PullRequestReviewComment } from '../../../../shared/types'
+import { useTheme } from '../../hooks/useTheme'
+import {
+  getLanguageFromPath,
+  tokenizeReviewPreviewLines,
+  type HighlightedToken
+} from '../../lib/shiki'
 import MarkdownBody from './MarkdownBody'
 import { formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
 
@@ -106,7 +112,15 @@ export default function ReviewThreadCard({
 }
 
 function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment }) {
+  const { theme } = useTheme()
   const lines = getReviewDiffPreviewLines(comment)
+  const [tokenMap, setTokenMap] = useState<Map<number, HighlightedToken[]>>(new Map())
+
+  useEffect(() => {
+    if (lines.length === 0) return
+    const lang = getLanguageFromPath(comment.path)
+    tokenizeReviewPreviewLines(lines, lang, theme).then(setTokenMap)
+  }, [comment.diff_hunk, comment.path, theme])
 
   if (lines.length === 0) {
     return null
@@ -117,22 +131,37 @@ function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment 
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-sm">
           <tbody>
-            {lines.map((line, index) => (
-              <tr key={`${line.kind}-${index}`} className={getReviewDiffRowClassName(line.kind)}>
-                <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                  {line.oldLine ?? ''}
-                </td>
-                <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                  {line.newLine ?? ''}
-                </td>
-                <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
-                  <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
-                    {line.prefix}
-                  </span>
-                  {line.content}
-                </td>
-              </tr>
-            ))}
+            {lines.map((line, index) => {
+              const tokens = tokenMap.get(index)
+              return (
+                <tr key={`${line.kind}-${index}`} className={getReviewDiffRowClassName(line.kind)}>
+                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                    {line.oldLine ?? ''}
+                  </td>
+                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                    {line.newLine ?? ''}
+                  </td>
+                  <td className="px-3 py-1.5 font-mono text-[13px] text-foreground whitespace-pre">
+                    <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
+                      {line.prefix}
+                    </span>
+                    {tokens ? (
+                      tokens.map((token, i) =>
+                        token.color ? (
+                          <span key={i} style={{ color: token.color }}>
+                            {token.content}
+                          </span>
+                        ) : (
+                          <span key={i}>{token.content}</span>
+                        )
+                      )
+                    ) : (
+                      line.content
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

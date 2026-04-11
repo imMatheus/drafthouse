@@ -10,14 +10,16 @@ import type {
   PullRequestReviewEvent,
   PullRequestReviewLineSide
 } from '../../../../shared/types'
+import { useTheme } from '../../hooks/useTheme'
+import {
+  getLanguageFromPath,
+  tokenizeDiffHunks,
+  type HighlightedToken
+} from '../../lib/shiki'
 import MarkdownBody from './MarkdownBody'
 import ReviewThreadCard from './ReviewThreadCard'
 import { getDiffThreadKey, parsePullRequestFileDiff } from './pullRequestDiff'
-import {
-  buildPullRequestReviewThreads,
-  DiffStat,
-  type PullRequestReviewThread
-} from './pullRequestShared'
+import { buildPullRequestReviewThreads, DiffStat, type PullRequestReviewThread } from './pullRequestShared'
 
 export default function PRFilesTab({
   pr,
@@ -88,14 +90,9 @@ export default function PRFilesTab({
     threadsByKey.set(key, rowThreads)
   }
 
-  const threadsByCommentId = new Map(
-    reviewThreads.map((thread) => [thread.topLevelComment.id, thread])
-  )
+  const threadsByCommentId = new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread]))
 
-  const draftCommentsByKey = new Map<
-    string,
-    Array<{ comment: PullRequestReviewDraftComment; index: number }>
-  >()
+  const draftCommentsByKey = new Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>()
   draftReviewComments.forEach((comment, index) => {
     const key = getDiffThreadKey(comment.path, comment.side, comment.line)
     const rowComments = draftCommentsByKey.get(key) ?? []
@@ -185,9 +182,7 @@ export default function PRFilesTab({
   }
 
   const handleRemoveDraftComment = (index: number): void => {
-    onDraftReviewCommentsChange(
-      draftReviewComments.filter((_comment, commentIndex) => commentIndex !== index)
-    )
+    onDraftReviewCommentsChange(draftReviewComments.filter((_comment, commentIndex) => commentIndex !== index))
   }
 
   const handleInlineCommentPosted = async (): Promise<void> => {
@@ -203,7 +198,7 @@ export default function PRFilesTab({
   return (
     <>
       <div className="flex gap-5">
-        <aside className="sticky top-6 hidden h-[calc(100vh-11rem)] w-72 shrink-0 overflow-hidden rounded-xl border border-border bg-surface lg:block">
+        <aside className="sticky top-1 hidden h-[calc(100vh-11rem)] w-72 shrink-0 overflow-hidden rounded-xl border border-border bg-surface lg:block">
           <div className="border-b border-border px-4 py-3">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -254,9 +249,7 @@ export default function PRFilesTab({
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-medium text-foreground">{fileName}</div>
                     {parentPath ? (
-                      <div className="truncate text-[11px] text-foreground-subtle">
-                        {parentPath}
-                      </div>
+                      <div className="truncate text-[11px] text-foreground-subtle">{parentPath}</div>
                     ) : null}
                   </div>
                   <DiffStat additions={file.additions} deletions={file.deletions} />
@@ -265,9 +258,7 @@ export default function PRFilesTab({
             })}
 
             {!isLoading && filteredFiles.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-foreground-muted">
-                No files match this filter.
-              </div>
+              <div className="px-4 py-6 text-sm text-foreground-muted">No files match this filter.</div>
             ) : null}
           </div>
         </aside>
@@ -299,9 +290,7 @@ export default function PRFilesTab({
             </div>
           ) : null}
 
-          {isLoading ? (
-            <p className="text-sm text-foreground-muted">Loading changed files...</p>
-          ) : null}
+          {isLoading ? <p className="text-sm text-foreground-muted">Loading changed files...</p> : null}
 
           <div className="flex flex-col gap-5">
             {filteredFiles.map((file) => (
@@ -392,10 +381,7 @@ function PullRequestFileDiffCard({
   auth: AuthData | null | undefined
   fileThreads: PullRequestReviewThread[]
   threadsByKey: Map<string, PullRequestReviewThread[]>
-  draftCommentsByKey: Map<
-    string,
-    Array<{ comment: PullRequestReviewDraftComment; index: number }>
-  >
+  draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
   openCommentKey: string | null
   onOpenComment: (value: string | null) => void
   onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
@@ -404,14 +390,21 @@ function PullRequestFileDiffCard({
   sectionRef: (element: HTMLElement | null) => void
   threadRef: (commentId: number, element: HTMLElement | null) => void
 }) {
+  const { theme } = useTheme()
   const parsedDiff = parsePullRequestFileDiff(file)
+  const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
+
+  useEffect(() => {
+    const lang = getLanguageFromPath(file.filename)
+    tokenizeDiffHunks(parsedDiff.hunks, lang, theme).then(setTokenMap)
+  }, [file.patch, file.filename, theme])
+
   const anchoredThreadIds = new Set<number>()
 
   for (const hunk of parsedDiff.hunks) {
     for (const line of hunk.lines) {
       if (!line.commentSide || !line.commentLine) continue
-      const rowThreads =
-        threadsByKey.get(getDiffThreadKey(file.filename, line.commentSide, line.commentLine)) ?? []
+      const rowThreads = threadsByKey.get(getDiffThreadKey(file.filename, line.commentSide, line.commentLine)) ?? []
       rowThreads.forEach((thread) => anchoredThreadIds.add(thread.id))
     }
   }
@@ -428,17 +421,13 @@ function PullRequestFileDiffCard({
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${getFileStatusClassName(file.status)}`}
-            >
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${getFileStatusClassName(file.status)}`}>
               {formatFileStatus(file.status)}
             </span>
             <span className="truncate text-sm font-semibold text-foreground">{file.filename}</span>
           </div>
           {file.previous_filename ? (
-            <p className="mt-1 text-xs text-foreground-muted">
-              Renamed from {file.previous_filename}
-            </p>
+            <p className="mt-1 text-xs text-foreground-muted">Renamed from {file.previous_filename}</p>
           ) : null}
         </div>
 
@@ -495,11 +484,11 @@ function PullRequestFileDiffCard({
                           <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
                             {line.newLineNumber ?? ''}
                           </td>
-                          <td className="border-r border-border px-3 py-1.5 font-mono text-[13px] text-foreground">
+                          <td className="border-r border-border px-3 py-1.5 font-mono text-[13px] text-foreground whitespace-pre">
                             <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
                               {getFileDiffPrefix(line.kind)}
                             </span>
-                            {line.content}
+                            <DiffLineContent tokens={tokenMap.get(line.id)} fallback={line.content} />
                           </td>
                           <td className="w-10 px-1 py-1">
                             {rowKey ? (
@@ -516,10 +505,7 @@ function PullRequestFileDiffCard({
                         </tr>
 
                         {rowThreads.map((thread) => (
-                          <tr
-                            key={`thread-${thread.id}`}
-                            ref={(element) => threadRef(thread.id, element)}
-                          >
+                          <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
                             <td colSpan={4} className="bg-background px-3 py-3">
                               <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
                             </td>
@@ -540,12 +526,8 @@ function PullRequestFileDiffCard({
                                       />
                                     ) : null}
                                     <div className="text-sm text-foreground">
-                                      <span className="font-semibold">
-                                        {auth?.user.login ?? 'You'}
-                                      </span>{' '}
-                                      <span className="text-foreground-muted">
-                                        pending review comment
-                                      </span>
+                                      <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
+                                      <span className="text-foreground-muted">pending review comment</span>
                                     </div>
                                   </div>
                                   <button
@@ -599,9 +581,7 @@ function PullRequestFileDiffCard({
 
       {unanchoredThreads.length > 0 ? (
         <div className="border-t border-border px-4 py-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-            Other comments
-          </p>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Other comments</p>
           <div className="flex flex-col gap-3">
             {unanchoredThreads.map((thread) => (
               <div key={`unanchored-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
@@ -807,9 +787,7 @@ function SubmitReviewDialog({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
-          <p className="text-sm text-foreground-muted">
-            Inline comments will be submitted with this review.
-          </p>
+          <p className="text-sm text-foreground-muted">Inline comments will be submitted with this review.</p>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -849,6 +827,29 @@ function SubmitReviewDialog({
   )
 }
 
+function DiffLineContent({
+  tokens,
+  fallback
+}: {
+  tokens: HighlightedToken[] | undefined
+  fallback: string
+}) {
+  if (!tokens) return <>{fallback}</>
+  return (
+    <>
+      {tokens.map((token, i) =>
+        token.color ? (
+          <span key={i} style={{ color: token.color }}>
+            {token.content}
+          </span>
+        ) : (
+          <span key={i}>{token.content}</span>
+        )
+      )}
+    </>
+  )
+}
+
 function getFileStatusClassName(status: string): string {
   switch (status) {
     case 'added':
@@ -877,9 +878,7 @@ function formatFileStatus(status: string): string {
   }
 }
 
-function getFileDiffRowClassName(
-  kind: 'hunk' | 'addition' | 'deletion' | 'context' | 'meta'
-): string {
+function getFileDiffRowClassName(kind: 'hunk' | 'addition' | 'deletion' | 'context' | 'meta'): string {
   if (kind === 'addition') return 'bg-success/10'
   if (kind === 'deletion') return 'bg-danger/10'
   if (kind === 'meta') return 'bg-surface'
