@@ -6,7 +6,7 @@ import type { PaginatedPullRequestCommits, PullRequestCommit } from '../../../..
 import PlaceholderView from './PlaceholderView'
 import { formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
 
-const COMMITS_PER_PAGE = 10
+const COMMITS_PER_PAGE = 100
 
 interface CommitDayGroupData {
   dateKey: string
@@ -42,8 +42,7 @@ export default function PRCommitsTab({
 
   const { data, isLoading, error, isFetching } = useQuery<PaginatedPullRequestCommits, Error>({
     queryKey: ['pull-request-commits', owner, repo, number, safePage],
-    queryFn: () =>
-      window.api.auth.getPullRequestCommits(owner, repo, number, safePage, COMMITS_PER_PAGE),
+    queryFn: () => window.api.auth.getPullRequestCommits(owner, repo, number, safePage, COMMITS_PER_PAGE),
     retry: false,
     enabled: totalCommits > 0
   })
@@ -53,18 +52,12 @@ export default function PRCommitsTab({
 
     void queryClient.prefetchQuery({
       queryKey: ['pull-request-commits', owner, repo, number, safePage + 1],
-      queryFn: () =>
-        window.api.auth.getPullRequestCommits(owner, repo, number, safePage + 1, COMMITS_PER_PAGE)
+      queryFn: () => window.api.auth.getPullRequestCommits(owner, repo, number, safePage + 1, COMMITS_PER_PAGE)
     })
   }, [number, owner, queryClient, repo, safePage, totalPages])
 
   if (totalCommits === 0) {
-    return (
-      <PlaceholderView
-        title="Commits"
-        description="This pull request does not contain any commits yet."
-      />
-    )
+    return <PlaceholderView title="Commits" description="This pull request does not contain any commits yet." />
   }
 
   const items = data?.items ?? []
@@ -74,22 +67,6 @@ export default function PRCommitsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Commits</h2>
-          <p className="mt-1 text-sm text-foreground-muted">
-            Showing {rangeStart}-{rangeEnd} of {totalCommits} commit{totalCommits !== 1 ? 's' : ''}
-            {isFetching && !isLoading ? ' \u2022 Updating\u2026' : ''}
-          </p>
-        </div>
-        <PRCommitsPagination
-          page={safePage}
-          totalPages={totalPages}
-          onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-          onNext={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
-        />
-      </div>
-
       {error ? (
         <div className="rounded-xl border border-border bg-surface px-4 py-3">
           <p className="text-sm text-foreground-muted">{error.message}</p>
@@ -122,6 +99,22 @@ export default function PRCommitsTab({
           />
         </div>
       ) : null}
+
+      <div className="flex mt-10 mx-auto max-w-2xl w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Commits</h2>
+          <p className="mt-1 text-sm text-foreground-muted">
+            Showing {rangeStart}-{rangeEnd} of {totalCommits} commit{totalCommits !== 1 ? 's' : ''}
+            {isFetching && !isLoading ? ' \u2022 Updating\u2026' : ''}
+          </p>
+        </div>
+        <PRCommitsPagination
+          page={safePage}
+          totalPages={totalPages}
+          onPrevious={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+          onNext={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
+        />
+      </div>
     </div>
   )
 }
@@ -212,21 +205,17 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
           <div className="flex items-center gap-2">
             <p className="truncate text-[15px] font-semibold text-foreground">{subject}</p>
             {isMergeCommit ? (
-              <span className="rounded-full bg-purple/10 px-2 py-0.5 text-[11px] font-medium text-purple">
-                Merge
-              </span>
+              <span className="rounded-full bg-purple/10 px-2 py-0.5 text-[11px] font-medium text-purple">Merge</span>
             ) : null}
           </div>
 
-          {bodyPreview ? (
-            <p className="mt-1 truncate text-sm text-foreground-muted">{bodyPreview}</p>
-          ) : null}
+          {bodyPreview ? <p className="mt-1 truncate text-sm text-foreground-muted">{bodyPreview}</p> : null}
 
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-foreground-muted">
             <CommitActorStack actors={actors} />
             <span>
-              <span className="font-medium text-foreground">{formatCommitActorNames(actors)}</span>{' '}
-              committed {authoredLabel}
+              <span className="font-medium text-foreground">{formatCommitActorNames(actors)}</span> committed{' '}
+              {authoredLabel}
             </span>
             {commitDate != null ? (
               <span className="text-foreground-subtle">&middot; {formatAbsoluteDate(commitDate)}</span>
@@ -235,9 +224,7 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <span className="rounded-md px-2 py-1 font-mono text-sm text-foreground-muted">
-            {commit.sha.slice(0, 7)}
-          </span>
+          <span className="rounded-md px-2 py-1 font-mono text-sm text-foreground-muted">{commit.sha.slice(0, 7)}</span>
           <button
             type="button"
             onClick={handleCopySha}
@@ -263,11 +250,7 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
   )
 }
 
-function CommitActorStack({
-  actors
-}: {
-  actors: Array<{ name: string; avatarUrl: string | null }>
-}) {
+function CommitActorStack({ actors }: { actors: Array<{ name: string; avatarUrl: string | null }> }) {
   const visibleActors = actors.slice(0, 2)
 
   return (
@@ -275,7 +258,10 @@ function CommitActorStack({
       {visibleActors.map((actor, index) => (
         <div
           key={`${actor.name}-${index}`}
-          className={cn('flex size-6 items-center justify-center overflow-hidden rounded-full border border-surface bg-interactive', index > 0 && '-ml-2')}
+          className={cn(
+            'flex size-6 items-center justify-center overflow-hidden rounded-full border border-surface bg-interactive',
+            index > 0 && '-ml-2'
+          )}
         >
           {actor.avatarUrl ? (
             <img src={actor.avatarUrl} alt={actor.name} className="size-full object-cover" />
@@ -327,9 +313,7 @@ function formatCommitGroupLabel(dateStr: string): string {
   }).format(new Date(dateStr))
 }
 
-function getCommitActors(
-  commit: PullRequestCommit
-): Array<{ name: string; avatarUrl: string | null }> {
+function getCommitActors(commit: PullRequestCommit): Array<{ name: string; avatarUrl: string | null }> {
   const entries = [
     {
       name: commit.author?.login ?? commit.commit.author?.name ?? null,
