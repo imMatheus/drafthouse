@@ -105,8 +105,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       return
     }
 
-    const nextActiveTabId =
-      nextTabs[tabIndex - 1]?.id ?? nextTabs[tabIndex]?.id ?? null
+    const nextActiveTabId = nextTabs[tabIndex - 1]?.id ?? nextTabs[tabIndex]?.id ?? null
 
     onUpdateSession({
       ...session,
@@ -182,7 +181,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   ]
 
   return (
-    <div className="flex flex-1 bg-background">
+    <div className="flex flex-1 bg-background w-screen">
       <ActivityBar items={activityItems} />
 
       {sidebar.visible && sidebar.activePanel === 'explorer' ? (
@@ -197,9 +196,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           onCloseTab={handleCloseTab}
         />
 
-        <main
-          className={`min-h-0 flex-1 ${activeTab?.kind === 'file' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}
-        >
+        <main className={`min-h-0 flex-1 ${activeTab?.kind === 'file' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}>
           {renderWorkspaceTabContent({
             activeTab,
             folderPath,
