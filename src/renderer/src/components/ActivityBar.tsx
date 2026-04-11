@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { Moon, Sun } from 'lucide-react'
+import { cn } from '../lib/cn'
 import { useTheme } from '../hooks/useTheme'
 
 export interface ActivityBarItem {
@@ -27,11 +28,12 @@ export default function ActivityBar({ items }: ActivityBarProps) {
             <button
               key={item.id}
               onClick={item.onClick}
-              className={`relative flex h-10 w-10 items-center justify-center rounded-md transition-colors ${
+              className={cn(
+                'relative flex h-10 w-10 items-center justify-center rounded-md transition-colors',
                 item.active
                   ? 'bg-surface-hover text-foreground'
                   : 'text-foreground-subtle hover:bg-surface-hover hover:text-foreground'
-              }`}
+              )}
               title={item.label}
             >
               <Icon size={18} strokeWidth={1.75} />

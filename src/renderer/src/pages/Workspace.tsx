@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Files, GitGraph } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
 import type { GitRepoInfo } from '../../../shared/types'
+import { cn } from '../lib/cn'
 import ActivityBar from '../components/ActivityBar'
 import ExplorerPanel from '../components/ExplorerPanel'
 import WorkspaceTabBar from '../components/WorkspaceTabBar'
@@ -217,7 +218,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           onCloseTab={handleCloseTab}
         />
 
-        <main className={`min-h-0 flex-1 ${activeTab?.kind === 'file' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}>
+        <main className={cn('min-h-0 flex-1', activeTab?.kind === 'file' ? 'overflow-hidden' : 'overflow-y-auto p-6')}>
           {renderWorkspaceTabContent({
             activeTab,
             folderPath,

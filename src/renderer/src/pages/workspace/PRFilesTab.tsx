@@ -20,6 +20,7 @@ import type {
   PullRequestReviewEvent,
   PullRequestReviewLineSide
 } from '../../../../shared/types'
+import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
 import { getLanguageFromPath, tokenizeDiffHunks, type HighlightedToken } from '../../lib/shiki'
 import MarkdownBody from './MarkdownBody'
@@ -383,7 +384,7 @@ function PullRequestFileDiffCard({
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${getFileStatusClassName(file.status)}`}>
+            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', getFileStatusClassName(file.status))}>
               {formatFileStatus(file.status)}
             </span>
             <span className="truncate text-sm font-semibold text-foreground">{file.filename}</span>
@@ -919,7 +920,7 @@ function FileTreeFolder({
       >
         <ChevronDown
           size={14}
-          className={`shrink-0 text-foreground-subtle transition-transform ${isOpen ? '' : '-rotate-90'}`}
+          className={cn('shrink-0 text-foreground-subtle transition-transform', !isOpen && '-rotate-90')}
         />
         <Folder size={14} className="shrink-0 text-foreground-subtle" />
         <span className="truncate font-medium">{node.name}</span>
@@ -968,9 +969,10 @@ function FileTreeFileButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-1.5 py-1 text-left text-xs transition-colors ${
+      className={cn(
+        'flex w-full items-center gap-1.5 py-1 text-left text-xs transition-colors',
         isActive ? 'bg-surface-hover text-foreground' : 'text-foreground hover:bg-surface-hover'
-      }`}
+      )}
       style={{ paddingLeft: 8 + depth * 16 + 20 }}
     >
       <FileStatusIcon status={file.status} />

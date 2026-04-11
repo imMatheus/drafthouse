@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDownUp, Check, GitMerge, GitPullRequest, MessageSquare, Search, X } from 'lucide-react'
+import { cn } from '../../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../../shared/types'
 import { formatRelativeTime } from './pullRequestShared'
 import PlaceholderView from './PlaceholderView'
@@ -90,9 +91,10 @@ export default function PullRequestsView({
             <button
               type="button"
               onClick={() => setStateFilter('open')}
-              className={`inline-flex items-center gap-1.5 text-sm font-medium ${
+              className={cn(
+                'inline-flex items-center gap-1.5 text-sm font-medium',
                 stateFilter === 'open' ? 'text-foreground' : 'text-foreground-muted hover:text-foreground'
-              }`}
+              )}
             >
               <GitPullRequest size={15} />
               Open
@@ -101,9 +103,10 @@ export default function PullRequestsView({
             <button
               type="button"
               onClick={() => setStateFilter('closed')}
-              className={`inline-flex items-center gap-1.5 text-sm font-medium ${
+              className={cn(
+                'inline-flex items-center gap-1.5 text-sm font-medium',
                 stateFilter === 'closed' ? 'text-foreground' : 'text-foreground-muted hover:text-foreground'
-              }`}
+              )}
             >
               <Check size={15} />
               Closed

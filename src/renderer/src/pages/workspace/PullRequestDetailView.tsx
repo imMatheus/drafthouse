@@ -24,6 +24,7 @@ import type {
   PullRequestReviewComment,
   PullRequestReviewDraftComment
 } from '../../../../shared/types'
+import { cn } from '../../lib/cn'
 import type { PullRequestSubview } from '../../lib/workspaceTabs'
 import MarkdownBody from './MarkdownBody'
 import PRCommitsTab from './PRCommitsTab'
@@ -138,7 +139,7 @@ export default function PullRequestDetailView({
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${statusColor}`}
+          className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', statusColor)}
         >
           <GitPullRequest size={14} />
           {statusLabel}
@@ -243,11 +244,12 @@ function PRDetailTabButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors ${
+      className={cn(
+        'inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors',
         active
           ? 'border-foreground-muted text-foreground'
           : 'border-transparent text-foreground-muted hover:text-foreground'
-      }`}
+      )}
     >
       {icon}
       {children}
@@ -507,7 +509,7 @@ function ReviewStateBadge({ state }: { state: string }) {
         : 'bg-interactive text-foreground-muted'
 
   return (
-    <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>
+    <span className={cn('ml-auto rounded-full px-2 py-0.5 text-[11px] font-medium', className)}>
       {formatReviewStateLabel(state)}
     </span>
   )
@@ -611,21 +613,23 @@ function CommentBox({ owner, repo, number }: { owner: string; repo: string; numb
           <div className="flex">
             <button
               onClick={() => setActiveTab('write')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={cn(
+                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                 activeTab === 'write'
                   ? 'bg-surface-hover text-foreground'
                   : 'text-foreground-muted hover:text-foreground'
-              }`}
+              )}
             >
               Write
             </button>
             <button
               onClick={() => setActiveTab('preview')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={cn(
+                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                 activeTab === 'preview'
                   ? 'bg-surface-hover text-foreground'
                   : 'text-foreground-muted hover:text-foreground'
-              }`}
+              )}
             >
               Preview
             </button>

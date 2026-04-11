@@ -9,6 +9,7 @@ import {
   GitGraph,
   X
 } from 'lucide-react'
+import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import type { WorkspaceTab } from '../lib/workspaceTabs'
 
@@ -34,9 +35,10 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
           return (
             <div
               key={tab.id}
-              className={`group cursor-pointer mr-1.5 flex min-w-0 max-w-60 shrink-0 items-stretch rounded-t-lg border border-b-0 transition-colors ${
+              className={cn(
+                'group cursor-pointer mr-1.5 flex min-w-0 max-w-60 shrink-0 items-stretch rounded-t-lg border border-b-0 transition-colors',
                 isActive ? 'border-border bg-surface' : 'border-transparent bg-background hover:bg-surface-hover/60'
-              }`}
+              )}
             >
               <button
                 onClick={() => onSelectTab(tab.id)}
@@ -44,7 +46,7 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
               >
                 {icon}
                 <span
-                  className={`truncate text-sm font-medium ${isActive ? 'text-foreground' : 'text-foreground-muted'}`}
+                  className={cn('truncate text-sm font-medium', isActive ? 'text-foreground' : 'text-foreground-muted')}
                 >
                   {label}
                 </span>
@@ -52,11 +54,7 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
 
               <button
                 onClick={() => onCloseTab(tab.id)}
-                className={`flex px-2 items-center justify-center rounded-md transition-colors ${
-                  isActive
-                    ? 'text-foreground-subtle hover:text-foreground'
-                    : 'text-foreground-subtle hover:text-foreground'
-                }`}
+                className="flex px-2 items-center justify-center rounded-md transition-colors text-foreground-subtle hover:text-foreground"
                 title={`Close ${label}`}
               >
                 <X size={14} />

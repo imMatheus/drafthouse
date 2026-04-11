@@ -28,6 +28,10 @@ Use `shiki` for all syntax highlighting. The highlighter is set up in `src/rende
 
 Always use `lucide-react` for icons. Never use inline SVGs — import the icon component from `lucide-react` instead.
 
+## Class Names
+
+Use the `cn()` utility from `src/renderer/src/lib/cn.ts` for combining Tailwind classes. Never use template literal strings for conditional classNames — use `cn()` instead.
+
 ## General guidelines
 
 Always ask me question if you are unclear about anything.

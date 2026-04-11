@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
+import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
 import { getLanguageFromPath, tokenizeCode, type HighlightedToken } from '../../lib/shiki'
 
@@ -41,7 +42,7 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
         {segments.map((segment, i) => (
           <Fragment key={i}>
             {i > 0 && <ChevronRight size={12} className="shrink-0 text-foreground-subtle" />}
-            <span className={`text-sm ${i === segments.length - 1 ? 'text-foreground' : 'text-foreground-muted'}`}>
+            <span className={cn('text-sm', i === segments.length - 1 ? 'text-foreground' : 'text-foreground-muted')}>
               {segment}
             </span>
           </Fragment>

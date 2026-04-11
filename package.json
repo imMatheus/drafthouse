@@ -25,12 +25,14 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-query": "^5.97.0",
+    "clsx": "^2.1.1",
     "electron-updater": "^6.3.9",
     "lucide-react": "^1.8.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.14.0",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.0.2",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {

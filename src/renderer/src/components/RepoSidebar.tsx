@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, Search, X, Sun, Moon, LogOut } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { cn } from '../lib/cn'
 import { useTheme } from '../hooks/useTheme'
 
 export default function RepoSidebar() {
@@ -36,9 +37,10 @@ export default function RepoSidebar() {
 
   return (
     <aside
-      className={`flex h-screen shrink-0 flex-col border-r border-border bg-surface transition-all duration-200 ${
+      className={cn(
+        'flex h-screen shrink-0 flex-col border-r border-border bg-surface transition-all duration-200',
         collapsed ? 'w-12' : 'w-64'
-      }`}
+      )}
     >
       {/* Header */}
       <div className="flex justify-end items-center gap-1 px-3 pt-3 pb-2">
@@ -48,7 +50,7 @@ export default function RepoSidebar() {
         >
           <ChevronLeft
             size={14}
-            className={`transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`}
+            className={cn('transition-transform duration-200', collapsed && 'rotate-180')}
           />
         </button>
       </div>

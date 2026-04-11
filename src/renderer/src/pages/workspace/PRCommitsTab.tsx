@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCheck, ChevronLeft, ChevronRight, Copy, ExternalLink, GitCommit } from 'lucide-react'
+import { cn } from '../../lib/cn'
 import type { PaginatedPullRequestCommits, PullRequestCommit } from '../../../../shared/types'
 import PlaceholderView from './PlaceholderView'
 import { formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
@@ -205,7 +206,7 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
   }
 
   return (
-    <div className={`px-5 py-4 ${isLast ? '' : 'border-b border-border'}`}>
+    <div className={cn('px-5 py-4', !isLast && 'border-b border-border')}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -274,7 +275,7 @@ function CommitActorStack({
       {visibleActors.map((actor, index) => (
         <div
           key={`${actor.name}-${index}`}
-          className={`flex size-6 items-center justify-center overflow-hidden rounded-full border border-surface bg-interactive ${index > 0 ? '-ml-2' : ''}`}
+          className={cn('flex size-6 items-center justify-center overflow-hidden rounded-full border border-surface bg-interactive', index > 0 && '-ml-2')}
         >
           {actor.avatarUrl ? (
             <img src={actor.avatarUrl} alt={actor.name} className="size-full object-cover" />
