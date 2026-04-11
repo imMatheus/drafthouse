@@ -1,6 +1,16 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDownUp, Check, GitMerge, GitPullRequest, MessageSquare, Search, X } from 'lucide-react'
+import {
+  ArrowDownUp,
+  Check,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  MessageSquare,
+  Search,
+  X
+} from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../../shared/types'
 import { formatRelativeTime } from './pullRequestShared'
@@ -243,13 +253,32 @@ function PullRequestRow({ pr, onClick }: { pr: PullRequest; onClick: () => void 
 }
 
 function PullRequestStateIcon({ pr }: { pr: PullRequest }) {
+  if (pr.merged_at) {
+    return (
+      <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-purple/15">
+        <GitMerge size={12} strokeWidth={2} className="text-purple" />
+      </span>
+    )
+  }
   if (pr.state === 'closed') {
-    return <GitMerge size={16} className="mt-0.5 shrink-0 text-purple" />
+    return (
+      <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-danger/15">
+        <GitPullRequestClosed size={12} strokeWidth={2} className="text-danger" />
+      </span>
+    )
   }
   if (pr.draft) {
-    return <GitPullRequest size={16} className="mt-0.5 shrink-0 text-foreground-muted" />
+    return (
+      <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground-muted/15">
+        <GitPullRequestDraft size={12} strokeWidth={2} className="text-foreground-muted" />
+      </span>
+    )
   }
-  return <GitPullRequest size={16} className="mt-0.5 shrink-0 text-success" />
+  return (
+    <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-success/15">
+      <GitPullRequest size={12} strokeWidth={2} className="text-success" />
+    </span>
+  )
 }
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [

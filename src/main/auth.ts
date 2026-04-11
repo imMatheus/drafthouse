@@ -13,7 +13,9 @@ import type {
   PullRequestReviewComment,
   PullRequestDetail,
   PaginatedPullRequestCommits,
-  SubmitPullRequestReviewInput
+  SubmitPullRequestReviewInput,
+  PullRequestMergeMethod,
+  PullRequestMergeResult
 } from '../shared/types'
 
 const GITHUB_CLIENT_ID = import.meta.env.MAIN_VITE_GITHUB_CLIENT_ID
@@ -220,6 +222,45 @@ async function fetchGitHubPaginatedCollection<T>(
 
     page += 1
   }
+}
+
+async function fetchGitHubGraphQL<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+  errorContext: string
+): Promise<T> {
+  const response = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: getGitHubHeaders(token, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ query, variables })
+  })
+
+  if (!response.ok) {
+    const githubMessage = await readGitHubErrorMessage(response)
+
+    if (response.status === 401) {
+      throw new Error('GitHub authentication expired. Log out and sign in again.')
+    }
+
+    if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+      throw new Error('GitHub API rate limit exceeded. Try again later.')
+    }
+
+    throw new Error(`${errorContext}: ${githubMessage}`)
+  }
+
+  const json = (await response.json()) as { data?: T; errors?: { message: string }[] }
+
+  if (json.errors?.length) {
+    throw new Error(`${errorContext}: ${json.errors[0].message}`)
+  }
+
+  if (!json.data) {
+    throw new Error(`${errorContext}: No data returned`)
+  }
+
+  return json.data
 }
 
 export function registerAuthHandlers(): void {
@@ -527,4 +568,134 @@ export function registerAuthHandlers(): void {
       )
     }
   )
+
+  ipcMain.handle(
+    'auth:merge-pull-request',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number,
+      mergeMethod: PullRequestMergeMethod,
+      commitTitle?: string,
+      commitMessage?: string
+    ): Promise<PullRequestMergeResult> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to merge this pull request.')
+      }
+
+      const body: Record<string, string> = { merge_method: mergeMethod }
+      if (commitTitle) body.commit_title = commitTitle
+      if (commitMessage) body.commit_message = commitMessage
+
+      return fetchGitHubJson<PullRequestMergeResult>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}/merge`,
+        `Failed to merge PR #${number}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        }
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:close-pull-request',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number
+    ): Promise<PullRequestDetail> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error('GitHub authentication is missing. Log in again to close this pull request.')
+      }
+
+      return fetchGitHubJson<PullRequestDetail>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`,
+        `Failed to close PR #${number}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'closed' })
+        }
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:reopen-pull-request',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number
+    ): Promise<PullRequestDetail> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error(
+          'GitHub authentication is missing. Log in again to reopen this pull request.'
+        )
+      }
+
+      return fetchGitHubJson<PullRequestDetail>(
+        auth.token,
+        `https://api.github.com/repos/${owner}/${repo}/pulls/${number}`,
+        `Failed to reopen PR #${number}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'open' })
+        }
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'auth:convert-pull-request-to-draft',
+    async (_event, nodeId: string): Promise<void> => {
+      const auth = loadAuth()
+      if (!auth) {
+        throw new Error(
+          'GitHub authentication is missing. Log in again to convert this pull request to draft.'
+        )
+      }
+
+      await fetchGitHubGraphQL(
+        auth.token,
+        `mutation($id: ID!) {
+          convertPullRequestToDraft(input: { pullRequestId: $id }) {
+            pullRequest { isDraft }
+          }
+        }`,
+        { id: nodeId },
+        'Failed to convert PR to draft'
+      )
+    }
+  )
+
+  ipcMain.handle('auth:mark-pull-request-ready', async (_event, nodeId: string): Promise<void> => {
+    const auth = loadAuth()
+    if (!auth) {
+      throw new Error(
+        'GitHub authentication is missing. Log in again to mark this pull request as ready.'
+      )
+    }
+
+    await fetchGitHubGraphQL(
+      auth.token,
+      `mutation($id: ID!) {
+        markPullRequestAsReadyForReview(input: { pullRequestId: $id }) {
+          pullRequest { isDraft }
+        }
+      }`,
+      { id: nodeId },
+      'Failed to mark PR as ready for review'
+    )
+  })
 }

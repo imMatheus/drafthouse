@@ -68,7 +68,32 @@ const api = {
       number: number,
       input: unknown
     ): Promise<unknown> =>
-      ipcRenderer.invoke('auth:submit-pull-request-review', owner, repo, number, input)
+      ipcRenderer.invoke('auth:submit-pull-request-review', owner, repo, number, input),
+    mergePullRequest: (
+      owner: string,
+      repo: string,
+      number: number,
+      mergeMethod: string,
+      commitTitle?: string,
+      commitMessage?: string
+    ): Promise<unknown> =>
+      ipcRenderer.invoke(
+        'auth:merge-pull-request',
+        owner,
+        repo,
+        number,
+        mergeMethod,
+        commitTitle,
+        commitMessage
+      ),
+    closePullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
+      ipcRenderer.invoke('auth:close-pull-request', owner, repo, number),
+    reopenPullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
+      ipcRenderer.invoke('auth:reopen-pull-request', owner, repo, number),
+    convertPullRequestToDraft: (nodeId: string): Promise<unknown> =>
+      ipcRenderer.invoke('auth:convert-pull-request-to-draft', nodeId),
+    markPullRequestReady: (nodeId: string): Promise<unknown> =>
+      ipcRenderer.invoke('auth:mark-pull-request-ready', nodeId)
   },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),

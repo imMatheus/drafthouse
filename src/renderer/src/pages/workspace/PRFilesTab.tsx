@@ -384,7 +384,9 @@ function PullRequestFileDiffCard({
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', getFileStatusClassName(file.status))}>
+            <span
+              className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', getFileStatusClassName(file.status))}
+            >
               {formatFileStatus(file.status)}
             </span>
             <span className="truncate text-sm font-semibold text-foreground">{file.filename}</span>

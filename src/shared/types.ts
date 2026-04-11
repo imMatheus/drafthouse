@@ -41,6 +41,7 @@ export interface PullRequest {
   html_url: string
   created_at: string
   updated_at: string
+  merged_at: string | null
   comments: number
   user: {
     login: string
@@ -144,9 +145,12 @@ export interface PaginatedPullRequestCommits {
 }
 
 export interface PullRequestDetail extends PullRequest {
+  node_id: string
   body: string | null
   merged: boolean
   draft: boolean
+  mergeable: boolean | null
+  mergeable_state: string
   additions: number
   deletions: number
   changed_files: number
@@ -205,4 +209,12 @@ export interface SubmitPullRequestReviewInput {
   body: string
   event: PullRequestReviewEvent
   comments: PullRequestReviewDraftComment[]
+}
+
+export type PullRequestMergeMethod = 'merge' | 'squash' | 'rebase'
+
+export interface PullRequestMergeResult {
+  sha: string
+  merged: boolean
+  message: string
 }

@@ -9,6 +9,8 @@ import type {
   PullRequestComment,
   PullRequestDetail,
   PullRequestFile,
+  PullRequestMergeMethod,
+  PullRequestMergeResult,
   PullRequestReview,
   PullRequestReviewComment,
   PullRequestReviewDraftComment,
@@ -82,6 +84,18 @@ interface AuthAPI {
       comments: PullRequestReviewDraftComment[]
     }
   ) => Promise<PullRequestReview>
+  mergePullRequest: (
+    owner: string,
+    repo: string,
+    number: number,
+    mergeMethod: PullRequestMergeMethod,
+    commitTitle?: string,
+    commitMessage?: string
+  ) => Promise<PullRequestMergeResult>
+  closePullRequest: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
+  reopenPullRequest: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
+  convertPullRequestToDraft: (nodeId: string) => Promise<void>
+  markPullRequestReady: (nodeId: string) => Promise<void>
 }
 
 interface FsAPI {

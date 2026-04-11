@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bold,
+  Check,
+  ChevronDown,
   Code,
   ExternalLink,
   Eye,
   FileCode,
   GitCommit,
+  GitMerge,
   GitPullRequest,
   Heading,
   Italic,
@@ -20,6 +23,7 @@ import type {
   AuthData,
   PullRequestComment,
   PullRequestDetail,
+  PullRequestMergeMethod,
   PullRequestReview,
   PullRequestReviewComment,
   PullRequestReviewDraftComment
@@ -341,6 +345,7 @@ function PRConversationTab({
       ))}
 
       <CommentBox owner={owner} repo={repo} number={pr.number} />
+      <PRActionBar pr={pr} owner={owner} repo={repo} />
     </div>
   )
 }
@@ -736,6 +741,239 @@ function CommentBox({ owner, repo, number }: { owner: string; repo: string; numb
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+const MERGE_METHOD_OPTIONS: { key: PullRequestMergeMethod; label: string }[] = [
+  { key: 'merge', label: 'Create a merge commit' },
+  { key: 'squash', label: 'Squash and merge' },
+  { key: 'rebase', label: 'Rebase and merge' }
+]
+
+function getMergeButtonLabel(method: PullRequestMergeMethod): string {
+  switch (method) {
+    case 'merge':
+      return 'Merge pull request'
+    case 'squash':
+      return 'Squash and merge'
+    case 'rebase':
+      return 'Rebase and merge'
+  }
+}
+
+function PRActionBar({
+  pr,
+  owner,
+  repo
+}: {
+  pr: PullRequestDetail
+  owner: string
+  repo: string
+}) {
+  const queryClient = useQueryClient()
+  const [mergeMethod, setMergeMethod] = useState<PullRequestMergeMethod>('merge')
+  const [isMergeMethodOpen, setIsMergeMethodOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const state = pr.draft ? 'draft' : pr.merged ? 'merged' : pr.state === 'closed' ? 'closed' : 'open'
+
+  if (state === 'merged') return null
+
+  const invalidateAfterAction = async (): Promise<void> => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['pull-request', owner, repo, pr.number] }),
+      queryClient.invalidateQueries({ queryKey: ['pull-requests', owner, repo] })
+    ])
+  }
+
+  const handleMerge = async (): Promise<void> => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    setErrorMessage(null)
+    try {
+      await window.api.auth.mergePullRequest(owner, repo, pr.number, mergeMethod)
+      await invalidateAfterAction()
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to merge pull request')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleClose = async (): Promise<void> => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    setErrorMessage(null)
+    try {
+      await window.api.auth.closePullRequest(owner, repo, pr.number)
+      await invalidateAfterAction()
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to close pull request')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleReopen = async (): Promise<void> => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    setErrorMessage(null)
+    try {
+      await window.api.auth.reopenPullRequest(owner, repo, pr.number)
+      await invalidateAfterAction()
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to reopen pull request')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleConvertToDraft = async (): Promise<void> => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    setErrorMessage(null)
+    try {
+      await window.api.auth.convertPullRequestToDraft(pr.node_id)
+      await invalidateAfterAction()
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to convert to draft')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleMarkReady = async (): Promise<void> => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    setErrorMessage(null)
+    try {
+      await window.api.auth.markPullRequestReady(pr.node_id)
+      await invalidateAfterAction()
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to mark as ready for review')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const mergeDisabledReason =
+    pr.mergeable === false
+      ? 'This branch has conflicts that must be resolved'
+      : pr.mergeable_state === 'blocked'
+        ? 'Merging is blocked'
+        : null
+
+  return (
+    <div className="mt-4 rounded-lg border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        {state === 'open' ? (
+          <>
+            <div className="relative flex">
+              <button
+                onClick={handleMerge}
+                disabled={isSubmitting || pr.mergeable === null || mergeDisabledReason !== null}
+                className="rounded-l-md bg-success px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <GitMerge size={14} />
+                  {isSubmitting
+                    ? 'Merging...'
+                    : pr.mergeable === null
+                      ? 'Checking...'
+                      : getMergeButtonLabel(mergeMethod)}
+                </span>
+              </button>
+              <button
+                onClick={() => setIsMergeMethodOpen(!isMergeMethodOpen)}
+                disabled={isSubmitting}
+                className="rounded-r-md border-l border-success/30 bg-success px-2 py-2 text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronDown size={14} />
+              </button>
+              {isMergeMethodOpen ? (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsMergeMethodOpen(false)} />
+                  <div className="absolute left-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+                    <div className="border-b border-border px-3 py-2 text-xs font-medium text-foreground-muted">
+                      Merge method
+                    </div>
+                    {MERGE_METHOD_OPTIONS.map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => {
+                          setMergeMethod(option.key)
+                          setIsMergeMethodOpen(false)
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover"
+                      >
+                        <span className="inline-flex size-4 items-center justify-center">
+                          {mergeMethod === option.key ? <Check size={13} /> : null}
+                        </span>
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            <button
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="rounded-md border border-border bg-interactive px-4 py-2 text-xs font-medium text-danger transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isSubmitting ? 'Closing...' : 'Close pull request'}
+            </button>
+
+            <button
+              onClick={handleConvertToDraft}
+              disabled={isSubmitting}
+              className="rounded-md px-4 py-2 text-xs font-medium text-foreground-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Convert to draft
+            </button>
+          </>
+        ) : null}
+
+        {state === 'draft' ? (
+          <>
+            <button
+              onClick={handleMarkReady}
+              disabled={isSubmitting}
+              className="rounded-md bg-success px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isSubmitting ? 'Marking ready...' : 'Ready for review'}
+            </button>
+
+            <button
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="rounded-md border border-border bg-interactive px-4 py-2 text-xs font-medium text-danger transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isSubmitting ? 'Closing...' : 'Close pull request'}
+            </button>
+          </>
+        ) : null}
+
+        {state === 'closed' ? (
+          <button
+            onClick={handleReopen}
+            disabled={isSubmitting}
+            className="rounded-md bg-success px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isSubmitting ? 'Reopening...' : 'Reopen pull request'}
+          </button>
+        ) : null}
+      </div>
+
+      {mergeDisabledReason ? (
+        <p className="mt-2 text-sm text-danger">{mergeDisabledReason}</p>
+      ) : null}
+
+      {errorMessage ? <p className="mt-2 text-sm text-danger">{errorMessage}</p> : null}
     </div>
   )
 }
