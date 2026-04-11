@@ -1,6 +1,16 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ExternalLink, FileDiff, FileMinus, FilePlus, Folder, MessageSquarePlus, Search, X } from 'lucide-react'
+import {
+  ChevronDown,
+  ExternalLink,
+  FileDiff,
+  FileMinus,
+  FilePlus,
+  Folder,
+  MessageSquarePlus,
+  Search,
+  X
+} from 'lucide-react'
 import type {
   AuthData,
   PullRequestDetail,
@@ -11,11 +21,7 @@ import type {
   PullRequestReviewLineSide
 } from '../../../../shared/types'
 import { useTheme } from '../../hooks/useTheme'
-import {
-  getLanguageFromPath,
-  tokenizeDiffHunks,
-  type HighlightedToken
-} from '../../lib/shiki'
+import { getLanguageFromPath, tokenizeDiffHunks, type HighlightedToken } from '../../lib/shiki'
 import MarkdownBody from './MarkdownBody'
 import ReviewThreadCard from './ReviewThreadCard'
 import { getDiffThreadKey, parsePullRequestFileDiff } from './pullRequestDiff'
@@ -208,7 +214,11 @@ export default function PRFilesTab({
               className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
             />
             {filterValue ? (
-              <button type="button" onClick={() => setFilterValue('')} className="shrink-0 text-foreground-subtle hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => setFilterValue('')}
+                className="shrink-0 text-foreground-subtle hover:text-foreground"
+              >
                 <X size={14} />
               </button>
             ) : null}
@@ -218,11 +228,7 @@ export default function PRFilesTab({
             {filteredFiles.length === 0 && !isLoading ? (
               <div className="px-3 py-4 text-xs text-foreground-muted">No files match this filter.</div>
             ) : (
-              <FileTree
-                files={filteredFiles}
-                activeFilePath={activeFilePath}
-                onSelectFile={handleScrollToFile}
-              />
+              <FileTree files={filteredFiles} activeFilePath={activeFilePath} onSelectFile={handleScrollToFile} />
             )}
           </div>
 
@@ -240,26 +246,6 @@ export default function PRFilesTab({
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                {pr.changed_files} file{pr.changed_files !== 1 ? 's' : ''} changed
-              </p>
-              <p className="mt-1 text-sm text-foreground-muted">
-                {pr.additions} additions and {pr.deletions} deletions
-              </p>
-            </div>
-            {draftReviewComments.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setIsSubmitReviewOpen(true)}
-                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent-hover"
-              >
-                Submit review ({draftReviewComments.length})
-              </button>
-            ) : null}
-          </div>
-
           {filesErrorMessage ? (
             <div className="rounded-xl border border-border bg-surface px-4 py-3">
               <p className="text-sm text-foreground-muted">{filesErrorMessage.message}</p>
@@ -803,13 +789,7 @@ function SubmitReviewDialog({
   )
 }
 
-function DiffLineContent({
-  tokens,
-  fallback
-}: {
-  tokens: HighlightedToken[] | undefined
-  fallback: string
-}) {
+function DiffLineContent({ tokens, fallback }: { tokens: HighlightedToken[] | undefined; fallback: string }) {
   if (!tokens) return <>{fallback}</>
   return (
     <>
@@ -1051,5 +1031,3 @@ function getFileDiffPrefix(kind: 'hunk' | 'addition' | 'deletion' | 'context' | 
   if (kind === 'meta') return '\\'
   return ' '
 }
-
-
