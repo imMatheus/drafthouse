@@ -197,15 +197,20 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           onCloseTab={handleCloseTab}
         />
 
-        <main className="min-h-0 flex-1 overflow-y-auto p-6">{renderWorkspaceTabContent({
-          activeTab,
-          gitInfo,
-          gitInfoError,
-          isLoadingGitInfo,
-          onOpenPullRequest: handleOpenPullRequest,
-          onPullRequestSubviewChange: handlePullRequestSubviewChange,
-          onPullRequestTitleChange: handlePullRequestTitleChange
-        })}</main>
+        <main
+          className={`min-h-0 flex-1 ${activeTab?.kind === 'file' ? 'overflow-hidden' : 'overflow-y-auto p-6'}`}
+        >
+          {renderWorkspaceTabContent({
+            activeTab,
+            folderPath,
+            gitInfo,
+            gitInfoError,
+            isLoadingGitInfo,
+            onOpenPullRequest: handleOpenPullRequest,
+            onPullRequestSubviewChange: handlePullRequestSubviewChange,
+            onPullRequestTitleChange: handlePullRequestTitleChange
+          })}
+        </main>
       </div>
     </div>
   )
@@ -213,6 +218,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
 function renderWorkspaceTabContent({
   activeTab,
+  folderPath,
   gitInfo,
   gitInfoError,
   isLoadingGitInfo,
@@ -221,6 +227,7 @@ function renderWorkspaceTabContent({
   onPullRequestTitleChange
 }: {
   activeTab: WorkspaceTab | null
+  folderPath: string
   gitInfo: GitRepoInfo | null | undefined
   gitInfoError: Error | null
   isLoadingGitInfo: boolean
@@ -241,7 +248,7 @@ function renderWorkspaceTabContent({
     case 'welcome':
       return <WelcomeView />
     case 'file':
-      return <FilesView filePath={activeTab.path} />
+      return <FilesView filePath={activeTab.path} folderPath={folderPath} />
     case 'pull-request-list':
       return (
         <PullRequestsView

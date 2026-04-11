@@ -141,7 +141,7 @@ function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment 
                   <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
                     {line.newLine ?? ''}
                   </td>
-                  <td className="px-3 py-1.5 font-mono text-[13px] text-foreground whitespace-pre">
+                  <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
                     <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
                       {line.prefix}
                     </span>
