@@ -36,7 +36,7 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
   const segments = relativePath.split('/')
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       <div className="flex items-center gap-1.5 border-b border-border bg-surface px-4 py-2">
         {segments.map((segment, i) => (
           <Fragment key={i}>
