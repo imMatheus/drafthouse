@@ -1,4 +1,4 @@
-export type PullRequestSubview = 'conversation' | 'commits' | 'checks' | 'files'
+export type PullRequestSubview = 'conversation' | 'commits' | 'files'
 
 export type WorkspaceTab =
   | {

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bold,
-  Check,
   Code,
   ExternalLink,
   Eye,
@@ -27,7 +26,6 @@ import type {
 } from '../../../../shared/types'
 import type { PullRequestSubview } from '../../lib/workspaceTabs'
 import MarkdownBody from './MarkdownBody'
-import PlaceholderView from './PlaceholderView'
 import PRCommitsTab from './PRCommitsTab'
 import PRFilesTab from './PRFilesTab'
 import ReviewThreadCard from './ReviewThreadCard'
@@ -169,13 +167,6 @@ export default function PullRequestDetailView({
           Commits
         </PRDetailTabButton>
         <PRDetailTabButton
-          active={subview === 'checks'}
-          onClick={() => onSubviewChange('checks')}
-          icon={<Check size={14} />}
-        >
-          Checks
-        </PRDetailTabButton>
-        <PRDetailTabButton
           active={subview === 'files'}
           onClick={() => onSubviewChange('files')}
           icon={<FileCode size={14} />}
@@ -211,13 +202,6 @@ export default function PullRequestDetailView({
 
         {subview === 'commits' ? (
           <PRCommitsTab owner={owner} repo={repo} number={pr.number} totalCommits={pr.commits} />
-        ) : null}
-
-        {subview === 'checks' ? (
-          <PlaceholderView
-            title="Checks"
-            description="Status checks for this pull request will appear here."
-          />
         ) : null}
 
         {subview === 'files' ? (
