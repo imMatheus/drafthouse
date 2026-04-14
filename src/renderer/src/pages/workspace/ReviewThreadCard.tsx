@@ -282,7 +282,7 @@ function InlineReviewReplyForm({
     setErrorMessage(null)
 
     try {
-      await window.api.auth.replyToPullRequestReviewComment(
+      await window.api.github.pullComments.createReply(
         owner,
         repo,
         number,

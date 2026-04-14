@@ -32,7 +32,7 @@ export default function RepoSidebar() {
   const query = debouncedSearch || undefined
   const { data: repos, isLoading } = useQuery({
     queryKey: ['repos', query],
-    queryFn: () => window.api.auth.getRepos(query)
+    queryFn: () => window.api.github.repos.list(query)
   })
 
   return (

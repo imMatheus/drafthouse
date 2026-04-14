@@ -42,7 +42,7 @@ export default function PRCommitsTab({
 
   const { data, isLoading, error, isFetching } = useQuery<PaginatedPullRequestCommits, Error>({
     queryKey: ['pull-request-commits', owner, repo, number, safePage],
-    queryFn: () => window.api.auth.getPullRequestCommits(owner, repo, number, safePage, COMMITS_PER_PAGE),
+    queryFn: () => window.api.github.pulls.listCommits(owner, repo, number, safePage, COMMITS_PER_PAGE),
     retry: false,
     enabled: totalCommits > 0
   })
@@ -52,7 +52,7 @@ export default function PRCommitsTab({
 
     void queryClient.prefetchQuery({
       queryKey: ['pull-request-commits', owner, repo, number, safePage + 1],
-      queryFn: () => window.api.auth.getPullRequestCommits(owner, repo, number, safePage + 1, COMMITS_PER_PAGE)
+      queryFn: () => window.api.github.pulls.listCommits(owner, repo, number, safePage + 1, COMMITS_PER_PAGE)
     })
   }, [number, owner, queryClient, repo, safePage, totalPages])
 

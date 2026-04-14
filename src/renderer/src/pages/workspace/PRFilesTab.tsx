@@ -57,7 +57,7 @@ export default function PRFilesTab({
     error: filesError
   } = useQuery<PullRequestFile[], Error>({
     queryKey: ['pull-request-files', owner, repo, pr.number],
-    queryFn: () => window.api.auth.getPullRequestFiles(owner, repo, pr.number),
+    queryFn: () => window.api.github.pulls.listFiles(owner, repo, pr.number),
     retry: false
   })
   const {
@@ -66,7 +66,7 @@ export default function PRFilesTab({
     error: reviewCommentsError
   } = useQuery<PullRequestReviewComment[], Error>({
     queryKey: ['pull-request-review-comments', owner, repo, pr.number],
-    queryFn: () => window.api.auth.getPullRequestReviewComments(owner, repo, pr.number),
+    queryFn: () => window.api.github.pullComments.listForPull(owner, repo, pr.number),
     retry: false
   })
   const { data: auth } = useQuery<AuthData | null, Error>({
@@ -594,7 +594,7 @@ function InlineDiffCommentComposer({
     setErrorMessage(null)
 
     try {
-      await window.api.auth.createPullRequestReviewComment(owner, repo, number, {
+      await window.api.github.pullComments.create(owner, repo, number, {
         body,
         commitId,
         path,
@@ -707,7 +707,7 @@ function SubmitReviewDialog({
     setErrorMessage(null)
 
     try {
-      await window.api.auth.submitPullRequestReview(owner, repo, number, {
+      await window.api.github.reviews.create(owner, repo, number, {
         commitId,
         body,
         event,

@@ -11,89 +11,411 @@ const api = {
         callback(data)
       ipcRenderer.on('auth:device-code', listener)
       return () => ipcRenderer.removeListener('auth:device-code', listener)
+    }
+  },
+  github: {
+    repos: {
+      list: (query?: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:repos:list', query)
     },
-    getRepos: (query?: string): Promise<unknown> => ipcRenderer.invoke('auth:get-repos', query),
-    getPullRequests: (owner: string, repo: string, state?: string): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-requests', owner, repo, state),
-    getPullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-request', owner, repo, number),
-    getPullRequestCommits: (
-      owner: string,
-      repo: string,
-      number: number,
-      page = 1,
-      perPage = 10
-    ): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-request-commits', owner, repo, number, page, perPage),
-    getPullRequestComments: (owner: string, repo: string, number: number): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-request-comments', owner, repo, number),
-    getPullRequestReviewComments: (owner: string, repo: string, number: number): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-request-review-comments', owner, repo, number),
-    getPullRequestReviews: (owner: string, repo: string, number: number): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-request-reviews', owner, repo, number),
-    getPullRequestFiles: (owner: string, repo: string, number: number): Promise<unknown> =>
-      ipcRenderer.invoke('auth:get-pull-request-files', owner, repo, number),
-    createPullRequestComment: (
-      owner: string,
-      repo: string,
-      number: number,
-      body: string
-    ): Promise<unknown> =>
-      ipcRenderer.invoke('auth:create-pull-request-comment', owner, repo, number, body),
-    createPullRequestReviewComment: (
-      owner: string,
-      repo: string,
-      number: number,
-      input: unknown
-    ): Promise<unknown> =>
-      ipcRenderer.invoke('auth:create-pull-request-review-comment', owner, repo, number, input),
-    replyToPullRequestReviewComment: (
-      owner: string,
-      repo: string,
-      number: number,
-      commentId: number,
-      body: string
-    ): Promise<unknown> =>
-      ipcRenderer.invoke(
-        'auth:reply-to-pull-request-review-comment',
-        owner,
-        repo,
-        number,
-        commentId,
-        body
-      ),
-    submitPullRequestReview: (
-      owner: string,
-      repo: string,
-      number: number,
-      input: unknown
-    ): Promise<unknown> =>
-      ipcRenderer.invoke('auth:submit-pull-request-review', owner, repo, number, input),
-    mergePullRequest: (
-      owner: string,
-      repo: string,
-      number: number,
-      mergeMethod: string,
-      commitTitle?: string,
-      commitMessage?: string
-    ): Promise<unknown> =>
-      ipcRenderer.invoke(
-        'auth:merge-pull-request',
-        owner,
-        repo,
-        number,
-        mergeMethod,
-        commitTitle,
-        commitMessage
-      ),
-    closePullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
-      ipcRenderer.invoke('auth:close-pull-request', owner, repo, number),
-    reopenPullRequest: (owner: string, repo: string, number: number): Promise<unknown> =>
-      ipcRenderer.invoke('auth:reopen-pull-request', owner, repo, number),
-    convertPullRequestToDraft: (nodeId: string): Promise<unknown> =>
-      ipcRenderer.invoke('auth:convert-pull-request-to-draft', nodeId),
-    markPullRequestReady: (nodeId: string): Promise<unknown> =>
-      ipcRenderer.invoke('auth:mark-pull-request-ready', nodeId)
+    branches: {
+      list: (
+        owner: string,
+        repo: string,
+        options?: { protected?: boolean; perPage?: number; page?: number }
+      ): Promise<unknown> => ipcRenderer.invoke('github:branches:list', owner, repo, options),
+      get: (owner: string, repo: string, branch: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:branches:get', owner, repo, branch),
+      rename: (owner: string, repo: string, branch: string, newName: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:branches:rename', owner, repo, branch, newName),
+      syncFork: (owner: string, repo: string, branch: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:branches:sync-fork', owner, repo, branch),
+      merge: (
+        owner: string,
+        repo: string,
+        base: string,
+        head: string,
+        commitMessage?: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:branches:merge', owner, repo, base, head, commitMessage)
+    },
+    collaborators: {
+      list: (
+        owner: string,
+        repo: string,
+        options?: {
+          affiliation?: string
+          permission?: string
+          perPage?: number
+          page?: number
+        }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:collaborators:list', owner, repo, options),
+      check: (owner: string, repo: string, username: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:collaborators:check', owner, repo, username),
+      add: (
+        owner: string,
+        repo: string,
+        username: string,
+        permission?: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:collaborators:add', owner, repo, username, permission),
+      remove: (owner: string, repo: string, username: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:collaborators:remove', owner, repo, username),
+      getPermission: (owner: string, repo: string, username: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:collaborators:get-permission', owner, repo, username)
+    },
+    commits: {
+      list: (
+        owner: string,
+        repo: string,
+        options?: {
+          sha?: string
+          path?: string
+          author?: string
+          committer?: string
+          since?: string
+          until?: string
+          perPage?: number
+          page?: number
+        }
+      ): Promise<unknown> => ipcRenderer.invoke('github:commits:list', owner, repo, options),
+      get: (
+        owner: string,
+        repo: string,
+        ref: string,
+        options?: { page?: number; perPage?: number }
+      ): Promise<unknown> => ipcRenderer.invoke('github:commits:get', owner, repo, ref, options),
+      compare: (
+        owner: string,
+        repo: string,
+        basehead: string,
+        options?: { page?: number; perPage?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:commits:compare', owner, repo, basehead, options),
+      listBranchesForHead: (
+        owner: string,
+        repo: string,
+        commitSha: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:commits:list-branches-for-head', owner, repo, commitSha),
+      listPullRequests: (
+        owner: string,
+        repo: string,
+        commitSha: string,
+        options?: { perPage?: number; page?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:commits:list-pull-requests', owner, repo, commitSha, options)
+    },
+    commitComments: {
+      listForRepo: (
+        owner: string,
+        repo: string,
+        options?: { perPage?: number; page?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:commit-comments:list-for-repo', owner, repo, options),
+      get: (owner: string, repo: string, commentId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:commit-comments:get', owner, repo, commentId),
+      update: (owner: string, repo: string, commentId: number, body: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:commit-comments:update', owner, repo, commentId, body),
+      delete: (owner: string, repo: string, commentId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:commit-comments:delete', owner, repo, commentId),
+      listForCommit: (
+        owner: string,
+        repo: string,
+        commitSha: string,
+        options?: { perPage?: number; page?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:commit-comments:list-for-commit',
+          owner,
+          repo,
+          commitSha,
+          options
+        ),
+      create: (
+        owner: string,
+        repo: string,
+        commitSha: string,
+        body: string,
+        path?: string,
+        position?: number
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:commit-comments:create',
+          owner,
+          repo,
+          commitSha,
+          body,
+          path,
+          position
+        )
+    },
+    commitStatuses: {
+      getCombined: (
+        owner: string,
+        repo: string,
+        ref: string,
+        options?: { perPage?: number; page?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:commit-statuses:get-combined', owner, repo, ref, options),
+      list: (
+        owner: string,
+        repo: string,
+        ref: string,
+        options?: { perPage?: number; page?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:commit-statuses:list', owner, repo, ref, options),
+      create: (
+        owner: string,
+        repo: string,
+        sha: string,
+        state: string,
+        options?: { targetUrl?: string | null; description?: string | null; context?: string }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:commit-statuses:create', owner, repo, sha, state, options)
+    },
+    emojis: {
+      get: (): Promise<unknown> => ipcRenderer.invoke('github:emojis:get')
+    },
+    pulls: {
+      list: (
+        owner: string,
+        repo: string,
+        options?: {
+          state?: string
+          head?: string
+          base?: string
+          sort?: string
+          direction?: string
+          perPage?: number
+          page?: number
+        }
+      ): Promise<unknown> => ipcRenderer.invoke('github:pulls:list', owner, repo, options),
+      get: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:get', owner, repo, number),
+      create: (owner: string, repo: string, input: unknown): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:create', owner, repo, input),
+      update: (
+        owner: string,
+        repo: string,
+        number: number,
+        input: unknown
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:update', owner, repo, number, input),
+      close: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:close', owner, repo, number),
+      reopen: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:reopen', owner, repo, number),
+      listCommits: (
+        owner: string,
+        repo: string,
+        number: number,
+        page?: number,
+        perPage?: number
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:list-commits', owner, repo, number, page, perPage),
+      listFiles: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:list-files', owner, repo, number),
+      checkMerged: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:check-merged', owner, repo, number),
+      merge: (
+        owner: string,
+        repo: string,
+        number: number,
+        mergeMethod: string,
+        commitTitle?: string,
+        commitMessage?: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:pulls:merge',
+          owner,
+          repo,
+          number,
+          mergeMethod,
+          commitTitle,
+          commitMessage
+        ),
+      updateBranch: (
+        owner: string,
+        repo: string,
+        number: number,
+        expectedHeadSha?: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:update-branch', owner, repo, number, expectedHeadSha),
+      convertToDraft: (nodeId: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:convert-to-draft', nodeId),
+      markReady: (nodeId: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:mark-ready', nodeId)
+    },
+    pullComments: {
+      listIssueComments: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:list-issue-comments', owner, repo, number),
+      createIssueComment: (
+        owner: string,
+        repo: string,
+        number: number,
+        body: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:create-issue-comment', owner, repo, number, body),
+      listForPull: (
+        owner: string,
+        repo: string,
+        number: number,
+        options?: {
+          sort?: string
+          direction?: string
+          since?: string
+          perPage?: number
+          page?: number
+        }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:list-for-pull', owner, repo, number, options),
+      listForRepo: (
+        owner: string,
+        repo: string,
+        options?: {
+          sort?: string
+          direction?: string
+          since?: string
+          perPage?: number
+          page?: number
+        }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:list-for-repo', owner, repo, options),
+      get: (owner: string, repo: string, commentId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:get', owner, repo, commentId),
+      create: (owner: string, repo: string, number: number, input: unknown): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:create', owner, repo, number, input),
+      createReply: (
+        owner: string,
+        repo: string,
+        number: number,
+        commentId: number,
+        body: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:pull-comments:create-reply',
+          owner,
+          repo,
+          number,
+          commentId,
+          body
+        ),
+      update: (owner: string, repo: string, commentId: number, body: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:update', owner, repo, commentId, body),
+      delete: (owner: string, repo: string, commentId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:delete', owner, repo, commentId)
+    },
+    reviewRequests: {
+      get: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:review-requests:get', owner, repo, number),
+      request: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewers?: string[],
+        teamReviewers?: string[]
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:review-requests:request',
+          owner,
+          repo,
+          number,
+          reviewers,
+          teamReviewers
+        ),
+      remove: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewers: string[],
+        teamReviewers?: string[]
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:review-requests:remove',
+          owner,
+          repo,
+          number,
+          reviewers,
+          teamReviewers
+        )
+    },
+    reviews: {
+      list: (
+        owner: string,
+        repo: string,
+        number: number,
+        options?: { perPage?: number; page?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:reviews:list', owner, repo, number, options),
+      get: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewId: number
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:reviews:get', owner, repo, number, reviewId),
+      create: (owner: string, repo: string, number: number, input: unknown): Promise<unknown> =>
+        ipcRenderer.invoke('github:reviews:create', owner, repo, number, input),
+      update: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewId: number,
+        body: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:reviews:update', owner, repo, number, reviewId, body),
+      deletePending: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewId: number
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:reviews:delete-pending', owner, repo, number, reviewId),
+      listComments: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewId: number,
+        options?: { perPage?: number; page?: number }
+      ): Promise<unknown> =>
+        ipcRenderer.invoke('github:reviews:list-comments', owner, repo, number, reviewId, options),
+      dismiss: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewId: number,
+        message: string,
+        event?: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:reviews:dismiss',
+          owner,
+          repo,
+          number,
+          reviewId,
+          message,
+          event
+        ),
+      submitPending: (
+        owner: string,
+        repo: string,
+        number: number,
+        reviewId: number,
+        reviewEvent: string,
+        body?: string
+      ): Promise<unknown> =>
+        ipcRenderer.invoke(
+          'github:reviews:submit-pending',
+          owner,
+          repo,
+          number,
+          reviewId,
+          reviewEvent,
+          body
+        )
+    }
   },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),

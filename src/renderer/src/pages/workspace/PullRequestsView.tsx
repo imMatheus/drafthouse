@@ -43,7 +43,7 @@ export default function PullRequestsView({
     error
   } = useQuery<PullRequest[], Error>({
     queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, stateFilter],
-    queryFn: () => window.api.auth.getPullRequests(gitInfo!.owner, gitInfo!.repo, stateFilter),
+    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: stateFilter as 'open' | 'closed' | 'all' }),
     enabled: gitInfo != null,
     retry: false
   })

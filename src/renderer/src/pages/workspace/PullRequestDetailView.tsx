@@ -74,7 +74,7 @@ export default function PullRequestDetailView({
     error
   } = useQuery<PullRequestDetail, Error>({
     queryKey: ['pull-request', owner, repo, number],
-    queryFn: () => window.api.auth.getPullRequest(owner, repo, number),
+    queryFn: () => window.api.github.pulls.get(owner, repo, number),
     retry: false
   })
 
@@ -279,7 +279,7 @@ function PRConversationTab({
     error: commentsError
   } = useQuery<PullRequestComment[], Error>({
     queryKey: ['pull-request-comments', owner, repo, pr.number],
-    queryFn: () => window.api.auth.getPullRequestComments(owner, repo, pr.number),
+    queryFn: () => window.api.github.pullComments.listIssueComments(owner, repo, pr.number),
     retry: false
   })
   const {
@@ -288,7 +288,7 @@ function PRConversationTab({
     error: reviewCommentsError
   } = useQuery<PullRequestReviewComment[], Error>({
     queryKey: ['pull-request-review-comments', owner, repo, pr.number],
-    queryFn: () => window.api.auth.getPullRequestReviewComments(owner, repo, pr.number),
+    queryFn: () => window.api.github.pullComments.listForPull(owner, repo, pr.number),
     retry: false
   })
   const {
@@ -297,7 +297,7 @@ function PRConversationTab({
     error: reviewsError
   } = useQuery<PullRequestReview[], Error>({
     queryKey: ['pull-request-reviews', owner, repo, pr.number],
-    queryFn: () => window.api.auth.getPullRequestReviews(owner, repo, pr.number),
+    queryFn: () => window.api.github.reviews.list(owner, repo, pr.number),
     retry: false
   })
 
@@ -590,7 +590,7 @@ function CommentBox({ owner, repo, number }: { owner: string; repo: string; numb
     if (!body.trim() || isSubmitting) return
     setIsSubmitting(true)
     try {
-      await window.api.auth.createPullRequestComment(owner, repo, number, body)
+      await window.api.github.pullComments.createIssueComment(owner, repo, number, body)
       setBody('')
       setActiveTab('write')
       queryClient.invalidateQueries({ queryKey: ['pull-request-comments', owner, repo, number] })
@@ -793,7 +793,7 @@ function PRActionBar({
     setIsSubmitting(true)
     setErrorMessage(null)
     try {
-      await window.api.auth.mergePullRequest(owner, repo, pr.number, mergeMethod)
+      await window.api.github.pulls.merge(owner, repo, pr.number, mergeMethod)
       await invalidateAfterAction()
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to merge pull request')
@@ -807,7 +807,7 @@ function PRActionBar({
     setIsSubmitting(true)
     setErrorMessage(null)
     try {
-      await window.api.auth.closePullRequest(owner, repo, pr.number)
+      await window.api.github.pulls.close(owner, repo, pr.number)
       await invalidateAfterAction()
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to close pull request')
@@ -821,7 +821,7 @@ function PRActionBar({
     setIsSubmitting(true)
     setErrorMessage(null)
     try {
-      await window.api.auth.reopenPullRequest(owner, repo, pr.number)
+      await window.api.github.pulls.reopen(owner, repo, pr.number)
       await invalidateAfterAction()
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to reopen pull request')
@@ -835,7 +835,7 @@ function PRActionBar({
     setIsSubmitting(true)
     setErrorMessage(null)
     try {
-      await window.api.auth.convertPullRequestToDraft(pr.node_id)
+      await window.api.github.pulls.convertToDraft(pr.node_id)
       await invalidateAfterAction()
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to convert to draft')
@@ -849,7 +849,7 @@ function PRActionBar({
     setIsSubmitting(true)
     setErrorMessage(null)
     try {
-      await window.api.auth.markPullRequestReady(pr.node_id)
+      await window.api.github.pulls.markReady(pr.node_id)
       await invalidateAfterAction()
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to mark as ready for review')

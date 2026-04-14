@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerAuthHandlers } from './auth'
 import { registerFsHandlers } from './fs'
+import { registerGitHubHandlers } from './github'
 
 function createWindow(): void {
   // Create the browser window.
@@ -52,6 +53,7 @@ app.whenReady().then(() => {
   })
 
   registerAuthHandlers()
+  registerGitHubHandlers()
   registerFsHandlers()
 
   const menu = Menu.buildFromTemplate([
