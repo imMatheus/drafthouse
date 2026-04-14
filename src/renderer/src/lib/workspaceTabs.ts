@@ -23,6 +23,8 @@ export type WorkspaceTab =
       prState?: 'open' | 'closed' | 'merged' | 'draft'
     }
 
+export type WorkspaceActiveView = 'workspace' | 'agent'
+
 export interface WorkspaceSidebarState {
   visible: boolean
   activePanel: 'explorer' | null
@@ -33,6 +35,7 @@ export interface WorkspaceSession {
   sidebar: WorkspaceSidebarState
   tabs: WorkspaceTab[]
   activeTabId: WorkspaceTab['id'] | null
+  activeView: WorkspaceActiveView
 }
 
 export function createWelcomeTab(): WorkspaceTab {
@@ -76,7 +79,8 @@ export function createInitialWorkspaceSession(folderPath: string): WorkspaceSess
       activePanel: 'explorer'
     },
     tabs: [welcomeTab],
-    activeTabId: welcomeTab.id
+    activeTabId: welcomeTab.id,
+    activeView: 'workspace'
   }
 }
 

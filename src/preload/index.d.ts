@@ -1,5 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
+  AgentEvent,
+  AgentSessionSummary,
   AuthData,
   FileEntry,
   GitHubRepo,
@@ -400,6 +402,25 @@ interface GitHubAPI {
 }
 
 // ============================================================
+// Agent API
+// ============================================================
+
+interface AgentAPI {
+  start: (cwd: string, prompt: string, files?: string[], skipPermissions?: boolean) => Promise<{ sessionId: string }>
+  continue: (
+    sessionId: string,
+    cliSessionId: string,
+    cwd: string,
+    prompt: string,
+    files?: string[],
+    skipPermissions?: boolean
+  ) => Promise<void>
+  stop: (sessionId: string) => Promise<void>
+  listSessions: () => Promise<AgentSessionSummary[]>
+  onEvent: (callback: (data: AgentEvent) => void) => () => void
+}
+
+// ============================================================
 // Filesystem API
 // ============================================================
 
@@ -422,6 +443,7 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
+      agent: AgentAPI
       auth: AuthAPI
       github: GitHubAPI
       fs: FsAPI

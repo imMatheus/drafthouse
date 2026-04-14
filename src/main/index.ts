@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, Menu, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { registerAgentHandlers } from './agent'
 import { registerAuthHandlers } from './auth'
 import { registerFsHandlers } from './fs'
 import { registerGitHubHandlers } from './github'
@@ -55,6 +56,7 @@ app.whenReady().then(() => {
   registerAuthHandlers()
   registerGitHubHandlers()
   registerFsHandlers()
+  registerAgentHandlers()
 
   const menu = Menu.buildFromTemplate([
     {

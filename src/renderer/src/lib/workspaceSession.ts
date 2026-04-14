@@ -5,6 +5,7 @@ import {
   createPullRequestTab,
   createWelcomeTab,
   type PullRequestSubview,
+  type WorkspaceActiveView,
   type WorkspaceSession,
   type WorkspaceSidebarState,
   type WorkspaceTab
@@ -72,13 +73,16 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
     typeof session.activeTabId === 'string' && tabs.some((tab) => tab.id === session.activeTabId)
       ? session.activeTabId
       : tabs[0]?.id ?? null
+  const activeView: WorkspaceActiveView =
+    (session as { activeView?: unknown }).activeView === 'agent' ? 'agent' : 'workspace'
 
   if (hasTabsField) {
     return {
       folderPath: parsedFolderPath,
       sidebar,
       tabs,
-      activeTabId
+      activeTabId,
+      activeView
     }
   }
 
@@ -89,7 +93,8 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
       folderPath: parsedFolderPath,
       sidebar,
       tabs: [fileTab],
-      activeTabId: fileTab.id
+      activeTabId: fileTab.id,
+      activeView
     }
   }
 
@@ -97,7 +102,8 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
     folderPath: parsedFolderPath,
     sidebar,
     tabs: [createWelcomeTab()],
-    activeTabId: 'welcome'
+    activeTabId: 'welcome',
+    activeView
   }
 }
 

@@ -417,6 +417,33 @@ const api = {
         )
     }
   },
+  agent: {
+    start: (cwd: string, prompt: string, files?: string[], skipPermissions?: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('agent:start', cwd, prompt, files, skipPermissions),
+    continue: (
+      sessionId: string,
+      cliSessionId: string,
+      cwd: string,
+      prompt: string,
+      files?: string[],
+      skipPermissions?: boolean
+    ): Promise<unknown> =>
+      ipcRenderer.invoke('agent:continue', sessionId, cliSessionId, cwd, prompt, files, skipPermissions),
+    stop: (sessionId: string): Promise<unknown> =>
+      ipcRenderer.invoke('agent:stop', sessionId),
+    listSessions: (): Promise<unknown> =>
+      ipcRenderer.invoke('agent:list-sessions'),
+    onEvent: (
+      callback: (data: { sessionId: string; event: unknown }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: IpcRendererEvent,
+        data: { sessionId: string; event: unknown }
+      ): void => callback(data)
+      ipcRenderer.on('agent:event', listener)
+      return () => ipcRenderer.removeListener('agent:event', listener)
+    }
+  },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
     readDir: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir', path),
