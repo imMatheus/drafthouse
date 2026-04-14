@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
-import { ChevronRight, ShieldAlert } from 'lucide-react'
+import { Check, ChevronRight, ShieldQuestion, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type {
   AgentContentBlock,
@@ -254,16 +254,29 @@ function PermissionDenialBlock({
   content: string
   callbacks?: PermissionCallbacks
 }) {
+  const [decision, setDecision] = useState<'pending' | 'allowed' | 'always-allowed' | 'denied' | 'redirected'>(
+    callbacks ? 'pending' : 'allowed' // If no callbacks, this is an old resolved denial
+  )
   const [showInput, setShowInput] = useState(false)
   const [inputText, setInputText] = useState('')
 
-  // Parse the permission message to extract the action
   const description = content
     .replace('Claude requested permissions to ', '')
     .replace(", but you haven't granted it yet.", '')
 
+  const handleAllow = (): void => {
+    setDecision('allowed')
+    callbacks?.onAllowOnce()
+  }
+
+  const handleAlwaysAllow = (): void => {
+    setDecision('always-allowed')
+    callbacks?.onAlwaysAllow()
+  }
+
   const handleSendMessage = (): void => {
     if (!inputText.trim() || !callbacks) return
+    setDecision('redirected')
     callbacks.onRespondDifferently(inputText.trim())
     setInputText('')
     setShowInput(false)
@@ -280,65 +293,87 @@ function PermissionDenialBlock({
     }
   }
 
+  // Resolved states
+  if (decision === 'allowed' || decision === 'always-allowed') {
+    return (
+      <div className="my-1.5 flex items-center gap-2 text-xs text-foreground-muted">
+        <Check size={12} className="shrink-0 text-success" />
+        <span>Allowed: <span className="text-foreground-subtle">{description}</span></span>
+      </div>
+    )
+  }
+
+  if (decision === 'denied') {
+    return (
+      <div className="my-1.5 flex items-center gap-2 text-xs text-foreground-muted">
+        <X size={12} className="shrink-0 text-danger" />
+        <span>Denied: <span className="text-foreground-subtle">{description}</span></span>
+      </div>
+    )
+  }
+
+  if (decision === 'redirected') {
+    return null
+  }
+
+  // Pending state — show action buttons
   return (
     <div className="my-2 rounded-md border border-border bg-surface">
       <div className="flex items-start gap-2.5 px-3 py-2.5">
-        <ShieldAlert size={14} className="mt-0.5 shrink-0 text-foreground-subtle" />
+        <ShieldQuestion size={14} className="mt-0.5 shrink-0 text-foreground-muted" />
         <div className="min-w-0 flex-1">
           <p className="text-xs text-foreground">
-            Permission denied: <span className="text-foreground-muted">{description}</span>
+            Approve: <span className="text-foreground-muted">{description}</span>
           </p>
 
-          {callbacks && (
-            <div className="mt-2.5">
-              {showInput ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Tell the agent what to do instead..."
-                    className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={!inputText.trim()}
-                    className="shrink-0 rounded bg-accent px-2 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
-                  >
-                    Send
-                  </button>
-                  <button
-                    onClick={() => { setShowInput(false); setInputText('') }}
-                    className="shrink-0 text-xs text-foreground-subtle hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={callbacks.onAllowOnce}
-                    className="rounded bg-interactive px-2 py-1 text-xs text-foreground transition-colors hover:bg-surface-hover"
-                  >
-                    Allow once
-                  </button>
-                  <button
-                    onClick={callbacks.onAlwaysAllow}
-                    className="rounded bg-interactive px-2 py-1 text-xs text-foreground transition-colors hover:bg-surface-hover"
-                  >
-                    Always allow
-                  </button>
-                  <button
-                    onClick={() => setShowInput(true)}
-                    className="rounded bg-interactive px-2 py-1 text-xs text-foreground transition-colors hover:bg-surface-hover"
-                  >
-                    Do something else...
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="mt-2.5">
+            {showInput ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Tell the agent what to do instead..."
+                  className="min-w-0 flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!inputText.trim()}
+                  className="shrink-0 rounded bg-accent px-2 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+                >
+                  Send
+                </button>
+                <button
+                  onClick={() => { setShowInput(false); setInputText('') }}
+                  className="shrink-0 text-xs text-foreground-subtle hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleAllow}
+                  className="rounded bg-interactive px-2 py-1 text-xs text-foreground transition-colors hover:bg-surface-hover"
+                >
+                  Allow once
+                </button>
+                <button
+                  onClick={handleAlwaysAllow}
+                  className="rounded bg-interactive px-2 py-1 text-xs text-foreground transition-colors hover:bg-surface-hover"
+                >
+                  Always allow
+                </button>
+                <button
+                  onClick={() => setShowInput(true)}
+                  className="rounded bg-interactive px-2 py-1 text-xs text-foreground transition-colors hover:bg-surface-hover"
+                >
+                  Do something else...
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

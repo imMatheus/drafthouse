@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Loader2 } from 'lucide-react'
+import AgentSpinner from './AgentSpinner'
 import type { AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
 import AgentMessageBlock, { type PermissionCallbacks } from './AgentMessageBlock'
 
@@ -91,9 +91,9 @@ export default function AgentConversation({
 
         {/* Running indicator */}
         {session.status === 'running' && (
-          <div className="flex items-center gap-2 py-2 text-foreground-muted">
-            <Loader2 size={14} className="animate-spin" />
-            <span className="text-xs">Agent is working...</span>
+          <div className="flex items-center gap-2 py-2 text-accent">
+            <AgentSpinner />
+            <span className="text-xs">Drafting...</span>
           </div>
         )}
 
@@ -101,7 +101,9 @@ export default function AgentConversation({
         {lastResultEvent && session.status !== 'running' && (
           <div className="mt-4 rounded-md border border-border bg-surface px-3 py-2">
             <div className="flex items-center gap-3 text-xs text-foreground-subtle">
-              <span>{lastResultEvent.num_turns} turn{lastResultEvent.num_turns !== 1 ? 's' : ''}</span>
+              <span>
+                {lastResultEvent.num_turns} turn{lastResultEvent.num_turns !== 1 ? 's' : ''}
+              </span>
               <span>{(lastResultEvent.duration_ms / 1000).toFixed(1)}s</span>
               <span>${lastResultEvent.total_cost_usd.toFixed(4)}</span>
             </div>
