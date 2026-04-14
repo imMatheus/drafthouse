@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 const FRAMES = ['✶', '✸', '✹', '✺', '✹', '✷']
 
-export default function AgentSpinner({ className }: { className?: string }) {
+export default function AgentSpinner() {
   const [frame, setFrame] = useState(0)
 
   useEffect(() => {

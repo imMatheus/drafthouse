@@ -8,6 +8,7 @@ export interface ActivityBarItem {
   label: string
   icon: LucideIcon
   active?: boolean
+  badge?: number
   onClick: () => void
 }
 
@@ -37,6 +38,11 @@ export default function ActivityBar({ items }: ActivityBarProps) {
               title={item.label}
             >
               <Icon size={18} strokeWidth={1.75} />
+              {item.badge != null && item.badge > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white">
+                  {item.badge}
+                </span>
+              )}
             </button>
           )
         })}

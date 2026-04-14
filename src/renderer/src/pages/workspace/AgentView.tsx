@@ -9,8 +9,6 @@ interface AgentViewProps {
   onSelectSession: (id: string | null) => void
   onStartSession: (prompt: string, files?: string[]) => Promise<void>
   onContinueSession: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
-  onAllowAndRetry: (sessionId: string) => Promise<void>
-  onAlwaysAllowAndRetry: (sessionId: string) => Promise<void>
   onStopSession: (sessionId: string) => Promise<void>
 }
 
@@ -20,8 +18,6 @@ export default function AgentView({
   onSelectSession,
   onStartSession,
   onContinueSession,
-  onAllowAndRetry,
-  onAlwaysAllowAndRetry,
   onStopSession
 }: AgentViewProps) {
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
@@ -37,11 +33,6 @@ export default function AgentView({
     } else {
       await onStartSession(prompt, files)
     }
-  }
-
-  const handleRespondDifferently = (message: string): void => {
-    if (!activeSession || !canContinue) return
-    void onContinueSession(activeSession.id, message)
   }
 
   const handleNewSession = (): void => {
@@ -60,12 +51,7 @@ export default function AgentView({
       <div className="flex min-w-0 flex-1 flex-col bg-background">
         {activeSession ? (
           <>
-            <AgentConversation
-              session={activeSession}
-              onAllowOnce={() => void onAllowAndRetry(activeSession.id)}
-              onAlwaysAllow={() => void onAlwaysAllowAndRetry(activeSession.id)}
-              onRespondDifferently={handleRespondDifferently}
-            />
+            <AgentConversation session={activeSession} />
             <AgentPromptBar
               onSubmit={handleSubmit}
               onStop={() => onStopSession(activeSession.id)}

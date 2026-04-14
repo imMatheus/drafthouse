@@ -1,56 +1,33 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { FileText } from 'lucide-react'
 import AgentSpinner from './AgentSpinner'
-import type { AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
-import AgentMessageBlock, { type PermissionCallbacks } from './AgentMessageBlock'
+import type { AgentSession, AgentStreamResult } from '../../../../shared/types'
+import AgentMessageBlock from './AgentMessageBlock'
 
-const PERMISSION_DENIAL_PREFIX = 'Claude requested permissions to'
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
 
 interface AgentConversationProps {
   session: AgentSession
-  onAllowOnce: () => void
-  onAlwaysAllow: () => void
-  onRespondDifferently: (message: string) => void
 }
 
-function isPermissionDenialEvent(event: AgentStreamEvent): boolean {
-  return (
-    event.type === 'user' &&
-    event.message.content.some(
-      (c) =>
-        c.type === 'tool_result' &&
-        'is_error' in c &&
-        typeof c.content === 'string' &&
-        c.content.startsWith(PERMISSION_DENIAL_PREFIX)
-    )
-  )
-}
-
-function findLastDenialIndex(events: AgentStreamEvent[]): number {
-  let lastInitIndex = -1
-  for (let i = events.length - 1; i >= 0; i--) {
-    if (events[i].type === 'system' && (events[i] as { subtype?: string }).subtype === 'init') {
-      lastInitIndex = i
-      break
-    }
-  }
-
-  for (let i = events.length - 1; i > lastInitIndex; i--) {
-    if (isPermissionDenialEvent(events[i])) return i
-  }
-  return -1
-}
-
-export default function AgentConversation({
-  session,
-  onAllowOnce,
-  onAlwaysAllow,
-  onRespondDifferently
-}: AgentConversationProps) {
+export default function AgentConversation({ session }: AgentConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [session.events.length])
+
+  // Collect inline tool IDs (Read, Glob, Grep) to hide their results
+  const inlineToolIds = new Set<string>()
+  for (const event of session.events) {
+    if (event.type === 'assistant') {
+      for (const b of event.message.content) {
+        if (b.type === 'tool_use' && (b.name === 'Read' || b.name === 'Glob' || b.name === 'Grep')) {
+          inlineToolIds.add(b.id)
+        }
+      }
+    }
+  }
 
   let lastResultEvent: AgentStreamResult | null = null
   for (let i = session.events.length - 1; i >= 0; i--) {
@@ -61,32 +38,28 @@ export default function AgentConversation({
     }
   }
 
-  const lastDenialIndex = session.status !== 'running' ? findLastDenialIndex(session.events) : -1
-
-  const permissionCallbacks: PermissionCallbacks = {
-    onAllowOnce,
-    onAlwaysAllow,
-    onRespondDifferently
-  }
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-6">
-        {/* Initial user prompt — right-aligned bubble */}
+        {/* Initial user prompt */}
         <div className="mb-6 flex justify-end">
           <div className="max-w-[80%] rounded-2xl bg-surface px-4 py-2.5">
-            <p className="text-sm text-foreground whitespace-pre-wrap">{session.prompt}</p>
+            {session.files.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {session.files.map((filePath) => (
+                  <FileAttachment key={filePath} filePath={filePath} />
+                ))}
+              </div>
+            )}
+            {session.prompt && (
+              <p className="text-sm text-foreground whitespace-pre-wrap">{session.prompt}</p>
+            )}
           </div>
         </div>
 
-        {/* Agent messages */}
+        {/* Events */}
         {session.events.map((event, i) => (
-          <AgentMessageBlock
-            key={i}
-            event={event}
-            permissionCallbacks={permissionCallbacks}
-            isLastDenial={i === lastDenialIndex}
-          />
+          <AgentMessageBlock key={i} event={event} inlineToolIds={inlineToolIds} />
         ))}
 
         {/* Running indicator */}
@@ -119,6 +92,37 @@ export default function AgentConversation({
 
         <div ref={bottomRef} />
       </div>
+    </div>
+  )
+}
+
+function FileAttachment({ filePath }: { filePath: string }) {
+  const fileName = filePath.split('/').pop() ?? filePath
+  const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+  const isImage = IMAGE_EXTENSIONS.has(ext)
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isImage) return
+    let cancelled = false
+    window.api.fs.readFileDataUrl(filePath).then((url) => {
+      if (!cancelled) setDataUrl(url)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [filePath, isImage])
+
+  if (isImage) {
+    return (
+      <div className="size-16 overflow-hidden rounded-md border border-border">
+        {dataUrl && <img src={dataUrl} alt={fileName} className="size-full object-cover" />}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-border bg-interactive px-2 py-1">
+      <FileText size={12} className="shrink-0 text-foreground-subtle" />
+      <span className="max-w-[100px] truncate text-xs text-foreground-muted">{fileName}</span>
     </div>
   )
 }

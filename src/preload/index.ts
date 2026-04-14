@@ -418,17 +418,16 @@ const api = {
     }
   },
   agent: {
-    start: (cwd: string, prompt: string, files?: string[], skipPermissions?: boolean): Promise<unknown> =>
-      ipcRenderer.invoke('agent:start', cwd, prompt, files, skipPermissions),
+    start: (cwd: string, prompt: string, files?: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('agent:start', cwd, prompt, files),
     continue: (
       sessionId: string,
       cliSessionId: string,
       cwd: string,
       prompt: string,
-      files?: string[],
-      skipPermissions?: boolean
+      files?: string[]
     ): Promise<unknown> =>
-      ipcRenderer.invoke('agent:continue', sessionId, cliSessionId, cwd, prompt, files, skipPermissions),
+      ipcRenderer.invoke('agent:continue', sessionId, cliSessionId, cwd, prompt, files),
     stop: (sessionId: string): Promise<unknown> =>
       ipcRenderer.invoke('agent:stop', sessionId),
     listSessions: (): Promise<unknown> =>
@@ -451,6 +450,8 @@ const api = {
     getRecentFolders: (): Promise<unknown> => ipcRenderer.invoke('fs:get-recent-folders'),
     openRecent: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:open-recent', path),
     getGitInfo: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:get-git-info', path),
+    pickFiles: (): Promise<unknown> => ipcRenderer.invoke('fs:pick-files'),
+    readFileDataUrl: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-file-data-url', path),
     onOpenFolder: (callback: (path: string) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, path: string): void => callback(path)
       ipcRenderer.on('menu:open-folder', listener)

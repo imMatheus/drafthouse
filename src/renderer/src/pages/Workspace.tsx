@@ -213,7 +213,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       startedAt: Date.now(),
       events: [],
       cliSessionId: null,
-      alwaysAllow: false
+      files: files ?? []
     }
 
     setAgentSessions((prev) => [...prev, newSession])
@@ -237,8 +237,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       existingSession.cliSessionId,
       folderPath,
       prompt,
-      files,
-      existingSession.alwaysAllow || undefined
+      files
     )
 
     // Mark session as running again and add a synthetic user message
@@ -260,49 +259,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                 }
               ]
             }
-          : s
-      )
-    )
-  }
-
-  const handleAllowAndRetry = async (agentSessionId: string): Promise<void> => {
-    const existingSession = agentSessions.find((s) => s.id === agentSessionId)
-    if (!existingSession?.cliSessionId) return
-
-    await window.api.agent.continue(
-      existingSession.id,
-      existingSession.cliSessionId,
-      folderPath,
-      'Continue. The permission has been granted — proceed with the previous task.',
-      undefined,
-      true
-    )
-
-    setAgentSessions((prev) =>
-      prev.map((s) =>
-        s.id === agentSessionId ? { ...s, status: 'running' as const } : s
-      )
-    )
-  }
-
-  const handleAlwaysAllowAndRetry = async (agentSessionId: string): Promise<void> => {
-    const existingSession = agentSessions.find((s) => s.id === agentSessionId)
-    if (!existingSession?.cliSessionId) return
-
-    await window.api.agent.continue(
-      existingSession.id,
-      existingSession.cliSessionId,
-      folderPath,
-      'Continue. All permissions have been permanently granted — proceed with the previous task.',
-      undefined,
-      true
-    )
-
-    // Mark as always-allowed so future continues in this session also skip permissions
-    setAgentSessions((prev) =>
-      prev.map((s) =>
-        s.id === agentSessionId
-          ? { ...s, status: 'running' as const, alwaysAllow: true }
           : s
       )
     )
@@ -382,6 +338,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       label: 'Agent',
       icon: Terminal,
       active: activeView === 'agent',
+      badge: agentSessions.filter((s) => s.status === 'running').length,
       onClick: handleToggleAgent
     }
   ]
@@ -397,8 +354,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           onSelectSession={setActiveAgentSessionId}
           onStartSession={handleStartAgent}
           onContinueSession={handleContinueAgent}
-          onAllowAndRetry={handleAllowAndRetry}
-          onAlwaysAllowAndRetry={handleAlwaysAllowAndRetry}
           onStopSession={handleStopAgent}
         />
       ) : (

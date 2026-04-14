@@ -1,6 +1,7 @@
-import { Plus } from 'lucide-react'
+import { Check, Plus, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { AgentSession } from '../../../../shared/types'
+import AgentSpinner from './AgentSpinner'
 
 interface AgentSessionListProps {
   sessions: AgentSession[]
@@ -9,29 +10,20 @@ interface AgentSessionListProps {
   onNewSession: () => void
 }
 
-function formatRelativeTime(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
+function StatusIndicator({ status }: { status: AgentSession['status'] }) {
+  if (status === 'running') {
+    return <AgentSpinner />
+  }
 
-function StatusDot({ status }: { status: AgentSession['status'] }) {
-  return (
-    <span
-      className={cn(
-        'size-2 shrink-0 rounded-full',
-        status === 'running' && 'animate-pulse bg-success',
-        status === 'completed' && 'bg-foreground-subtle',
-        status === 'error' && 'bg-danger',
-        status === 'cancelled' && 'bg-foreground-subtle'
-      )}
-    />
-  )
+  if (status === 'completed') {
+    return <Check size={12} className="shrink-0 text-success" />
+  }
+
+  if (status === 'error' || status === 'cancelled') {
+    return <X size={12} className="shrink-0 text-foreground-subtle" />
+  }
+
+  return null
 }
 
 export default function AgentSessionList({
@@ -40,7 +32,6 @@ export default function AgentSessionList({
   onSelectSession,
   onNewSession
 }: AgentSessionListProps) {
-  // Show newest first
   const sortedSessions = [...sessions].reverse()
 
   return (
@@ -65,19 +56,14 @@ export default function AgentSessionList({
               key={session.id}
               onClick={() => onSelectSession(session.id)}
               className={cn(
-                'flex w-full items-start gap-2 px-3 py-2.5 text-left transition-colors',
+                'flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors',
                 session.id === activeSessionId
                   ? 'bg-surface-hover'
                   : 'hover:bg-surface-hover'
               )}
             >
-              <StatusDot status={session.status} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs text-foreground">{session.prompt}</p>
-                <p className="mt-0.5 text-[10px] text-foreground-subtle">
-                  {formatRelativeTime(session.startedAt)}
-                </p>
-              </div>
+              <StatusIndicator status={session.status} />
+              <p className="min-w-0 flex-1 truncate text-xs text-foreground">{session.prompt}</p>
             </button>
           ))
         )}

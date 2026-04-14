@@ -406,14 +406,13 @@ interface GitHubAPI {
 // ============================================================
 
 interface AgentAPI {
-  start: (cwd: string, prompt: string, files?: string[], skipPermissions?: boolean) => Promise<{ sessionId: string }>
+  start: (cwd: string, prompt: string, files?: string[]) => Promise<{ sessionId: string }>
   continue: (
     sessionId: string,
     cliSessionId: string,
     cwd: string,
     prompt: string,
-    files?: string[],
-    skipPermissions?: boolean
+    files?: string[]
   ) => Promise<void>
   stop: (sessionId: string) => Promise<void>
   listSessions: () => Promise<AgentSessionSummary[]>
@@ -431,6 +430,8 @@ interface FsAPI {
   getRecentFolders: () => Promise<string[]>
   openRecent: (path: string) => Promise<string>
   getGitInfo: (path: string) => Promise<GitRepoInfo | null>
+  pickFiles: () => Promise<string[]>
+  readFileDataUrl: (path: string) => Promise<string>
   onOpenFolder: (callback: (path: string) => void) => () => void
   onCloseTab: (callback: () => void) => () => void
 }

@@ -21,33 +21,44 @@ function sendAgentEvent(session: AgentProcess, event: AgentStreamEvent): void {
   session.webContents.send('agent:event', { sessionId: session.id, event })
 }
 
+const BINARY_EXTENSIONS = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg',
+  'mp3', 'mp4', 'wav', 'avi', 'mov', 'mkv',
+  'zip', 'tar', 'gz', 'rar', '7z',
+  'pdf', 'doc', 'docx', 'xls', 'xlsx',
+  'exe', 'dll', 'so', 'dylib', 'wasm'
+])
+
+function isBinaryFile(filePath: string): boolean {
+  const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+  return BINARY_EXTENSIONS.has(ext)
+}
+
 function buildPromptWithFiles(prompt: string, files?: string[]): string {
   if (!files || files.length === 0) return prompt
 
-  const fileContents = files
+  const fileRefs = files
     .map((filePath) => {
+      if (isBinaryFile(filePath)) {
+        return `(Attached file: ${filePath})`
+      }
       try {
         const content = readFileSync(filePath, 'utf-8')
         return `Here is the content of ${filePath}:\n\`\`\`\n${content}\n\`\`\``
       } catch {
-        return `(Could not read file: ${filePath})`
+        return `(Attached file: ${filePath})`
       }
     })
     .join('\n\n')
 
-  return `${fileContents}\n\n${prompt}`
+  return `${fileRefs}\n\n${prompt}`
 }
 
 function buildCliArgs(options: {
   prompt: string
   resumeSessionId?: string
-  skipPermissions?: boolean
 }): string[] {
-  const args = ['-p', '--output-format', 'stream-json', '--verbose']
-
-  if (options.skipPermissions) {
-    args.push('--dangerously-skip-permissions')
-  }
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions']
 
   if (options.resumeSessionId) {
     args.push('--resume', options.resumeSessionId)
@@ -127,7 +138,6 @@ export function startAgentSession(
   cwd: string,
   prompt: string,
   files: string[] | undefined,
-  skipPermissions: boolean,
   webContents: WebContents
 ): { sessionId: string } {
   const sessionId = randomUUID()
@@ -135,7 +145,7 @@ export function startAgentSession(
 
   const child = spawn(
     'claude',
-    buildCliArgs({ prompt: fullPrompt, skipPermissions }),
+    buildCliArgs({ prompt: fullPrompt }),
     { cwd, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] }
   )
 
@@ -161,7 +171,6 @@ export function continueAgentSession(
   cwd: string,
   prompt: string,
   files: string[] | undefined,
-  skipPermissions: boolean,
   webContents: WebContents
 ): void {
   const existingSession = sessions.get(existingSessionId)
@@ -169,7 +178,7 @@ export function continueAgentSession(
 
   const child = spawn(
     'claude',
-    buildCliArgs({ prompt: fullPrompt, resumeSessionId: cliSessionId, skipPermissions }),
+    buildCliArgs({ prompt: fullPrompt, resumeSessionId: cliSessionId }),
     { cwd, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] }
   )
 
@@ -185,8 +194,8 @@ export function continueAgentSession(
 export function registerAgentHandlers(): void {
   ipcMain.handle(
     'agent:start',
-    (event, cwd: string, prompt: string, files?: string[], skipPermissions?: boolean) => {
-      return startAgentSession(cwd, prompt, files, skipPermissions ?? false, event.sender)
+    (event, cwd: string, prompt: string, files?: string[]) => {
+      return startAgentSession(cwd, prompt, files, event.sender)
     }
   )
 
@@ -198,13 +207,9 @@ export function registerAgentHandlers(): void {
       cliSessionId: string,
       cwd: string,
       prompt: string,
-      files?: string[],
-      skipPermissions?: boolean
+      files?: string[]
     ) => {
-      continueAgentSession(
-        sessionId, cliSessionId, cwd, prompt, files,
-        skipPermissions ?? false, event.sender
-      )
+      continueAgentSession(sessionId, cliSessionId, cwd, prompt, files, event.sender)
     }
   )
 

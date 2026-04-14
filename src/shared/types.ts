@@ -565,5 +565,5 @@ export interface AgentSession {
   startedAt: number
   events: AgentStreamEvent[]
   cliSessionId: string | null
-  alwaysAllow: boolean
+  files: string[]
 }
