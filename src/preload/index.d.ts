@@ -6,6 +6,9 @@ import type {
   FileEntry,
   GitHubRepo,
   GitRepoInfo,
+  GitChangedFile,
+  GitBranchInfo,
+  GitLogEntry,
   GitHubBranch,
   GitHubBranchDetail,
   MergeUpstreamResult,
@@ -402,6 +405,29 @@ interface GitHubAPI {
 }
 
 // ============================================================
+// Local Git API
+// ============================================================
+
+interface GitAPI {
+  status: (cwd: string) => Promise<GitChangedFile[]>
+  branchInfo: (cwd: string) => Promise<GitBranchInfo>
+  diff: (cwd: string, filePath: string, staged: boolean) => Promise<string>
+  showFile: (cwd: string, filePath: string) => Promise<string>
+  stage: (cwd: string, filePaths: string[]) => Promise<void>
+  unstage: (cwd: string, filePaths: string[]) => Promise<void>
+  stageAll: (cwd: string) => Promise<void>
+  unstageAll: (cwd: string) => Promise<void>
+  discard: (cwd: string, filePaths: string[]) => Promise<void>
+  discardAll: (cwd: string) => Promise<void>
+  commit: (cwd: string, message: string, amend?: boolean) => Promise<void>
+  push: (cwd: string) => Promise<string>
+  pull: (cwd: string) => Promise<string>
+  stash: (cwd: string, message?: string) => Promise<void>
+  stashPop: (cwd: string) => Promise<void>
+  log: (cwd: string, count?: number) => Promise<GitLogEntry[]>
+}
+
+// ============================================================
 // Agent API
 // ============================================================
 
@@ -446,6 +472,7 @@ declare global {
     api: {
       agent: AgentAPI
       auth: AuthAPI
+      git: GitAPI
       github: GitHubAPI
       fs: FsAPI
     }

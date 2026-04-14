@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Files, GitGraph, Terminal } from 'lucide-react'
+import { Files, GitBranch, GitGraph, Terminal } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
-import type { AgentSession, GitRepoInfo } from '../../../shared/types'
+import type { AgentSession, GitChangedFile, GitRepoInfo } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import ActivityBar from '../components/ActivityBar'
 import ExplorerPanel from '../components/ExplorerPanel'
+import SourceControlPanel from '../components/SourceControlPanel'
 import WorkspaceTabBar from '../components/WorkspaceTabBar'
 import type { WorkspaceSession } from '../lib/workspaceSession'
 import {
+  createDiffTab,
   createFileTab,
   createPullRequestListTab,
   createPullRequestTab,
@@ -18,6 +20,7 @@ import {
   type WorkspaceTab
 } from '../lib/workspaceTabs'
 import AgentView from './workspace/AgentView'
+import DiffView from './workspace/DiffView'
 import FilesView from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
 import PullRequestDetailView from './workspace/PullRequestDetailView'
@@ -50,6 +53,13 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   } = useQuery<GitRepoInfo | null, Error>({
     queryKey: ['git-info', folderPath],
     queryFn: () => window.api.fs.getGitInfo(folderPath),
+    retry: false
+  })
+
+  const { data: gitStatus } = useQuery<GitChangedFile[]>({
+    queryKey: ['git-status', folderPath],
+    queryFn: () => window.api.git.status(folderPath),
+    refetchInterval: 3000,
     retry: false
   })
 
@@ -189,6 +199,30 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
+  const handleToggleSourceControl = (): void => {
+    if (activeView === 'agent') {
+      onUpdateSession({
+        ...session,
+        activeView: 'workspace',
+        sidebar: { visible: true, activePanel: 'source-control' }
+      })
+      return
+    }
+
+    const isSourceControlActive = sidebar.visible && sidebar.activePanel === 'source-control'
+
+    onUpdateSession({
+      ...session,
+      sidebar: isSourceControlActive
+        ? { visible: false, activePanel: null }
+        : { visible: true, activePanel: 'source-control' }
+    })
+  }
+
+  const handleOpenDiff = (path: string, staged: boolean): void => {
+    openOrFocusTab(createDiffTab(path, staged))
+  }
+
   const handleToggleAgent = (): void => {
     if (activeView === 'agent') {
       onUpdateSession({
@@ -313,6 +347,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     return window.api.fs.onCloseTab(() => handleCloseTab(activeTabId))
   }, [activeTabId, handleCloseTab])
 
+  const changedFileCount = gitStatus?.length ?? 0
+
   const activityItems = [
     {
       id: 'explorer',
@@ -320,6 +356,14 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       icon: Files,
       active: activeView === 'workspace' && sidebar.visible && sidebar.activePanel === 'explorer',
       onClick: handleToggleExplorer
+    },
+    {
+      id: 'source-control',
+      label: 'Source Control',
+      icon: GitBranch,
+      active: activeView === 'workspace' && sidebar.visible && sidebar.activePanel === 'source-control',
+      badge: changedFileCount > 0 ? changedFileCount : undefined,
+      onClick: handleToggleSourceControl
     },
     {
       id: 'pull-requests',
@@ -362,6 +406,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
             <ExplorerPanel folderPath={folderPath} selectedFilePath={activeFilePath} onSelectFile={handleOpenFile} />
           ) : null}
 
+          {sidebar.visible && sidebar.activePanel === 'source-control' ? (
+            <SourceControlPanel folderPath={folderPath} onOpenDiff={handleOpenDiff} />
+          ) : null}
+
           <div className="flex min-w-0 flex-1 flex-col">
             <WorkspaceTabBar
               tabs={tabs}
@@ -370,13 +418,14 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
               onCloseTab={handleCloseTab}
             />
 
-            <main className={cn('min-h-0 flex-1', activeTab?.kind === 'file' ? 'overflow-hidden' : 'overflow-y-auto p-6')}>
+            <main className={cn('min-h-0 flex-1', (activeTab?.kind === 'file' || activeTab?.kind === 'diff') ? 'overflow-hidden' : 'overflow-y-auto p-6')}>
               {renderWorkspaceTabContent({
                 activeTab,
                 folderPath,
                 gitInfo,
                 gitInfoError,
                 isLoadingGitInfo,
+                onOpenFile: handleOpenFile,
                 onOpenPullRequest: handleOpenPullRequest,
                 onPullRequestSubviewChange: handlePullRequestSubviewChange,
                 onPullRequestTitleChange: handlePullRequestTitleChange,
@@ -396,6 +445,7 @@ function renderWorkspaceTabContent({
   gitInfo,
   gitInfoError,
   isLoadingGitInfo,
+  onOpenFile,
   onOpenPullRequest,
   onPullRequestSubviewChange,
   onPullRequestTitleChange,
@@ -406,6 +456,7 @@ function renderWorkspaceTabContent({
   gitInfo: GitRepoInfo | null | undefined
   gitInfoError: Error | null
   isLoadingGitInfo: boolean
+  onOpenFile: (path: string) => void
   onOpenPullRequest: (number: number) => void
   onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void
   onPullRequestTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
@@ -425,6 +476,15 @@ function renderWorkspaceTabContent({
       return <WelcomeView />
     case 'file':
       return <FilesView filePath={activeTab.path} folderPath={folderPath} />
+    case 'diff':
+      return (
+        <DiffView
+          filePath={activeTab.path}
+          folderPath={folderPath}
+          staged={activeTab.staged}
+          onOpenFile={onOpenFile}
+        />
+      )
     case 'pull-request-list':
       return (
         <PullRequestsView

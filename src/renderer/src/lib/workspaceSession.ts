@@ -1,4 +1,5 @@
 import {
+  createDiffTab,
   createFileTab,
   createInitialWorkspaceSession,
   createPullRequestListTab,
@@ -6,6 +7,7 @@ import {
   createWelcomeTab,
   type PullRequestSubview,
   type WorkspaceActiveView,
+  type WorkspaceSidebarPanel,
   type WorkspaceSession,
   type WorkspaceSidebarState,
   type WorkspaceTab
@@ -107,13 +109,18 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
   }
 }
 
+const VALID_SIDEBAR_PANELS: WorkspaceSidebarPanel[] = ['explorer', 'source-control']
+
 function parseWorkspaceSidebarState(value: unknown, explorerVisible?: boolean): WorkspaceSidebarState {
   if (value && typeof value === 'object') {
     const sidebar = value as Partial<WorkspaceSidebarState>
+    const panel = VALID_SIDEBAR_PANELS.includes(sidebar.activePanel as WorkspaceSidebarPanel)
+      ? (sidebar.activePanel as WorkspaceSidebarPanel)
+      : null
 
     return {
       visible: sidebar.visible !== false,
-      activePanel: sidebar.activePanel === 'explorer' ? 'explorer' : null
+      activePanel: panel
     }
   }
 
@@ -144,6 +151,10 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
       return createWelcomeTab()
     case 'file':
       return typeof tab.path === 'string' && tab.path.length > 0 ? createFileTab(tab.path) : null
+    case 'diff':
+      return typeof tab.path === 'string' && tab.path.length > 0
+        ? createDiffTab(tab.path, typeof tab.staged === 'boolean' ? tab.staged : false)
+        : null
     case 'pull-request-list':
       return createPullRequestListTab()
     case 'pull-request': {

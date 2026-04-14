@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import {
   FileCode2,
+  FileDiff,
   GitMerge,
   GitPullRequest,
   GitPullRequestClosed,
@@ -46,7 +47,7 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
               >
                 {icon}
                 <span
-                  className={cn('truncate text-sm font-medium', isActive ? 'text-foreground' : 'text-foreground-muted')}
+                  className={cn('truncate text-xs font-medium', isActive ? 'text-foreground' : 'text-foreground-muted')}
                 >
                   {label}
                 </span>
@@ -113,6 +114,11 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
       return {
         icon: <FileCode2 size={14} strokeWidth={1.8} className="text-foreground-subtle" />,
         label: getPathBasename(tab.path)
+      }
+    case 'diff':
+      return {
+        icon: <FileDiff size={14} strokeWidth={1.8} className="text-accent" />,
+        label: `${getPathBasename(tab.path)} (${tab.staged ? 'index' : 'working tree'})`
       }
     case 'pull-request-list':
       return {

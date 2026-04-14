@@ -443,6 +443,38 @@ const api = {
       return () => ipcRenderer.removeListener('agent:event', listener)
     }
   },
+  git: {
+    status: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:status', cwd),
+    branchInfo: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:branch-info', cwd),
+    diff: (cwd: string, filePath: string, staged: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('git:diff', cwd, filePath, staged),
+    showFile: (cwd: string, filePath: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:show-file', cwd, filePath),
+    stage: (cwd: string, filePaths: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('git:stage', cwd, filePaths),
+    unstage: (cwd: string, filePaths: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('git:unstage', cwd, filePaths),
+    stageAll: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:stage-all', cwd),
+    unstageAll: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:unstage-all', cwd),
+    discard: (cwd: string, filePaths: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('git:discard', cwd, filePaths),
+    discardAll: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:discard-all', cwd),
+    commit: (cwd: string, message: string, amend?: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('git:commit', cwd, message, amend),
+    push: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:push', cwd),
+    pull: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:pull', cwd),
+    stash: (cwd: string, message?: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:stash', cwd, message),
+    stashPop: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:stash-pop', cwd),
+    log: (cwd: string, count?: number): Promise<unknown> =>
+      ipcRenderer.invoke('git:log', cwd, count)
+  },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
     readDir: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir', path),

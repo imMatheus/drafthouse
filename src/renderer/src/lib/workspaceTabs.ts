@@ -11,6 +11,12 @@ export type WorkspaceTab =
       path: string
     }
   | {
+      id: `diff:${string}`
+      kind: 'diff'
+      path: string
+      staged: boolean
+    }
+  | {
       id: 'pull-request-list'
       kind: 'pull-request-list'
     }
@@ -25,9 +31,11 @@ export type WorkspaceTab =
 
 export type WorkspaceActiveView = 'workspace' | 'agent'
 
+export type WorkspaceSidebarPanel = 'explorer' | 'source-control'
+
 export interface WorkspaceSidebarState {
   visible: boolean
-  activePanel: 'explorer' | null
+  activePanel: WorkspaceSidebarPanel | null
 }
 
 export interface WorkspaceSession {
@@ -90,6 +98,19 @@ export function getFileTabId(path: string): `file:${string}` {
 
 export function getPullRequestTabId(number: number): `pull-request:${number}` {
   return `pull-request:${number}`
+}
+
+export function createDiffTab(path: string, staged: boolean): WorkspaceTab {
+  return {
+    id: getDiffTabId(path, staged),
+    kind: 'diff',
+    path,
+    staged
+  }
+}
+
+export function getDiffTabId(path: string, staged: boolean): `diff:${string}` {
+  return `diff:${staged ? 'staged' : 'unstaged'}:${path}`
 }
 
 export function isPullRequestWorkspaceTab(tab: WorkspaceTab | null | undefined): boolean {

@@ -31,6 +31,31 @@ export interface GitRepoInfo {
 }
 
 // ============================================================
+// Local Git (CLI-based)
+// ============================================================
+
+export type GitStatusCode = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?' | '!'
+
+export interface GitChangedFile {
+  path: string
+  oldPath?: string
+  indexStatus: GitStatusCode | ' '
+  workTreeStatus: GitStatusCode | ' '
+}
+
+export interface GitBranchInfo {
+  name: string
+  upstream: string | null
+  ahead: number
+  behind: number
+}
+
+export interface GitLogEntry {
+  hash: string
+  message: string
+}
+
+// ============================================================
 // Repositories
 // ============================================================
 

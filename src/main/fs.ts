@@ -81,7 +81,7 @@ function setAllowedRoot(sender: WebContents, folderPath: string): string {
   return resolvedFolderPath
 }
 
-function requireAllowedPath(sender: WebContents, targetPath: string): string {
+export function requireAllowedPath(sender: WebContents, targetPath: string): string {
   const rootPath = allowedRoots.get(sender.id)
   if (!rootPath) {
     throw new Error('Open a folder before browsing files')
@@ -99,7 +99,7 @@ function requireAllowedPath(sender: WebContents, targetPath: string): string {
   return resolvedPath
 }
 
-function requireAllowedDirectory(sender: WebContents, dirPath: string): string {
+export function requireAllowedDirectory(sender: WebContents, dirPath: string): string {
   const resolvedPath = requireAllowedPath(sender, dirPath)
   if (!statSync(resolvedPath).isDirectory()) {
     throw new Error('Path is not a directory')

@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { registerAgentHandlers } from './agent'
 import { registerAuthHandlers } from './auth'
 import { registerFsHandlers } from './fs'
+import { registerGitHandlers } from './git'
 import { registerGitHubHandlers } from './github'
 
 function createWindow(): void {
@@ -64,6 +65,7 @@ app.whenReady().then(() => {
   registerAuthHandlers()
   registerGitHubHandlers()
   registerFsHandlers()
+  registerGitHandlers()
   registerAgentHandlers()
 
   const menu = Menu.buildFromTemplate([
