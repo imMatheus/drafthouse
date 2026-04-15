@@ -189,10 +189,33 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     onUpdateSession({
       ...session,
       sidebar: isActive
-        ? { visible: false, activePanel: null }
+        ? { visible: false, activePanel: panel }
         : { visible: true, activePanel: panel }
     })
   }
+
+  const handleToggleSidebarVisibility = (): void => {
+    const panelToRestore = sidebar.activePanel ?? 'explorer'
+
+    onUpdateSession({
+      ...session,
+      sidebar: sidebar.visible
+        ? { visible: false, activePanel: sidebar.activePanel }
+        : { visible: true, activePanel: panelToRestore }
+    })
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault()
+        handleToggleSidebarVisibility()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [sidebar, session])
 
   const handleOpenDiff = (path: string, staged: boolean): void => {
     openOrFocusTab(createDiffTab(path, staged))
