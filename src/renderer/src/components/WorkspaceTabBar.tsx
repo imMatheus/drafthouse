@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import {
   FileCode2,
   FileDiff,
@@ -19,11 +19,34 @@ interface WorkspaceTabBarProps {
   activeTabId: WorkspaceTab['id'] | null
   onSelectTab: (tabId: WorkspaceTab['id']) => void
   onCloseTab: (tabId: WorkspaceTab['id']) => void
+  onReorderTabs: (tabs: WorkspaceTab[]) => void
 }
 
-export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onCloseTab }: WorkspaceTabBarProps) {
+export default function WorkspaceTabBar({
+  tabs,
+  activeTabId,
+  onSelectTab,
+  onCloseTab,
+  onReorderTabs
+}: WorkspaceTabBarProps) {
+  const [dragTabId, setDragTabId] = useState<WorkspaceTab['id'] | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<WorkspaceTab['id'] | null>(null)
+
   if (tabs.length === 0) {
     return null
+  }
+
+  const handleDrop = (targetTabId: WorkspaceTab['id']): void => {
+    if (!dragTabId || dragTabId === targetTabId) return
+
+    const dragIndex = tabs.findIndex((t) => t.id === dragTabId)
+    const targetIndex = tabs.findIndex((t) => t.id === targetTabId)
+    if (dragIndex === -1 || targetIndex === -1) return
+
+    const reordered = [...tabs]
+    const [moved] = reordered.splice(dragIndex, 1)
+    reordered.splice(targetIndex, 0, moved)
+    onReorderTabs(reordered)
   }
 
   return (
@@ -32,13 +55,36 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
         {tabs.map((tab) => {
           const { icon, label } = getWorkspaceTabPresentation(tab)
           const isActive = tab.id === activeTabId
+          const isDragging = tab.id === dragTabId
+          const isDropTarget = tab.id === dropTargetId && dragTabId !== null && dragTabId !== tab.id
 
           return (
             <div
               key={tab.id}
+              draggable
+              onDragStart={(e) => {
+                setDragTabId(tab.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setDropTargetId(tab.id)
+              }}
+              onDragLeave={() => setDropTargetId(null)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDropTargetId(null)
+                handleDrop(tab.id)
+              }}
+              onDragEnd={() => {
+                setDragTabId(null)
+                setDropTargetId(null)
+              }}
               className={cn(
                 'group cursor-pointer mr-1.5 flex min-w-0 max-w-60 shrink-0 items-stretch rounded-t-lg border border-b-0 transition-colors',
-                isActive ? 'border-border bg-surface' : 'border-transparent bg-background hover:bg-surface-hover/60'
+                isActive ? 'border-border bg-surface' : 'border-transparent bg-background hover:bg-surface-hover/60',
+                isDropTarget && 'border-l-2 border-l-accent'
               )}
             >
               <button

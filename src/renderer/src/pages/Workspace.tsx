@@ -163,6 +163,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
+  const handleReorderTabs = (reorderedTabs: WorkspaceTab[]): void => {
+    onUpdateSession({ ...session, tabs: reorderedTabs })
+  }
+
   const handleOpenFile = (filePath: string): void => {
     openOrFocusTab(createFileTab(filePath))
   }
@@ -460,6 +464,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
               activeTabId={activeTabId}
               onSelectTab={handleSelectTab}
               onCloseTab={handleCloseTab}
+              onReorderTabs={handleReorderTabs}
             />
 
             <main

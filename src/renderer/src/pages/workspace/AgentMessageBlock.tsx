@@ -11,6 +11,16 @@ import type {
 import AgentEditDiffBlock from './AgentEditDiffBlock'
 import MarkdownBody from './MarkdownBody'
 
+export function UserBubble({ text }: { text: string }) {
+  return (
+    <div className="mb-3 mt-2 flex justify-end">
+      <div className="max-w-[80%] rounded-2xl bg-interactive px-3 py-2 text-sm text-foreground whitespace-pre-wrap">
+        {text}
+      </div>
+    </div>
+  )
+}
+
 interface AgentMessageBlockProps {
   event: AgentStreamEvent
   inlineToolIds: Set<string>
@@ -47,16 +57,8 @@ function UserMessage({ event, inlineToolIds }: { event: AgentStreamUser; inlineT
 
   return (
     <div className="mb-4">
-      {textBlocks.length > 0 && (
-        <div className="mb-3 mt-6 flex justify-end">
-          <div className="max-w-[80%] rounded-2xl bg-surface px-4 py-2.5">
-            {textBlocks.map((block, i) => (
-              <p key={i} className="text-sm text-foreground whitespace-pre-wrap">
-                {block.type === 'text' ? block.text : ''}
-              </p>
-            ))}
-          </div>
-        </div>
+      {textBlocks.map((block, i) =>
+        block.type === 'text' && block.text ? <UserBubble key={i} text={block.text} /> : null
       )}
       {nonTextBlocks.map((block, i) => {
         if (block.type === 'tool_result' && inlineToolIds.has(block.tool_use_id)) {

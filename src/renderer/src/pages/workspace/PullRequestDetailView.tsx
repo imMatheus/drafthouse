@@ -172,6 +172,7 @@ export default function PullRequestDetailView({
           active={subview === 'conversation'}
           onClick={() => onSubviewChange('conversation')}
           icon={<MessageSquare size={14} />}
+          count={pr.comments}
         >
           Conversation
         </PRDetailTabButton>

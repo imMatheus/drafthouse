@@ -3,7 +3,7 @@ import { ArrowUp, ChevronRight, ExternalLink, Square } from 'lucide-react'
 import type { AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import claudeLogoUrl from '../assets/claude.png'
-import AgentMessageBlock from '../pages/workspace/AgentMessageBlock'
+import AgentMessageBlock, { UserBubble } from '../pages/workspace/AgentMessageBlock'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
 
 function getThinkingStepLabel(name: string, input: Record<string, unknown>): string {
@@ -107,9 +107,6 @@ export default function InlineAgentResponseCard({
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <img src={claudeLogoUrl} alt="Claude" className="size-6 rounded-full" />
         <span className="text-sm font-medium text-foreground">Claude</span>
-        <span className="text-xs text-foreground-subtle">
-          {session.prompt.length > 60 ? session.prompt.slice(0, 60) + '...' : session.prompt}
-        </span>
         <div className="ml-auto flex items-center gap-1.5">
           {isRunning && (
             <button
@@ -134,6 +131,8 @@ export default function InlineAgentResponseCard({
       </div>
 
       <div className="px-4 py-3">
+        {/* User prompt as a message bubble */}
+        <UserBubble text={session.prompt} />
         {/* While thinking and no response yet: show latest step */}
         {isRunning && !hasResponse && thinkingStepCount > 0 && (
           <div className="flex items-center gap-2 py-1 text-accent">
