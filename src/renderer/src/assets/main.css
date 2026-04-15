@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Cursor theme */
 :root {
   --color-background: #14120b;
   --color-surface: #1b1913;
@@ -12,10 +13,30 @@
   --color-interactive-hover: #2b2923;
   --color-accent: #f54e00;
   --color-accent-hover: #ff6d2e;
+  --color-accent-bg: hsl(17, 33%, 11%);
   --color-success: #22c55e;
   --color-danger: #ef4444;
   --color-purple: #a78bfa;
 }
+
+/* Claude theme */
+/* :root {
+  --color-background: rgb(12, 12, 12);
+  --color-surface: rgb(18, 18, 18);
+  --color-surface-hover: rgb(22, 22, 22);
+  --color-foreground: rgb(226, 225, 219);
+  --color-foreground-muted: rgb(195, 194, 184);
+  --color-foreground-subtle: rgb(124, 123, 116);
+  --color-border: rgb(32, 32, 32);
+  --color-interactive: rgb(47, 47, 47);
+  --color-interactive-hover: rgb(43, 41, 35);
+  --color-accent: rgb(67, 151, 248);
+  --color-accent-hover: rgb(87, 171, 255);
+  --color-accent-bg: rgb(18, 26, 36);
+  --color-success: rgb(102, 201, 95);
+  --color-danger: rgb(227, 66, 88);
+  --color-purple: rgb(167, 139, 250);
+} */
 
 .light {
   --color-background: #f7f7f4;
@@ -29,6 +50,7 @@
   --color-interactive-hover: #e2e1dc;
   --color-accent: #f54e00;
   --color-accent-hover: #d94400;
+  --color-accent-bg: hsl(17, 33%, 11%);
   --color-success: #16a34a;
   --color-danger: #dc2626;
   --color-purple: #7c3aed;
@@ -286,6 +308,7 @@
   --color-interactive-hover: var(--color-interactive-hover);
   --color-accent: var(--color-accent);
   --color-accent-hover: var(--color-accent-hover);
+  --color-accent-bg: var(--color-accent-bg);
   --color-success: var(--color-success);
   --color-danger: var(--color-danger);
   --color-purple: var(--color-purple);

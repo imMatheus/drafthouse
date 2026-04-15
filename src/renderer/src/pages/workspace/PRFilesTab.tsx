@@ -33,7 +33,7 @@ import { getLanguageFromPath, tokenizeDiffHunks, type HighlightedToken } from '.
 import MarkdownBody from './MarkdownBody'
 import ReviewThreadCard from './ReviewThreadCard'
 import { getDiffThreadKey, parsePullRequestFileDiff, type ParsedDiffHunk } from './pullRequestDiff'
-import { buildPullRequestReviewThreads, DiffStat, type PullRequestReviewThread } from './pullRequestShared'
+import { buildPullRequestReviewThreads, DiffStat, formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
 
 export default function PRFilesTab({
   pr,
@@ -563,6 +563,90 @@ function PullRequestFileDiffCard({
         </div>
       ) : null}
     </section>
+  )
+}
+
+function InlineDiffThread({
+  thread,
+  replyTarget
+}: {
+  thread: PullRequestReviewThread
+  replyTarget: { owner: string; repo: string; number: number }
+}) {
+  const [replyBody, setReplyBody] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  const handleReply = async (): Promise<void> => {
+    if (!replyBody.trim() || isSubmitting) return
+    setIsSubmitting(true)
+    setErrorMessage(null)
+    try {
+      await window.api.github.pullComments.createReply(
+        replyTarget.owner,
+        replyTarget.repo,
+        replyTarget.number,
+        thread.topLevelComment.id,
+        replyBody
+      )
+      setReplyBody('')
+      await queryClient.invalidateQueries({
+        queryKey: ['pull-request-review-comments', replyTarget.owner, replyTarget.repo, replyTarget.number]
+      })
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to reply.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const allComments = [thread.topLevelComment, ...thread.replies]
+
+  return (
+    <div>
+      {allComments.map((comment) => (
+        <div key={comment.id} className="py-2">
+          <div className="flex items-center gap-2">
+            <img src={comment.user.avatar_url} alt={comment.user.login} className="size-5 rounded-full" />
+            <span className="text-xs font-semibold text-foreground">{comment.user.login}</span>
+            <span className="text-xs text-foreground-subtle">{formatRelativeTime(comment.created_at)}</span>
+          </div>
+          <div className="mt-1 pl-7">
+            <MarkdownBody>{comment.body}</MarkdownBody>
+          </div>
+        </div>
+      ))}
+
+      <div className="pt-1 pb-1">
+        <textarea
+          value={replyBody}
+          onChange={(e) => setReplyBody(e.target.value)}
+          placeholder="Write a reply"
+          className="w-full resize-none rounded border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+          rows={1}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              handleReply()
+            }
+          }}
+        />
+        {errorMessage ? <p className="mt-1 text-xs text-danger">{errorMessage}</p> : null}
+        {replyBody.trim() ? (
+          <div className="mt-1.5 flex items-center justify-end">
+            <button
+              type="button"
+              onClick={handleReply}
+              disabled={isSubmitting}
+              className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:opacity-40"
+            >
+              {isSubmitting ? 'Replying...' : 'Reply'}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
   )
 }
 
@@ -1182,8 +1266,8 @@ function UnifiedPRDiff({
 
                     {rowThreads.map((thread) => (
                       <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                        <td colSpan={3} className="bg-background px-3 py-3">
-                          <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
+                        <td colSpan={3} className="border-b border-border bg-background px-4 py-1">
+                          <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                         </td>
                       </tr>
                     ))}
@@ -1468,13 +1552,32 @@ function SplitPRDiff({
                   </td>
                 </tr>
 
-                {rowThreads.map((thread) => (
-                  <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                    <td colSpan={4} className="bg-background px-3 py-3">
-                      <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
-                    </td>
-                  </tr>
-                ))}
+                {rowThreads.map((thread) => {
+                  const isLeft = thread.side === 'LEFT'
+                  return (
+                    <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
+                      {isLeft ? (
+                        <>
+                          <td className="border-r border-border" />
+                          <td className="border-r border-border px-3 py-2 align-top">
+                            <InlineDiffThread thread={thread} replyTarget={replyTarget} />
+                          </td>
+                          <td className="border-r border-border" />
+                          <td />
+                        </>
+                      ) : (
+                        <>
+                          <td className="border-r border-border" />
+                          <td className="border-r border-border" />
+                          <td className="border-r border-border" />
+                          <td className="px-3 py-2 align-top">
+                            <InlineDiffThread thread={thread} replyTarget={replyTarget} />
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  )
+                })}
 
                 {draftComments.map(({ comment, index }) => (
                   <tr key={`draft-${index}`}>

@@ -161,8 +161,8 @@ export default function PullRequestDetailView({
         <p className="text-xs text-foreground-muted">
           <span className="font-medium text-foreground">{pr.user.login}</span> wants to merge {pr.commits} commit
           {pr.commits !== 1 ? 's' : ''} into{' '}
-          <code className="rounded bg-surface px-1.5 py-0.5 text-xs text-accent">{pr.base.ref}</code> from{' '}
-          <code className="rounded bg-surface px-1.5 py-0.5 text-xs text-accent">{pr.head.ref}</code>
+          <code className="rounded bg-accent-bg px-1.5 py-0.5 text-xs text-accent">{pr.base.ref}</code> from{' '}
+          <code className="rounded bg-accent-bg px-1.5 py-0.5 text-xs text-accent">{pr.head.ref}</code>
         </p>
         <DiffStat additions={pr.additions} deletions={pr.deletions} />
       </div>
@@ -310,7 +310,8 @@ function PRConversationTab({
   // Filter workspace sessions to find this PR's inline agents (exclude diff-line sessions)
   const prLabel = `PR #${pr.number}`
   const inlineSessions = agentSessions.filter(
-    (s) => s.context?.source === 'pull-request' && s.context.label === prLabel && s.context.inline && !s.context.filePath
+    (s) =>
+      s.context?.source === 'pull-request' && s.context.label === prLabel && s.context.inline && !s.context.filePath
   )
 
   const handleAskClaude = async (prompt: string): Promise<void> => {
@@ -363,7 +364,13 @@ function PRConversationTab({
       {isLoadingConversation ? <p className="text-sm text-foreground-muted">Loading conversation...</p> : null}
 
       {timelineItems.map((item) => (
-        <PullRequestTimelineCard key={item.id} item={item} owner={owner} repo={repo} onViewReviewThread={onViewReviewThread} />
+        <PullRequestTimelineCard
+          key={item.id}
+          item={item}
+          owner={owner}
+          repo={repo}
+          onViewReviewThread={onViewReviewThread}
+        />
       ))}
 
       {inlineSessions.map((session) => (
@@ -509,7 +516,13 @@ function PullRequestTimelineCard({
         {item.threads.length > 0 ? (
           <div className="mt-3 flex flex-col gap-4">
             {item.threads.map((thread) => (
-              <ReviewThreadCard key={thread.id} thread={thread} owner={owner} repo={repo} onViewReviewThread={onViewReviewThread} />
+              <ReviewThreadCard
+                key={thread.id}
+                thread={thread}
+                owner={owner}
+                repo={repo}
+                onViewReviewThread={onViewReviewThread}
+              />
             ))}
           </div>
         ) : null}
