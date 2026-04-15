@@ -48,6 +48,7 @@ export function buildPullRequestAgentContext(params: {
   return {
     source: 'pull-request',
     systemPromptSuffix,
-    label: `PR #${pr.number}`
+    label: `PR #${pr.number}`,
+    inline: true
   }
 }

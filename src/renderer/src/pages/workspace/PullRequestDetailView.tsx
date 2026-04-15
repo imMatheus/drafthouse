@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  ArrowUp,
   Bold,
   Check,
   ChevronDown,
+  ChevronRight,
   Code,
   ExternalLink,
   Eye,
@@ -19,10 +21,13 @@ import {
   MessageSquare,
   Pencil,
   Quote,
-  Sparkles
+  Square
 } from 'lucide-react'
 import type {
   AgentContext,
+  AgentSession,
+  AgentStreamEvent,
+  AgentStreamResult,
   AuthData,
   PullRequestComment,
   PullRequestDetail,
@@ -36,6 +41,10 @@ import { buildPullRequestAgentContext } from '../../lib/agentContext'
 import { cn } from '../../lib/cn'
 import { extractClaudePrompt, isClaudeMention } from '../../lib/claudeMention'
 import type { PullRequestSubview } from '../../lib/workspaceTabs'
+import claudeLogoUrl from '../../assets/claude.png'
+import ReactionBar from '../../components/ReactionBar'
+import AgentMessageBlock from './AgentMessageBlock'
+import AgentSpinner from './AgentSpinner'
 import MarkdownBody from './MarkdownBody'
 import PRCommitsTab from './PRCommitsTab'
 import PRFilesTab from './PRFilesTab'
@@ -52,10 +61,14 @@ interface PullRequestDetailViewProps {
   repo: string
   number: number
   subview: PullRequestSubview
+  agentSessions: AgentSession[]
   onSubviewChange: (subview: PullRequestSubview) => void
   onTitleChange?: (title: string) => void
   onStateChange?: (prState: 'open' | 'closed' | 'merged' | 'draft') => void
-  onStartAgent?: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
+  onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
+  onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent: (sessionId: string) => Promise<void>
+  onPromoteAgent: (sessionId: string) => void
 }
 
 export default function PullRequestDetailView({
@@ -63,14 +76,16 @@ export default function PullRequestDetailView({
   repo,
   number,
   subview,
+  agentSessions,
   onSubviewChange,
   onTitleChange,
   onStateChange,
-  onStartAgent
+  onStartAgent,
+  onContinueAgent,
+  onStopAgent,
+  onPromoteAgent
 }: PullRequestDetailViewProps) {
-  const [draftReviewComments, setDraftReviewComments] = useState<PullRequestReviewDraftComment[]>(
-    []
-  )
+  const [draftReviewComments, setDraftReviewComments] = useState<PullRequestReviewDraftComment[]>([])
   const [threadJumpTarget, setThreadJumpTarget] = useState<{
     path: string
     commentId: number
@@ -94,7 +109,7 @@ export default function PullRequestDetailView({
 
   useEffect(() => {
     if (!pr) return
-    const state = pr.draft ? 'draft' : pr.merged ? 'merged' : pr.state === 'closed' ? 'closed' : 'open'
+    const state = pr.merged ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open'
     onStateChange?.(state)
   }, [onStateChange, pr?.draft, pr?.merged, pr?.state])
 
@@ -116,21 +131,15 @@ export default function PullRequestDetailView({
 
   if (!pr) return null
 
-  const statusColor = pr.draft
-    ? 'text-foreground-muted bg-surface'
-    : pr.merged
-      ? 'text-purple bg-purple/10'
-      : pr.state === 'closed'
-        ? 'text-danger bg-danger/10'
+  const statusColor = pr.merged
+    ? 'text-purple bg-purple/10'
+    : pr.state === 'closed'
+      ? 'text-danger bg-danger/10'
+      : pr.draft
+        ? 'text-foreground-muted bg-surface'
         : 'text-success bg-success/10'
 
-  const statusLabel = pr.draft
-    ? 'Draft'
-    : pr.merged
-      ? 'Merged'
-      : pr.state === 'closed'
-        ? 'Closed'
-        : 'Open'
+  const statusLabel = pr.merged ? 'Merged' : pr.state === 'closed' ? 'Closed' : pr.draft ? 'Draft' : 'Open'
 
   return (
     <div>
@@ -157,16 +166,10 @@ export default function PullRequestDetailView({
           {statusLabel}
         </span>
         <p className="text-xs text-foreground-muted">
-          <span className="font-medium text-foreground">{pr.user.login}</span> wants to merge{' '}
-          {pr.commits} commit
+          <span className="font-medium text-foreground">{pr.user.login}</span> wants to merge {pr.commits} commit
           {pr.commits !== 1 ? 's' : ''} into{' '}
-          <code className="rounded bg-surface px-1.5 py-0.5 text-xs text-accent">
-            {pr.base.ref}
-          </code>{' '}
-          from{' '}
-          <code className="rounded bg-surface px-1.5 py-0.5 text-xs text-accent">
-            {pr.head.ref}
-          </code>
+          <code className="rounded bg-surface px-1.5 py-0.5 text-xs text-accent">{pr.base.ref}</code> from{' '}
+          <code className="rounded bg-surface px-1.5 py-0.5 text-xs text-accent">{pr.head.ref}</code>
         </p>
         <DiffStat additions={pr.additions} deletions={pr.deletions} />
       </div>
@@ -205,6 +208,7 @@ export default function PullRequestDetailView({
                 pr={pr}
                 owner={owner}
                 repo={repo}
+                agentSessions={agentSessions}
                 onViewReviewThread={(thread) => {
                   onSubviewChange('files')
                   setThreadJumpTarget({
@@ -214,6 +218,9 @@ export default function PullRequestDetailView({
                   })
                 }}
                 onStartAgent={onStartAgent}
+                onContinueAgent={onContinueAgent}
+                onStopAgent={onStopAgent}
+                onPromoteAgent={onPromoteAgent}
               />
             </div>
             <div className="hidden w-48 shrink-0 lg:block">
@@ -275,15 +282,40 @@ function PRConversationTab({
   pr,
   owner,
   repo,
+  agentSessions,
   onViewReviewThread,
-  onStartAgent
+  onStartAgent,
+  onContinueAgent,
+  onStopAgent,
+  onPromoteAgent
 }: {
   pr: PullRequestDetail
   owner: string
   repo: string
+  agentSessions: AgentSession[]
   onViewReviewThread: (thread: PullRequestReviewThread) => void
-  onStartAgent?: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
+  onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
+  onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent: (sessionId: string) => Promise<void>
+  onPromoteAgent: (sessionId: string) => void
 }) {
+  const { data: prFiles } = useQuery<PullRequestFile[], Error>({
+    queryKey: ['pull-request-files', owner, repo, pr.number],
+    queryFn: () => window.api.github.pulls.listFiles(owner, repo, pr.number),
+    retry: false
+  })
+
+  // Filter workspace sessions to find this PR's inline agents
+  const prLabel = `PR #${pr.number}`
+  const inlineSessions = agentSessions.filter(
+    (s) => s.context?.source === 'pull-request' && s.context.label === prLabel && s.context.inline
+  )
+
+  const handleAskClaude = async (prompt: string): Promise<void> => {
+    const context = buildPullRequestAgentContext({ owner, repo, pr, files: prFiles })
+    await onStartAgent(prompt, undefined, context)
+  }
+
   const {
     data: comments,
     isLoading: isLoadingComments,
@@ -312,11 +344,7 @@ function PRConversationTab({
     retry: false
   })
 
-  const timelineItems = buildPullRequestTimelineItems(
-    comments ?? [],
-    reviewComments ?? [],
-    reviews ?? []
-  )
+  const timelineItems = buildPullRequestTimelineItems(comments ?? [], reviewComments ?? [], reviews ?? [])
   const conversationError = commentsError ?? reviewCommentsError ?? reviewsError
   const isLoadingConversation = isLoadingComments || isLoadingReviewComments || isLoadingReviews
 
@@ -330,19 +358,23 @@ function PRConversationTab({
         </div>
       ) : null}
 
-      {isLoadingConversation ? (
-        <p className="text-sm text-foreground-muted">Loading conversation...</p>
-      ) : null}
+      {isLoadingConversation ? <p className="text-sm text-foreground-muted">Loading conversation...</p> : null}
 
       {timelineItems.map((item) => (
-        <PullRequestTimelineCard
-          key={item.id}
-          item={item}
-          onViewReviewThread={onViewReviewThread}
+        <PullRequestTimelineCard key={item.id} item={item} owner={owner} repo={repo} onViewReviewThread={onViewReviewThread} />
+      ))}
+
+      {inlineSessions.map((session) => (
+        <InlineAgentResponseCard
+          key={session.id}
+          session={session}
+          onStop={() => onStopAgent(session.id)}
+          onContinue={(prompt) => onContinueAgent(session.id, prompt)}
+          onOpenInChat={() => onPromoteAgent(session.id)}
         />
       ))}
 
-      <CommentBox owner={owner} repo={repo} number={pr.number} pr={pr} onStartAgent={onStartAgent} />
+      <CommentBox owner={owner} repo={repo} number={pr.number} onAskClaude={handleAskClaude} />
       <PRActionBar pr={pr} owner={owner} repo={repo} />
     </div>
   )
@@ -391,10 +423,7 @@ function buildPullRequestTimelineItems(
     }))
 
   const orphanReviewItems: PullRequestTimelineItem[] = Array.from(threadsByReviewId.entries())
-    .filter(
-      ([reviewId]) =>
-        !reviews.some((review) => review.id === reviewId && review.submitted_at && review.user)
-    )
+    .filter(([reviewId]) => !reviews.some((review) => review.id === reviewId && review.submitted_at && review.user))
     .map(([reviewId, threads]) => ({
       id: `review-${reviewId}`,
       type: 'review-block' as const,
@@ -419,22 +448,30 @@ function buildPullRequestTimelineItems(
 
 function PullRequestTimelineCard({
   item,
+  owner,
+  repo,
   onViewReviewThread
 }: {
   item: PullRequestTimelineItem
+  owner: string
+  repo: string
   onViewReviewThread: (thread: PullRequestReviewThread) => void
 }) {
   if (item.type === 'issue-comment') {
+    // Extract the numeric comment ID from the timeline item ID
+    const commentId = Number(item.id.replace('issue-comment-', ''))
+
     return (
       <div className="rounded-lg border border-border bg-surface">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <img src={item.user.avatar_url} alt={item.user.login} className="size-6 rounded-full" />
           <span className="text-sm font-medium text-foreground">{item.user.login}</span>
-          <span className="text-xs text-foreground-subtle">
-            commented {formatRelativeTime(item.createdAt)}
-          </span>
+          <span className="text-xs text-foreground-subtle">commented {formatRelativeTime(item.createdAt)}</span>
         </div>
         <MarkdownBody>{item.body}</MarkdownBody>
+        <div className="border-t border-border px-4 py-2">
+          <ReactionBar owner={owner} repo={repo} commentId={commentId} commentType="issue-comment" />
+        </div>
       </div>
     )
   }
@@ -442,11 +479,7 @@ function PullRequestTimelineCard({
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3">
       <div className="flex flex-col items-center">
-        <img
-          src={item.user.avatar_url}
-          alt={item.user.login}
-          className="size-8 rounded-full border border-border"
-        />
+        <img src={item.user.avatar_url} alt={item.user.login} className="size-8 rounded-full border border-border" />
         <div className="mt-2 flex min-h-8 size-8 items-center justify-center rounded-full border border-border bg-surface text-foreground-muted">
           <Eye size={14} />
         </div>
@@ -474,11 +507,7 @@ function PullRequestTimelineCard({
         {item.threads.length > 0 ? (
           <div className="mt-3 flex flex-col gap-4">
             {item.threads.map((thread) => (
-              <ReviewThreadCard
-                key={thread.id}
-                thread={thread}
-                onViewReviewThread={onViewReviewThread}
-              />
+              <ReviewThreadCard key={thread.id} thread={thread} owner={owner} repo={repo} onViewReviewThread={onViewReviewThread} />
             ))}
           </div>
         ) : null}
@@ -535,15 +564,7 @@ function formatReviewStateLabel(state: string): string {
   }
 }
 
-function PRDescriptionCard({
-  pr,
-  owner,
-  repo
-}: {
-  pr: PullRequestDetail
-  owner: string
-  repo: string
-}) {
+function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: string; repo: string }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editBody, setEditBody] = useState(pr.body ?? '')
   const [editTab, setEditTab] = useState<'write' | 'preview'>('write')
@@ -629,7 +650,9 @@ function PRDescriptionCard({
               onClick={() => setEditTab('preview')}
               className={cn(
                 'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                editTab === 'preview' ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground'
+                editTab === 'preview'
+                  ? 'bg-surface-hover text-foreground'
+                  : 'text-foreground-muted hover:text-foreground'
               )}
             >
               Preview
@@ -638,27 +661,62 @@ function PRDescriptionCard({
 
           {editTab === 'write' ? (
             <div className="flex items-center gap-0.5">
-              <button type="button" title="Heading" className={toolbarBtnClass} onClick={() => insertAtLineStart('### ')}>
+              <button
+                type="button"
+                title="Heading"
+                className={toolbarBtnClass}
+                onClick={() => insertAtLineStart('### ')}
+              >
                 <Heading size={14} />
               </button>
-              <button type="button" title="Bold" className={toolbarBtnClass} onClick={() => wrapSelection('**', '**', 'bold text')}>
+              <button
+                type="button"
+                title="Bold"
+                className={toolbarBtnClass}
+                onClick={() => wrapSelection('**', '**', 'bold text')}
+              >
                 <Bold size={14} />
               </button>
-              <button type="button" title="Italic" className={toolbarBtnClass} onClick={() => wrapSelection('_', '_', 'italic text')}>
+              <button
+                type="button"
+                title="Italic"
+                className={toolbarBtnClass}
+                onClick={() => wrapSelection('_', '_', 'italic text')}
+              >
                 <Italic size={14} />
               </button>
               <div className="mx-1 h-4 w-px bg-border" />
-              <button type="button" title="Unordered list" className={toolbarBtnClass} onClick={() => insertAtLineStart('- ')}>
+              <button
+                type="button"
+                title="Unordered list"
+                className={toolbarBtnClass}
+                onClick={() => insertAtLineStart('- ')}
+              >
                 <List size={14} />
               </button>
-              <button type="button" title="Ordered list" className={toolbarBtnClass} onClick={() => insertAtLineStart('1. ')}>
+              <button
+                type="button"
+                title="Ordered list"
+                className={toolbarBtnClass}
+                onClick={() => insertAtLineStart('1. ')}
+              >
                 <ListOrdered size={14} />
               </button>
               <div className="mx-1 h-4 w-px bg-border" />
-              <button type="button" title="Code" className={toolbarBtnClass} onClick={() => wrapSelection('`', '`', 'code')}>
+              <button
+                type="button"
+                title="Code"
+                className={toolbarBtnClass}
+                onClick={() => wrapSelection('`', '`', 'code')}
+              >
                 <Code size={14} />
               </button>
-              <button type="button" title="Link" className={toolbarBtnClass} onClick={() => wrapSelection('[', '](url)', 'link text')}>
+              <button
+                type="button"
+                title="Link"
+                className={toolbarBtnClass}
+                onClick={() => wrapSelection('[', '](url)', 'link text')}
+              >
                 <Link size={14} />
               </button>
               <button type="button" title="Quote" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')}>
@@ -678,7 +736,11 @@ function PRDescriptionCard({
           />
         ) : (
           <div className="min-h-[180px]">
-            {editBody ? <MarkdownBody>{editBody}</MarkdownBody> : <p className="p-4 text-foreground-subtle">Nothing to preview</p>}
+            {editBody ? (
+              <MarkdownBody>{editBody}</MarkdownBody>
+            ) : (
+              <p className="p-4 text-foreground-subtle">Nothing to preview</p>
+            )}
           </div>
         )}
 
@@ -707,9 +769,7 @@ function PRDescriptionCard({
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <img src={pr.user.avatar_url} alt={pr.user.login} className="size-6 rounded-full" />
         <span className="text-sm font-medium text-foreground">{pr.user.login}</span>
-        <span className="text-xs text-foreground-subtle">
-          commented {formatRelativeTime(pr.created_at)}
-        </span>
+        <span className="text-xs text-foreground-subtle">commented {formatRelativeTime(pr.created_at)}</span>
         <button
           onClick={handleEdit}
           className="ml-auto rounded p-1 text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
@@ -727,18 +787,250 @@ function PRDescriptionCard({
   )
 }
 
+function getThinkingStepLabel(name: string, input: Record<string, unknown>): string {
+  switch (name) {
+    case 'Bash':
+      return typeof input.command === 'string' ? `${input.command.slice(0, 60)}` : name
+    case 'Read':
+      return typeof input.file_path === 'string' ? `Reading ${(input.file_path as string).split('/').pop()}` : name
+    case 'Grep':
+      return typeof input.pattern === 'string' ? `Searching for "${input.pattern}"` : name
+    case 'Glob':
+      return typeof input.pattern === 'string' ? `Finding files: ${input.pattern}` : name
+    case 'Edit':
+      return typeof input.file_path === 'string' ? `Editing ${(input.file_path as string).split('/').pop()}` : name
+    case 'Write':
+      return typeof input.file_path === 'string' ? `Writing ${(input.file_path as string).split('/').pop()}` : name
+    default:
+      return name
+  }
+}
+
+function InlineAgentResponseCard({
+  session,
+  onStop,
+  onContinue,
+  onOpenInChat
+}: {
+  session: AgentSession
+  onStop: () => void
+  onContinue: (prompt: string) => void
+  onOpenInChat: () => void
+}) {
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const [thinkingExpanded, setThinkingExpanded] = useState(false)
+  const [followUp, setFollowUp] = useState('')
+  const followUpRef = useRef<HTMLTextAreaElement>(null)
+  const isRunning = session.status === 'running'
+  const canContinue = !isRunning && session.cliSessionId !== null
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [session.events.length])
+
+  // Separate thinking steps from the final response
+  const thinkingEvents: AgentStreamEvent[] = []
+  const responseEvents: AgentStreamEvent[] = []
+  let thinkingStepCount = 0
+  let latestThinkingLabel = ''
+
+  for (const event of session.events) {
+    if (event.type === 'assistant') {
+      const hasToolUse = event.message.content.some((b) => b.type === 'tool_use')
+      if (hasToolUse) {
+        thinkingEvents.push(event)
+        for (const b of event.message.content) {
+          if (b.type === 'tool_use') {
+            thinkingStepCount++
+            latestThinkingLabel = getThinkingStepLabel(b.name, b.input)
+          }
+        }
+      } else {
+        responseEvents.push(event)
+      }
+    } else if (event.type === 'user') {
+      thinkingEvents.push(event)
+    } else if (event.type === 'system' && event.subtype !== 'init') {
+      thinkingEvents.push(event)
+    }
+  }
+
+  const hasResponse = responseEvents.length > 0
+
+  // Collect inline tool IDs for the expanded thinking view
+  const inlineToolIds = new Set<string>()
+  for (const event of thinkingEvents) {
+    if (event.type === 'assistant') {
+      for (const b of event.message.content) {
+        if (b.type === 'tool_use' && (b.name === 'Read' || b.name === 'Glob' || b.name === 'Grep')) {
+          inlineToolIds.add(b.id)
+        }
+      }
+    }
+  }
+
+  let lastResultEvent: AgentStreamResult | null = null
+  for (let i = session.events.length - 1; i >= 0; i--) {
+    const e = session.events[i]
+    if (e.type === 'result') {
+      lastResultEvent = e
+      break
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <img src={claudeLogoUrl} alt="Claude" className="size-6 rounded-full" />
+        <span className="text-sm font-medium text-foreground">Claude</span>
+        <span className="text-xs text-foreground-subtle">
+          {session.prompt.length > 60 ? session.prompt.slice(0, 60) + '...' : session.prompt}
+        </span>
+        <div className="ml-auto flex items-center gap-1.5">
+          {isRunning && (
+            <button
+              onClick={onStop}
+              className="flex size-6 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-hover hover:text-danger"
+              title="Stop agent"
+            >
+              <Square size={12} />
+            </button>
+          )}
+          {session.cliSessionId && (
+            <button
+              onClick={onOpenInChat}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+              title="Continue in chat tab"
+            >
+              <ExternalLink size={12} />
+              <span>Open in chat</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-3">
+        {/* While thinking and no response yet: show latest step */}
+        {isRunning && !hasResponse && thinkingStepCount > 0 && (
+          <div className="flex items-center gap-2 py-1 text-accent">
+            <AgentSpinner />
+            <span className="truncate text-xs text-foreground-muted">{latestThinkingLabel}</span>
+          </div>
+        )}
+
+        {/* While thinking with no steps yet */}
+        {isRunning && !hasResponse && thinkingStepCount === 0 && (
+          <div className="flex items-center gap-2 py-1 text-accent">
+            <AgentSpinner />
+            <span className="text-xs">Thinking...</span>
+          </div>
+        )}
+
+        {/* Once response arrives (or agent is done): show collapsible thinking accordion */}
+        {thinkingStepCount > 0 && (hasResponse || !isRunning) && (
+          <div className="mb-3">
+            <button
+              onClick={() => setThinkingExpanded(!thinkingExpanded)}
+              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
+              <ChevronRight
+                size={12}
+                className={cn('shrink-0 transition-transform', thinkingExpanded && 'rotate-90')}
+              />
+              <span>
+                {thinkingStepCount} thinking step{thinkingStepCount !== 1 ? 's' : ''}
+              </span>
+            </button>
+
+            {thinkingExpanded && (
+              <div className="mt-2 rounded-md border border-border bg-background px-3 py-2">
+                {thinkingEvents.map((event, i) => (
+                  <AgentMessageBlock key={i} event={event} inlineToolIds={inlineToolIds} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* The actual response */}
+        {responseEvents.map((event, i) => (
+          <AgentMessageBlock key={`response-${i}`} event={event} inlineToolIds={new Set()} />
+        ))}
+
+        {/* Streaming indicator when response is coming in */}
+        {isRunning && hasResponse && (
+          <div className="flex items-center gap-2 py-1 text-accent">
+            <AgentSpinner />
+          </div>
+        )}
+
+        {lastResultEvent && !isRunning && (
+          <div className="mt-2 flex items-center gap-3 text-xs text-foreground-subtle">
+            <span>{(lastResultEvent.duration_ms / 1000).toFixed(1)}s</span>
+            <span>${lastResultEvent.total_cost_usd.toFixed(4)}</span>
+          </div>
+        )}
+
+        {session.status === 'error' && !lastResultEvent && (
+          <div className="mt-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2">
+            <p className="text-xs text-danger">Agent encountered an error</p>
+          </div>
+        )}
+
+        {/* Follow-up input */}
+        {canContinue && (
+          <div className="mt-3 flex items-end gap-2 rounded-lg border border-border bg-background p-2">
+            <textarea
+              ref={followUpRef}
+              value={followUp}
+              onChange={(e) => setFollowUp(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && followUp.trim()) {
+                  e.preventDefault()
+                  onContinue(followUp.trim())
+                  setFollowUp('')
+                }
+              }}
+              onInput={() => {
+                const el = followUpRef.current
+                if (!el) return
+                el.style.height = 'auto'
+                el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+              }}
+              placeholder="Ask a follow-up..."
+              rows={1}
+              className="min-h-[24px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+            />
+            <button
+              onClick={() => {
+                if (!followUp.trim()) return
+                onContinue(followUp.trim())
+                setFollowUp('')
+              }}
+              disabled={!followUp.trim()}
+              className="flex size-6 shrink-0 items-center justify-center rounded-md bg-foreground text-background transition-colors hover:opacity-80 disabled:opacity-30"
+            >
+              <ArrowUp size={12} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+    </div>
+  )
+}
+
 function CommentBox({
   owner,
   repo,
   number,
-  pr,
-  onStartAgent
+  onAskClaude
 }: {
   owner: string
   repo: string
   number: number
-  pr: PullRequestDetail
-  onStartAgent?: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
+  onAskClaude?: (prompt: string) => Promise<void>
 }) {
   const [body, setBody] = useState('')
   const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write')
@@ -752,21 +1044,12 @@ function CommentBox({
     retry: false
   })
 
-  const { data: prFiles } = useQuery<PullRequestFile[], Error>({
-    queryKey: ['pull-request-files', owner, repo, number],
-    queryFn: () => window.api.github.pulls.listFiles(owner, repo, number),
-    retry: false
-  })
-
   const claudeMention = isClaudeMention(body)
   const hasClaudePrefix = /^@claude/i.test(body.trimStart())
 
   // Show autocomplete when user types @ at the start and it's a prefix of "@claude"
   const mentionMatch = body.trimStart().match(/^@(\w*)$/)
-  const showMentionMenu =
-    !!onStartAgent &&
-    mentionMatch !== null &&
-    'claude'.startsWith(mentionMatch[1].toLowerCase())
+  const showMentionMenu = !!onAskClaude && mentionMatch !== null && 'claude'.startsWith(mentionMatch[1].toLowerCase())
 
   const acceptMention = (): void => {
     setBody('@claude ')
@@ -787,10 +1070,7 @@ function CommentBox({
       if (selected) {
         textarea.setSelectionRange(start + before.length, start + before.length + content.length)
       } else {
-        textarea.setSelectionRange(
-          start + before.length,
-          start + before.length + placeholder.length
-        )
+        textarea.setSelectionRange(start + before.length, start + before.length + placeholder.length)
       }
     })
   }
@@ -812,20 +1092,13 @@ function CommentBox({
   const handleSubmit = async (): Promise<void> => {
     if (!body.trim() || isSubmitting) return
 
-    if (claudeMention && onStartAgent) {
+    if (claudeMention && onAskClaude) {
       const agentPrompt = extractClaudePrompt(body)
       if (!agentPrompt) return
 
-      const context = buildPullRequestAgentContext({
-        owner,
-        repo,
-        pr,
-        files: prFiles
-      })
-
       setBody('')
       setActiveTab('write')
-      await onStartAgent(agentPrompt, undefined, context)
+      await onAskClaude(agentPrompt)
       return
     }
 
@@ -941,12 +1214,7 @@ function CommentBox({
               >
                 <Link size={14} />
               </button>
-              <button
-                type="button"
-                title="Quote"
-                className={toolbarBtnClass}
-                onClick={() => insertAtLineStart('> ')}
-              >
+              <button type="button" title="Quote" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')}>
                 <Quote size={14} />
               </button>
             </div>
@@ -955,18 +1223,16 @@ function CommentBox({
 
         {activeTab === 'write' ? (
           <div className="relative">
-            {/* Highlight overlay — mirrors textarea text with @claude in accent color */}
+            {/* Overlay — highlights @claude with accent background. Uses only
+                color / background-color / border-radius which are paint-only
+                and don't shift text layout, so cursor alignment stays perfect. */}
             {hasClaudePrefix && (
               <div
                 className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-4 text-sm"
                 aria-hidden
               >
-                <span className="font-medium text-accent">
-                  {body.match(/^@claude/i)?.[0]}
-                </span>
-                <span className="text-foreground">
-                  {body.slice(body.match(/^@claude/i)?.[0]?.length ?? 0)}
-                </span>
+                <span className="rounded-sm bg-accent/15 font-medium text-accent">{body.match(/^@claude/i)?.[0]}</span>
+                <span className="text-foreground">{body.slice(body.match(/^@claude/i)?.[0]?.length ?? 0)}</span>
               </div>
             )}
             <textarea
@@ -1000,9 +1266,7 @@ function CommentBox({
                   }}
                   className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-surface-hover"
                 >
-                  <span className="flex size-6 items-center justify-center rounded-md bg-accent/15 text-accent">
-                    <Sparkles size={14} />
-                  </span>
+                  <img src={claudeLogoUrl} alt="Claude" className="size-6 rounded-full" />
                   <div>
                     <p className="text-sm font-medium text-foreground">claude</p>
                     <p className="text-xs text-foreground-muted">Ask about this PR</p>
@@ -1023,9 +1287,7 @@ function CommentBox({
 
         <div className="flex items-center justify-between border-t border-border px-4 py-3">
           <p className="text-xs text-foreground-subtle">
-            {claudeMention
-              ? 'This will open a Claude agent session with PR context'
-              : 'Markdown is supported'}
+            {claudeMention ? 'Claude will respond inline with PR context' : 'Markdown is supported'}
           </p>
           <button
             onClick={handleSubmit}
@@ -1057,22 +1319,14 @@ function getMergeButtonLabel(method: PullRequestMergeMethod): string {
   }
 }
 
-function PRActionBar({
-  pr,
-  owner,
-  repo
-}: {
-  pr: PullRequestDetail
-  owner: string
-  repo: string
-}) {
+function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string; repo: string }) {
   const queryClient = useQueryClient()
   const [mergeMethod, setMergeMethod] = useState<PullRequestMergeMethod>('merge')
   const [isMergeMethodOpen, setIsMergeMethodOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const state = pr.draft ? 'draft' : pr.merged ? 'merged' : pr.state === 'closed' ? 'closed' : 'open'
+  const state = pr.merged ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open'
 
   if (state === 'merged') return null
 
@@ -1264,9 +1518,7 @@ function PRActionBar({
         ) : null}
       </div>
 
-      {mergeDisabledReason ? (
-        <p className="mt-2 text-sm text-danger">{mergeDisabledReason}</p>
-      ) : null}
+      {mergeDisabledReason ? <p className="mt-2 text-sm text-danger">{mergeDisabledReason}</p> : null}
 
       {errorMessage ? <p className="mt-2 text-sm text-danger">{errorMessage}</p> : null}
     </div>
@@ -1282,11 +1534,7 @@ function PRDetailSidebar({ pr }: { pr: PullRequestDetail }) {
           <div className="flex flex-col gap-1.5">
             {pr.requested_reviewers.map((reviewer) => (
               <div key={reviewer.login} className="flex items-center gap-2">
-                <img
-                  src={reviewer.avatar_url}
-                  alt={reviewer.login}
-                  className="size-5 rounded-full"
-                />
+                <img src={reviewer.avatar_url} alt={reviewer.login} className="size-5 rounded-full" />
                 <span className="text-xs text-foreground">{reviewer.login}</span>
               </div>
             ))}
@@ -1302,11 +1550,7 @@ function PRDetailSidebar({ pr }: { pr: PullRequestDetail }) {
           <div className="flex flex-col gap-1.5">
             {pr.assignees.map((assignee) => (
               <div key={assignee.login} className="flex items-center gap-2">
-                <img
-                  src={assignee.avatar_url}
-                  alt={assignee.login}
-                  className="size-5 rounded-full"
-                />
+                <img src={assignee.avatar_url} alt={assignee.login} className="size-5 rounded-full" />
                 <span className="text-xs text-foreground">{assignee.login}</span>
               </div>
             ))}

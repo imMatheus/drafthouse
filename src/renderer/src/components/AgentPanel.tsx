@@ -32,7 +32,7 @@ export default function AgentPanel({
   onSelectSession,
   onNewSession
 }: AgentPanelProps) {
-  const sortedSessions = [...sessions].reverse()
+  const sortedSessions = [...sessions].filter((s) => !s.context?.inline).reverse()
 
   return (
     <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">

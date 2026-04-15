@@ -9,6 +9,8 @@ import type {
   GitChangedFile,
   GitBranchInfo,
   GitLogEntry,
+  GitHubReaction,
+  ReactionContent,
   GitHubBranch,
   GitHubBranchDetail,
   MergeUpstreamResult,
@@ -390,6 +392,14 @@ interface GitHubReviewsAPI {
   ) => Promise<PullRequestReview>
 }
 
+interface GitHubReactionsAPI {
+  listForIssueComment: (owner: string, repo: string, commentId: number) => Promise<GitHubReaction[]>
+  createForIssueComment: (owner: string, repo: string, commentId: number, content: ReactionContent) => Promise<GitHubReaction>
+  listForPullComment: (owner: string, repo: string, commentId: number) => Promise<GitHubReaction[]>
+  createForPullComment: (owner: string, repo: string, commentId: number, content: ReactionContent) => Promise<GitHubReaction>
+  delete: (owner: string, repo: string, reactionId: number) => Promise<void>
+}
+
 interface GitHubAPI {
   repos: GitHubReposAPI
   branches: GitHubBranchesAPI
@@ -400,6 +410,7 @@ interface GitHubAPI {
   emojis: GitHubEmojisAPI
   pulls: GitHubPullsAPI
   pullComments: GitHubPullCommentsAPI
+  reactions: GitHubReactionsAPI
   reviewRequests: GitHubReviewRequestsAPI
   reviews: GitHubReviewsAPI
 }

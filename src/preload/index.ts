@@ -415,11 +415,23 @@ const api = {
           reviewEvent,
           body
         )
+    },
+    reactions: {
+      listForIssueComment: (owner: string, repo: string, commentId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:reactions:list-for-issue-comment', owner, repo, commentId),
+      createForIssueComment: (owner: string, repo: string, commentId: number, content: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:reactions:create-for-issue-comment', owner, repo, commentId, content),
+      listForPullComment: (owner: string, repo: string, commentId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:reactions:list-for-pull-comment', owner, repo, commentId),
+      createForPullComment: (owner: string, repo: string, commentId: number, content: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:reactions:create-for-pull-comment', owner, repo, commentId, content),
+      delete: (owner: string, repo: string, reactionId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:reactions:delete', owner, repo, reactionId)
     }
   },
   agent: {
     start: (cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string): Promise<unknown> =>
-      ipcRenderer.invoke('agent:start', cwd, prompt, files, appendSystemPrompt),
+      ipcRenderer.invoke('agent:start', cwd, prompt, files ?? null, appendSystemPrompt ?? null),
     continue: (
       sessionId: string,
       cliSessionId: string,

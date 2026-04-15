@@ -394,6 +394,20 @@ export interface PullRequestMergeResult {
 }
 
 // ============================================================
+// Reactions
+// ============================================================
+
+export type ReactionContent = '+1' | '-1' | 'laugh' | 'confused' | 'heart' | 'hooray' | 'rocket' | 'eyes'
+
+export interface GitHubReaction {
+  id: number
+  content: ReactionContent
+  user: {
+    login: string
+  }
+}
+
+// ============================================================
 // Pull Request Comments (issue comments + review comments)
 // ============================================================
 
@@ -494,6 +508,8 @@ export interface AgentContext {
   systemPromptSuffix: string
   /** Human-readable label shown in the agent tab title, e.g. "PR #42" */
   label: string
+  /** When true, session is rendered inline (e.g. in a PR view) and hidden from the agent panel */
+  inline?: boolean
 }
 
 export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'

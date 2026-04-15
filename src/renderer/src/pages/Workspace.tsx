@@ -247,9 +247,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
 
     setAgentSessions((prev) => [...prev, newSession])
+
+    // Inline sessions (e.g. PR inline) don't open an agent tab
+    if (context?.inline) return
+
     setActiveAgentSessionId(sessionId)
 
-    // Replace the "new session" tab with the real session tab
     const tabTitle = context
       ? `${context.label}: ${prompt.length > 20 ? prompt.slice(0, 20) + '...' : prompt}`
       : (prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt)
@@ -350,6 +353,28 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
+  const handlePromoteAgentSession = (sessionId: string): void => {
+    const target = agentSessions.find((s) => s.id === sessionId)
+    if (!target) return
+
+    // Remove inline flag so it appears in the agent panel
+    setAgentSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId && s.context
+          ? { ...s, context: { ...s.context, inline: false } }
+          : s
+      )
+    )
+    setActiveAgentSessionId(sessionId)
+
+    const tabTitle = target.context
+      ? `${target.context.label}: ${target.prompt.length > 20 ? target.prompt.slice(0, 20) + '...' : target.prompt}`
+      : target.prompt.length > 30
+        ? target.prompt.slice(0, 30) + '...'
+        : target.prompt
+    openOrFocusTab(createAgentTab(sessionId, tabTitle))
+  }
+
   useEffect(() => {
     if (!activeTabId) return
     return window.api.fs.onCloseTab(() => handleCloseTab(activeTabId))
@@ -357,7 +382,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const changedFileCount = gitStatus?.length ?? 0
 
-  const runningAgentCount = agentSessions.filter((s) => s.status === 'running').length
+  const runningAgentCount = agentSessions.filter((s) => s.status === 'running' && !s.context?.inline).length
 
   const activityItems = [
     {
@@ -455,6 +480,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                 onStartAgent: handleStartAgent,
                 onContinueAgent: handleContinueAgent,
                 onStopAgent: handleStopAgent,
+                onPromoteAgent: handlePromoteAgentSession,
                 onPullRequestSubviewChange: handlePullRequestSubviewChange,
                 onPullRequestTitleChange: handlePullRequestTitleChange,
                 onPullRequestStateChange: handlePullRequestStateChange
@@ -477,6 +503,7 @@ function renderWorkspaceTabContent({
   onStartAgent,
   onContinueAgent,
   onStopAgent,
+  onPromoteAgent,
   onPullRequestSubviewChange,
   onPullRequestTitleChange,
   onPullRequestStateChange
@@ -490,6 +517,7 @@ function renderWorkspaceTabContent({
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent: (sessionId: string) => Promise<void>
+  onPromoteAgent: (sessionId: string) => void
   onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void
   onPullRequestTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
   onPullRequestStateChange: (tabId: WorkspaceTab['id'], prState: 'open' | 'closed' | 'merged' | 'draft') => void
@@ -523,10 +551,14 @@ function renderWorkspaceTabContent({
           repo={gitInfo.repo}
           number={activeTab.number}
           subview={activeTab.subview}
+          agentSessions={agentSessions}
           onSubviewChange={(subview) => onPullRequestSubviewChange(activeTab.id, subview)}
           onTitleChange={(title) => onPullRequestTitleChange(activeTab.id, title)}
           onStateChange={(prState) => onPullRequestStateChange(activeTab.id, prState)}
           onStartAgent={onStartAgent}
+          onContinueAgent={onContinueAgent}
+          onStopAgent={onStopAgent}
+          onPromoteAgent={onPromoteAgent}
         />
       ) : (
         <PlaceholderView title="Pull Request" description="Repository metadata is not available." />

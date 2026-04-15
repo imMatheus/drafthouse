@@ -2,25 +2,34 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Reply } from 'lucide-react'
 import type { PullRequestReviewComment } from '../../../../shared/types'
+import { cn } from '../../lib/cn'
+import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
 import {
   getLanguageFromPath,
   tokenizeReviewPreviewLines,
   type HighlightedToken
 } from '../../lib/shiki'
+import ReactionBar from '../../components/ReactionBar'
 import MarkdownBody from './MarkdownBody'
 import { formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
 
 export default function ReviewThreadCard({
   thread,
+  owner,
+  repo,
   onViewReviewThread,
   replyTarget
 }: {
   thread: PullRequestReviewThread
+  owner?: string
+  repo?: string
   onViewReviewThread?: (thread: PullRequestReviewThread) => void
   replyTarget?: { owner: string; repo: string; number: number }
 }) {
   const { topLevelComment, replies } = thread
+  const resolvedOwner = owner ?? replyTarget?.owner
+  const resolvedRepo = repo ?? replyTarget?.repo
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -63,6 +72,11 @@ export default function ReviewThreadCard({
             <div className="mt-3">
               <MarkdownBody>{topLevelComment.body}</MarkdownBody>
             </div>
+            {resolvedOwner && resolvedRepo ? (
+              <div className="mt-3">
+                <ReactionBar owner={resolvedOwner} repo={resolvedRepo} commentId={topLevelComment.id} commentType="pull-comment" />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -90,6 +104,11 @@ export default function ReviewThreadCard({
                   <div className="mt-3">
                     <MarkdownBody>{reply.body}</MarkdownBody>
                   </div>
+                  {resolvedOwner && resolvedRepo ? (
+                    <div className="mt-3">
+                      <ReactionBar owner={resolvedOwner} repo={resolvedRepo} commentId={reply.id} commentType="pull-comment" />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -113,6 +132,7 @@ export default function ReviewThreadCard({
 
 function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment }) {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const lines = getReviewDiffPreviewLines(comment)
   const [tokenMap, setTokenMap] = useState<Map<number, HighlightedToken[]>>(new Map())
 
@@ -126,38 +146,158 @@ function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment 
     return null
   }
 
+  if (settings.diffViewMode === 'split') {
+    return <ReviewDiffHunkSplit lines={lines} tokenMap={tokenMap} />
+  }
+
+  return <ReviewDiffHunkUnified lines={lines} tokenMap={tokenMap} />
+}
+
+function TokenizedContent({ tokens, fallback }: { tokens: HighlightedToken[] | undefined; fallback: string }) {
+  if (tokens) {
+    return (
+      <>
+        {tokens.map((token, i) =>
+          token.color ? (
+            <span key={i} style={{ color: token.color }}>{token.content}</span>
+          ) : (
+            <span key={i}>{token.content}</span>
+          )
+        )}
+      </>
+    )
+  }
+  return <>{fallback}</>
+}
+
+function ReviewDiffHunkUnified({
+  lines,
+  tokenMap
+}: {
+  lines: ReviewDiffPreviewLine[]
+  tokenMap: Map<number, HighlightedToken[]>
+}) {
   return (
     <div className="border-b border-border bg-background">
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse text-sm">
           <tbody>
-            {lines.map((line, index) => {
-              const tokens = tokenMap.get(index)
+            {lines.map((line, index) => (
+              <tr key={`${line.kind}-${index}`} className={getReviewDiffRowClassName(line.kind)}>
+                <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                  {line.oldLine ?? ''}
+                </td>
+                <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                  {line.newLine ?? ''}
+                </td>
+                <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
+                  <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
+                    {line.prefix}
+                  </span>
+                  <TokenizedContent tokens={tokenMap.get(index)} fallback={line.content} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function ReviewDiffHunkSplit({
+  lines,
+  tokenMap
+}: {
+  lines: ReviewDiffPreviewLine[]
+  tokenMap: Map<number, HighlightedToken[]>
+}) {
+  // Align deletions with additions into side-by-side pairs
+  type AlignedPair = { left: { line: ReviewDiffPreviewLine; index: number } | null; right: { line: ReviewDiffPreviewLine; index: number } | null }
+  const pairs: AlignedPair[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    if (line.kind === 'header' || line.kind === 'context') {
+      pairs.push({ left: { line, index: i }, right: { line, index: i } })
+      i++
+      continue
+    }
+
+    const deletions: { line: ReviewDiffPreviewLine; index: number }[] = []
+    const additions: { line: ReviewDiffPreviewLine; index: number }[] = []
+
+    while (i < lines.length && lines[i].kind === 'deletion') {
+      deletions.push({ line: lines[i], index: i })
+      i++
+    }
+    while (i < lines.length && lines[i].kind === 'addition') {
+      additions.push({ line: lines[i], index: i })
+      i++
+    }
+
+    const maxLen = Math.max(deletions.length, additions.length)
+    for (let j = 0; j < maxLen; j++) {
+      pairs.push({
+        left: j < deletions.length ? deletions[j] : null,
+        right: j < additions.length ? additions[j] : null
+      })
+    }
+  }
+
+  return (
+    <div className="border-b border-border bg-background">
+      <div className="overflow-x-auto">
+        <table className="min-w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col className="w-10" />
+            <col className="w-1/2" />
+            <col className="w-10" />
+            <col className="w-1/2" />
+          </colgroup>
+          <tbody>
+            {pairs.map((pair, idx) => {
+              if (pair.left?.line.kind === 'header') {
+                return (
+                  <tr key={idx} className="bg-interactive">
+                    <td colSpan={4} className="px-3 py-1.5 font-mono text-[13px] text-foreground-muted">
+                      {pair.left.line.content}
+                    </td>
+                  </tr>
+                )
+              }
+
               return (
-                <tr key={`${line.kind}-${index}`} className={getReviewDiffRowClassName(line.kind)}>
-                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                    {line.oldLine ?? ''}
+                <tr key={idx}>
+                  <td className={cn(
+                    'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    pair.left?.line.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
+                  )}>
+                    {pair.left?.line.oldLine ?? ''}
                   </td>
-                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                    {line.newLine ?? ''}
+                  <td className={cn(
+                    'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                    pair.left?.line.kind === 'deletion' ? 'bg-danger/10 text-foreground' : pair.left ? 'bg-background text-foreground' : 'bg-surface'
+                  )}>
+                    {pair.left ? (
+                      <TokenizedContent tokens={tokenMap.get(pair.left.index)} fallback={pair.left.line.content} />
+                    ) : '\u00A0'}
                   </td>
-                  <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
-                    <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
-                      {line.prefix}
-                    </span>
-                    {tokens ? (
-                      tokens.map((token, i) =>
-                        token.color ? (
-                          <span key={i} style={{ color: token.color }}>
-                            {token.content}
-                          </span>
-                        ) : (
-                          <span key={i}>{token.content}</span>
-                        )
-                      )
-                    ) : (
-                      line.content
-                    )}
+                  <td className={cn(
+                    'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    pair.right?.line.kind === 'addition' ? 'bg-success/10' : 'bg-background'
+                  )}>
+                    {pair.right?.line.newLine ?? ''}
+                  </td>
+                  <td className={cn(
+                    'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                    pair.right?.line.kind === 'addition' ? 'bg-success/10 text-foreground' : pair.right ? 'bg-background text-foreground' : 'bg-surface'
+                  )}>
+                    {pair.right ? (
+                      <TokenizedContent tokens={tokenMap.get(pair.right.index)} fallback={pair.right.line.content} />
+                    ) : '\u00A0'}
                   </td>
                 </tr>
               )
