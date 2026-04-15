@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
+import { useSettings } from '../../hooks/useSettings'
 import { getLanguageFromPath, tokenizeCode, type HighlightedToken } from '../../lib/shiki'
 
 interface DiffViewProps {
@@ -26,18 +27,17 @@ interface AlignedPair {
 
 export default function DiffView({ filePath, folderPath, staged, onOpenFile }: DiffViewProps) {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const leftRef = useRef<HTMLDivElement>(null)
   const rightRef = useRef<HTMLDivElement>(null)
   const isSyncing = useRef(false)
 
-  // Fetch the unified diff from git
   const { data: diffText, isLoading: isDiffLoading } = useQuery<string, Error>({
     queryKey: ['git-diff', folderPath, filePath, staged],
     queryFn: () => window.api.git.diff(folderPath, filePath, staged),
     retry: false
   })
 
-  // For untracked/new files, diff is empty — read the file content directly
   const isEmptyDiff = diffText != null && !diffText.trim()
   const absolutePath = `${folderPath}/${filePath}`
   const { data: fileContent, isLoading: isFileLoading } = useQuery<string, Error>({
@@ -47,46 +47,56 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
     retry: false
   })
 
-  // Parse diff into aligned pairs for side-by-side view
-  const [alignedPairs, setAlignedPairs] = useState<AlignedPair[] | null>(null)
+  // Parse diff lines (unified list)
+  const [diffLines, setDiffLines] = useState<DiffLine[]>([])
+  const [alignedPairs, setAlignedPairs] = useState<AlignedPair[]>([])
   const [leftTokens, setLeftTokens] = useState<HighlightedToken[][] | null>(null)
   const [rightTokens, setRightTokens] = useState<HighlightedToken[][] | null>(null)
+  const [unifiedTokens, setUnifiedTokens] = useState<HighlightedToken[][] | null>(null)
 
   useEffect(() => {
     if (diffText == null) {
-      setAlignedPairs(null)
+      setDiffLines([])
+      setAlignedPairs([])
       setLeftTokens(null)
       setRightTokens(null)
+      setUnifiedTokens(null)
       return
     }
 
-    // For untracked files: no diff, show entire file as additions
     if (!diffText.trim()) {
       if (fileContent == null) return
 
       const lines = fileContent.split('\n')
-      const pairs: AlignedPair[] = lines.map((content, i) => ({
-        left: null,
-        right: { kind: 'addition', content, oldLineNumber: null, newLineNumber: i + 1 }
+      const dl: DiffLine[] = lines.map((content, i) => ({
+        kind: 'addition',
+        content,
+        oldLineNumber: null,
+        newLineNumber: i + 1
       }))
-      setAlignedPairs(pairs)
-      setLeftTokens([])
+      setDiffLines(dl)
 
+      const pairs: AlignedPair[] = dl.map((line) => ({ left: null, right: line }))
+      setAlignedPairs(pairs)
+
+      setLeftTokens([])
       const lang = getLanguageFromPath(filePath)
-      tokenizeCode(fileContent, lang, theme).then(setRightTokens).catch(() => {})
+      tokenizeCode(fileContent, lang, theme).then((t) => {
+        setRightTokens(t)
+        setUnifiedTokens(t)
+      }).catch(() => {})
       return
     }
 
-    const pairs = parseDiffToAlignedPairs(diffText)
-    setAlignedPairs(pairs)
+    const dl = parseDiffLines(diffText)
+    setDiffLines(dl)
+    setAlignedPairs(alignDiffLines(dl))
 
     const lang = getLanguageFromPath(filePath)
 
-    // Tokenize left (original) side
-    const leftCode = pairs
-      .filter((p) => p.left !== null)
-      .map((p) => p.left!.content)
-      .join('\n')
+    // Tokenize for split view
+    const leftCode = dl.filter((l) => l.kind !== 'addition').map((l) => l.content).join('\n')
+    const rightCode = dl.filter((l) => l.kind !== 'deletion').map((l) => l.content).join('\n')
 
     if (leftCode) {
       tokenizeCode(leftCode, lang, theme).then(setLeftTokens).catch(() => {})
@@ -94,24 +104,24 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
       setLeftTokens([])
     }
 
-    // Tokenize right (modified) side
-    const rightCode = pairs
-      .filter((p) => p.right !== null)
-      .map((p) => p.right!.content)
-      .join('\n')
-
     if (rightCode) {
       tokenizeCode(rightCode, lang, theme).then(setRightTokens).catch(() => {})
     } else {
       setRightTokens([])
     }
+
+    // Tokenize for unified view (all lines in order)
+    const allCode = dl.map((l) => l.content).join('\n')
+    if (allCode) {
+      tokenizeCode(allCode, lang, theme).then(setUnifiedTokens).catch(() => {})
+    } else {
+      setUnifiedTokens([])
+    }
   }, [diffText, fileContent, filePath, theme])
 
-  // Build token maps indexed by aligned pair position
   const leftTokenMap = buildTokenMap(alignedPairs, 'left', leftTokens)
   const rightTokenMap = buildTokenMap(alignedPairs, 'right', rightTokens)
 
-  // Synchronized scrolling
   const handleScroll = (source: 'left' | 'right'): void => {
     if (isSyncing.current) return
     isSyncing.current = true
@@ -135,7 +145,7 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
     )
   }
 
-  if (!alignedPairs) {
+  if (diffLines.length === 0 && alignedPairs.length === 0) {
     return null
   }
 
@@ -158,53 +168,54 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
         ) : null}
       </div>
 
-      {/* Split diff view */}
-      <div className="flex min-h-0 flex-1">
-        {/* Left pane - original */}
-        <div
-          ref={leftRef}
-          className="flex-1 overflow-auto border-r border-border"
-          onScroll={() => handleScroll('left')}
-        >
-          <table className="w-full border-collapse font-mono text-xs">
-            <tbody>
-              {alignedPairs.map((pair, i) => (
-                <DiffRow
-                  key={i}
-                  line={pair.left}
-                  tokens={leftTokenMap.get(i)}
-                  side="left"
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {settings.diffViewMode === 'split' ? (
+        /* Split diff view */
+        <div className="flex min-h-0 flex-1">
+          <div
+            ref={leftRef}
+            className="flex-1 overflow-auto border-r border-border"
+            onScroll={() => handleScroll('left')}
+          >
+            <table className="w-full border-collapse font-mono text-xs">
+              <tbody>
+                {alignedPairs.map((pair, i) => (
+                  <SplitDiffRow key={i} line={pair.left} tokens={leftTokenMap.get(i)} side="left" />
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Right pane - modified */}
-        <div
-          ref={rightRef}
-          className="flex-1 overflow-auto"
-          onScroll={() => handleScroll('right')}
-        >
+          <div
+            ref={rightRef}
+            className="flex-1 overflow-auto"
+            onScroll={() => handleScroll('right')}
+          >
+            <table className="w-full border-collapse font-mono text-xs">
+              <tbody>
+                {alignedPairs.map((pair, i) => (
+                  <SplitDiffRow key={i} line={pair.right} tokens={rightTokenMap.get(i)} side="right" />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* Unified diff view */
+        <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full border-collapse font-mono text-xs">
             <tbody>
-              {alignedPairs.map((pair, i) => (
-                <DiffRow
-                  key={i}
-                  line={pair.right}
-                  tokens={rightTokenMap.get(i)}
-                  side="right"
-                />
+              {diffLines.map((line, i) => (
+                <UnifiedDiffRow key={i} line={line} tokens={unifiedTokens?.[i]} />
               ))}
             </tbody>
           </table>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
-function DiffRow({
+function SplitDiffRow({
   line,
   tokens,
   side
@@ -214,15 +225,12 @@ function DiffRow({
   side: 'left' | 'right'
 }) {
   if (!line) {
-    // Empty placeholder row
     return (
       <tr className="bg-surface">
         <td className="w-12 select-none border-r border-border bg-surface px-2 py-0 text-right text-foreground-subtle">
           &nbsp;
         </td>
-        <td className="px-3 py-0 whitespace-pre">
-          &nbsp;
-        </td>
+        <td className="px-3 py-0 whitespace-pre">&nbsp;</td>
       </tr>
     )
   }
@@ -241,23 +249,60 @@ function DiffRow({
         {lineNumber}
       </td>
       <td className="px-3 py-0 whitespace-pre">
-        {tokens ? (
-          tokens.map((token, i) => (
-            <span key={i} style={token.color ? { color: token.color } : undefined}>
-              {token.content}
-            </span>
-          ))
-        ) : (
-          <span className="text-foreground">{line.content}</span>
-        )}
+        <TokenizedContent tokens={tokens} fallback={line.content} />
       </td>
     </tr>
   )
 }
 
-function parseDiffToAlignedPairs(diffText: string): AlignedPair[] {
+function UnifiedDiffRow({
+  line,
+  tokens
+}: {
+  line: DiffLine
+  tokens: HighlightedToken[] | undefined
+}) {
+  return (
+    <tr
+      className={cn(
+        line.kind === 'deletion' && 'bg-danger/10',
+        line.kind === 'addition' && 'bg-success/10',
+        line.kind === 'context' && 'bg-background'
+      )}
+    >
+      <td className="w-12 select-none px-2 py-0 text-right text-foreground-subtle/50">
+        {line.oldLineNumber ?? ''}
+      </td>
+      <td className="w-12 select-none px-2 py-0 text-right text-foreground-subtle/50">
+        {line.newLineNumber ?? ''}
+      </td>
+      <td className="w-4 select-none py-0 text-center text-foreground-subtle">
+        {line.kind === 'addition' ? '+' : line.kind === 'deletion' ? '-' : ' '}
+      </td>
+      <td className="py-0 pr-4 whitespace-pre">
+        <TokenizedContent tokens={tokens} fallback={line.content} />
+      </td>
+    </tr>
+  )
+}
+
+function TokenizedContent({ tokens, fallback }: { tokens: HighlightedToken[] | undefined; fallback: string }) {
+  if (!tokens) return <span className="text-foreground">{fallback}</span>
+
+  return (
+    <>
+      {tokens.map((token, i) => (
+        <span key={i} style={token.color ? { color: token.color } : undefined}>
+          {token.content}
+        </span>
+      ))}
+    </>
+  )
+}
+
+function parseDiffLines(diffText: string): DiffLine[] {
   const lines = diffText.split('\n')
-  const diffLines: DiffLine[] = []
+  const result: DiffLine[] = []
 
   let oldLine = 0
   let newLine = 0
@@ -277,38 +322,25 @@ function parseDiffToAlignedPairs(diffText: string): AlignedPair[] {
     if (!inHunk) continue
 
     if (line.startsWith('-')) {
-      diffLines.push({
-        kind: 'deletion',
-        content: line.slice(1),
-        oldLineNumber: oldLine,
-        newLineNumber: null
-      })
+      result.push({ kind: 'deletion', content: line.slice(1), oldLineNumber: oldLine, newLineNumber: null })
       oldLine++
     } else if (line.startsWith('+')) {
-      diffLines.push({
-        kind: 'addition',
-        content: line.slice(1),
-        oldLineNumber: null,
-        newLineNumber: newLine
-      })
+      result.push({ kind: 'addition', content: line.slice(1), oldLineNumber: null, newLineNumber: newLine })
       newLine++
     } else if (line.startsWith('\\')) {
-      // "\ No newline at end of file" — skip
+      // skip "\ No newline at end of file"
     } else {
-      // Context line
       const content = line.startsWith(' ') ? line.slice(1) : line
-      diffLines.push({
-        kind: 'context',
-        content,
-        oldLineNumber: oldLine,
-        newLineNumber: newLine
-      })
+      result.push({ kind: 'context', content, oldLineNumber: oldLine, newLineNumber: newLine })
       oldLine++
       newLine++
     }
   }
 
-  // Align deletions and additions into side-by-side pairs
+  return result
+}
+
+function alignDiffLines(diffLines: DiffLine[]): AlignedPair[] {
   const pairs: AlignedPair[] = []
   let i = 0
 
@@ -321,7 +353,6 @@ function parseDiffToAlignedPairs(diffText: string): AlignedPair[] {
       continue
     }
 
-    // Collect consecutive deletions and additions
     const deletions: DiffLine[] = []
     const additions: DiffLine[] = []
 
@@ -334,7 +365,6 @@ function parseDiffToAlignedPairs(diffText: string): AlignedPair[] {
       i++
     }
 
-    // Pair them up
     const maxLen = Math.max(deletions.length, additions.length)
     for (let j = 0; j < maxLen; j++) {
       pairs.push({
@@ -348,12 +378,12 @@ function parseDiffToAlignedPairs(diffText: string): AlignedPair[] {
 }
 
 function buildTokenMap(
-  alignedPairs: AlignedPair[] | null,
+  alignedPairs: AlignedPair[],
   side: 'left' | 'right',
   tokens: HighlightedToken[][] | null
 ): Map<number, HighlightedToken[]> {
   const map = new Map<number, HighlightedToken[]>()
-  if (!alignedPairs || !tokens) return map
+  if (!tokens) return map
 
   let tokenIdx = 0
   for (let i = 0; i < alignedPairs.length; i++) {

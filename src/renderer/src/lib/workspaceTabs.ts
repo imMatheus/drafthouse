@@ -29,7 +29,7 @@ export type WorkspaceTab =
       prState?: 'open' | 'closed' | 'merged' | 'draft'
     }
 
-export type WorkspaceActiveView = 'workspace' | 'agent'
+export type WorkspaceActiveView = 'workspace' | 'agent' | 'settings'
 
 export type WorkspaceSidebarPanel = 'explorer' | 'source-control'
 

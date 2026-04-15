@@ -1,7 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
-import { Moon, Sun } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { useTheme } from '../hooks/useTheme'
 
 export interface ActivityBarItem {
   id: string
@@ -14,11 +13,11 @@ export interface ActivityBarItem {
 
 interface ActivityBarProps {
   items: ActivityBarItem[]
+  onSettingsClick: () => void
+  settingsActive?: boolean
 }
 
-export default function ActivityBar({ items }: ActivityBarProps) {
-  const { theme, toggleTheme } = useTheme()
-
+export default function ActivityBar({ items, onSettingsClick, settingsActive }: ActivityBarProps) {
   return (
     <div className="flex h-screen w-12 shrink-0 flex-col items-center border-r border-border bg-background py-2">
       <div className="flex w-full flex-col items-center gap-1">
@@ -50,11 +49,16 @@ export default function ActivityBar({ items }: ActivityBarProps) {
 
       <div className="mt-auto flex w-full justify-center">
         <button
-          onClick={toggleTheme}
-          className="flex h-10 w-10 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          onClick={onSettingsClick}
+          className={cn(
+            'flex h-10 w-10 items-center justify-center rounded-md transition-colors',
+            settingsActive
+              ? 'bg-surface-hover text-foreground'
+              : 'text-foreground-subtle hover:bg-surface-hover hover:text-foreground'
+          )}
+          title="Settings"
         >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          <Settings size={16} />
         </button>
       </div>
     </div>

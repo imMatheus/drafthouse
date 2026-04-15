@@ -75,8 +75,9 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
     typeof session.activeTabId === 'string' && tabs.some((tab) => tab.id === session.activeTabId)
       ? session.activeTabId
       : tabs[0]?.id ?? null
+  const rawActiveView = (session as { activeView?: unknown }).activeView
   const activeView: WorkspaceActiveView =
-    (session as { activeView?: unknown }).activeView === 'agent' ? 'agent' : 'workspace'
+    rawActiveView === 'agent' || rawActiveView === 'settings' ? rawActiveView : 'workspace'
 
   if (hasTabsField) {
     return {

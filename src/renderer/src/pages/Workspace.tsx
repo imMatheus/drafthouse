@@ -20,6 +20,7 @@ import {
   type WorkspaceTab
 } from '../lib/workspaceTabs'
 import AgentView from './workspace/AgentView'
+import SettingsView from './workspace/SettingsView'
 import DiffView from './workspace/DiffView'
 import FilesView from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
@@ -237,6 +238,20 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
   }
 
+  const handleToggleSettings = (): void => {
+    if (activeView === 'settings') {
+      onUpdateSession({
+        ...session,
+        activeView: 'workspace'
+      })
+    } else {
+      onUpdateSession({
+        ...session,
+        activeView: 'settings'
+      })
+    }
+  }
+
   const handleStartAgent = async (prompt: string, files?: string[]): Promise<void> => {
     const { sessionId } = await window.api.agent.start(folderPath, prompt, files)
 
@@ -389,9 +404,15 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   return (
     <div className="flex flex-1 bg-background w-screen">
-      <ActivityBar items={activityItems} />
+      <ActivityBar
+        items={activityItems}
+        onSettingsClick={handleToggleSettings}
+        settingsActive={activeView === 'settings'}
+      />
 
-      {activeView === 'agent' ? (
+      {activeView === 'settings' ? (
+        <SettingsView />
+      ) : activeView === 'agent' ? (
         <AgentView
           sessions={agentSessions}
           activeSessionId={activeAgentSessionId}
