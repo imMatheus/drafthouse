@@ -1112,11 +1112,16 @@ function SplitPRDiff({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse text-sm">
+    <div className="overflow-hidden">
+      <table className="w-full table-fixed border-collapse text-sm">
+        <colgroup>
+          <col className="w-10" />
+          <col className="w-1/2" />
+          <col className="w-10" />
+          <col className="w-1/2" />
+        </colgroup>
         <tbody>
           {pairs.map((pair, idx) => {
-            // Collect threads for the right side (addition/context) of this pair
             const rightLine = pair.right
             const rowKey = rightLine?.commentSide && rightLine.commentLine
               ? getDiffThreadKey(filename, rightLine.commentSide, rightLine.commentLine)
@@ -1128,13 +1133,13 @@ function SplitPRDiff({
                 <tr>
                   {/* Left side (original) */}
                   <td className={cn(
-                    'w-12 border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
                     pair.left?.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
                   )}>
                     {pair.left?.oldLineNumber ?? ''}
                   </td>
                   <td className={cn(
-                    'w-1/2 border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre',
+                    'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
                     pair.left?.kind === 'deletion' ? 'bg-danger/10 text-foreground' : pair.left ? 'bg-background text-foreground' : 'bg-surface'
                   )}>
                     {pair.left ? (
@@ -1144,13 +1149,13 @@ function SplitPRDiff({
 
                   {/* Right side (modified) */}
                   <td className={cn(
-                    'w-12 border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
                     pair.right?.kind === 'addition' ? 'bg-success/10' : 'bg-background'
                   )}>
                     {pair.right?.newLineNumber ?? ''}
                   </td>
                   <td className={cn(
-                    'px-3 py-0 font-mono text-[13px] whitespace-pre',
+                    'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
                     pair.right?.kind === 'addition' ? 'bg-success/10 text-foreground' : pair.right ? 'bg-background text-foreground' : 'bg-surface'
                   )}>
                     {pair.right ? (

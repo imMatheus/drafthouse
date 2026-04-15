@@ -6,26 +6,26 @@ import { Navigate } from 'react-router-dom'
 import type { AgentSession, GitChangedFile, GitRepoInfo } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import ActivityBar from '../components/ActivityBar'
+import AgentPanel from '../components/AgentPanel'
 import ExplorerPanel from '../components/ExplorerPanel'
+import PullRequestsPanel from '../components/PullRequestsPanel'
 import SourceControlPanel from '../components/SourceControlPanel'
 import WorkspaceTabBar from '../components/WorkspaceTabBar'
 import type { WorkspaceSession } from '../lib/workspaceSession'
 import {
+  createAgentTab,
   createDiffTab,
   createFileTab,
-  createPullRequestListTab,
   createPullRequestTab,
-  isPullRequestWorkspaceTab,
   type PullRequestSubview,
   type WorkspaceTab
 } from '../lib/workspaceTabs'
-import AgentView from './workspace/AgentView'
+import AgentSessionTab from './workspace/AgentSessionTab'
 import SettingsView from './workspace/SettingsView'
 import DiffView from './workspace/DiffView'
 import FilesView from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
 import PullRequestDetailView from './workspace/PullRequestDetailView'
-import PullRequestsView from './workspace/PullRequestsView'
 import WelcomeView from './workspace/WelcomeView'
 
 interface WorkspaceProps {
@@ -49,8 +49,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const {
     data: gitInfo,
-    isLoading: isLoadingGitInfo,
-    error: gitInfoError
+    isLoading: isLoadingGitInfo
   } = useQuery<GitRepoInfo | null, Error>({
     queryKey: ['git-info', folderPath],
     queryFn: () => window.api.fs.getGitInfo(folderPath),
@@ -129,6 +128,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const handleSelectTab = (tabId: WorkspaceTab['id']): void => {
     if (tabId === activeTabId) return
 
+    // Sync active agent session when selecting an agent tab
+    const selectedTab = tabs.find((tab) => tab.id === tabId)
+    if (selectedTab?.kind === 'agent') {
+      setActiveAgentSessionId(selectedTab.sessionId)
+    }
+
     onUpdateSession({
       ...session,
       activeTabId: tabId
@@ -165,77 +170,32 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     openOrFocusTab(createFileTab(filePath))
   }
 
-  const handleOpenPullRequestList = (): void => {
-    openOrFocusTab(createPullRequestListTab())
-  }
-
   const handleOpenPullRequest = (number: number): void => {
     openOrFocusTab(createPullRequestTab(number))
   }
 
-  const handleToggleExplorer = (): void => {
-    if (activeView === 'agent') {
-      // Switch back to workspace view and show explorer
+  const handleToggleSidebar = (panel: 'explorer' | 'source-control' | 'pull-requests' | 'agent'): void => {
+    if (activeView === 'settings') {
       onUpdateSession({
         ...session,
         activeView: 'workspace',
-        sidebar: { visible: true, activePanel: 'explorer' }
+        sidebar: { visible: true, activePanel: panel }
       })
       return
     }
 
-    const isExplorerActive = sidebar.visible && sidebar.activePanel === 'explorer'
+    const isActive = sidebar.visible && sidebar.activePanel === panel
 
     onUpdateSession({
       ...session,
-      sidebar: isExplorerActive
-        ? {
-            visible: false,
-            activePanel: null
-          }
-        : {
-            visible: true,
-            activePanel: 'explorer'
-          }
-    })
-  }
-
-  const handleToggleSourceControl = (): void => {
-    if (activeView === 'agent') {
-      onUpdateSession({
-        ...session,
-        activeView: 'workspace',
-        sidebar: { visible: true, activePanel: 'source-control' }
-      })
-      return
-    }
-
-    const isSourceControlActive = sidebar.visible && sidebar.activePanel === 'source-control'
-
-    onUpdateSession({
-      ...session,
-      sidebar: isSourceControlActive
+      sidebar: isActive
         ? { visible: false, activePanel: null }
-        : { visible: true, activePanel: 'source-control' }
+        : { visible: true, activePanel: panel }
     })
   }
 
   const handleOpenDiff = (path: string, staged: boolean): void => {
     openOrFocusTab(createDiffTab(path, staged))
-  }
-
-  const handleToggleAgent = (): void => {
-    if (activeView === 'agent') {
-      onUpdateSession({
-        ...session,
-        activeView: 'workspace'
-      })
-    } else {
-      onUpdateSession({
-        ...session,
-        activeView: 'agent'
-      })
-    }
   }
 
   const handleToggleSettings = (): void => {
@@ -268,9 +228,18 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     setAgentSessions((prev) => [...prev, newSession])
     setActiveAgentSessionId(sessionId)
 
-    if (activeView !== 'agent') {
-      onUpdateSession({ ...session, activeView: 'agent' })
-    }
+    // Replace the "new session" tab with the real session tab
+    const truncatedPrompt = prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt
+    const newTab = createAgentTab(sessionId, truncatedPrompt)
+    const nextTabs = tabs
+      .filter((tab) => !(tab.kind === 'agent' && tab.sessionId === 'new'))
+      .concat(newTab)
+
+    onUpdateSession({
+      ...session,
+      tabs: nextTabs,
+      activeTabId: newTab.id
+    })
   }
 
   const handleContinueAgent = async (
@@ -311,6 +280,22 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           : s
       )
     )
+  }
+
+  const handleSelectAgentSession = (sessionId: string): void => {
+    setActiveAgentSessionId(sessionId)
+    const agentSession = agentSessions.find((s) => s.id === sessionId)
+    if (agentSession) {
+      const truncatedPrompt = agentSession.prompt.length > 30
+        ? agentSession.prompt.slice(0, 30) + '...'
+        : agentSession.prompt
+      openOrFocusTab(createAgentTab(sessionId, truncatedPrompt))
+    }
+  }
+
+  const handleNewAgentSession = (): void => {
+    setActiveAgentSessionId(null)
+    openOrFocusTab(createAgentTab('new', 'New Session'))
   }
 
   const handleStopAgent = async (sessionId: string): Promise<void> => {
@@ -364,41 +349,38 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const changedFileCount = gitStatus?.length ?? 0
 
+  const runningAgentCount = agentSessions.filter((s) => s.status === 'running').length
+
   const activityItems = [
     {
       id: 'explorer',
       label: 'Explorer',
       icon: Files,
-      active: activeView === 'workspace' && sidebar.visible && sidebar.activePanel === 'explorer',
-      onClick: handleToggleExplorer
+      active: sidebar.visible && sidebar.activePanel === 'explorer',
+      onClick: () => handleToggleSidebar('explorer')
     },
     {
       id: 'source-control',
       label: 'Source Control',
       icon: GitBranch,
-      active: activeView === 'workspace' && sidebar.visible && sidebar.activePanel === 'source-control',
+      active: sidebar.visible && sidebar.activePanel === 'source-control',
       badge: changedFileCount > 0 ? changedFileCount : undefined,
-      onClick: handleToggleSourceControl
+      onClick: () => handleToggleSidebar('source-control')
     },
     {
       id: 'pull-requests',
       label: 'Pull Requests',
       icon: GitGraph,
-      active: activeView === 'workspace' && isPullRequestWorkspaceTab(activeTab),
-      onClick: () => {
-        if (activeView === 'agent') {
-          onUpdateSession({ ...session, activeView: 'workspace' })
-        }
-        handleOpenPullRequestList()
-      }
+      active: sidebar.visible && sidebar.activePanel === 'pull-requests',
+      onClick: () => handleToggleSidebar('pull-requests')
     },
     {
       id: 'agent',
       label: 'Agent',
       icon: Terminal,
-      active: activeView === 'agent',
-      badge: agentSessions.filter((s) => s.status === 'running').length,
-      onClick: handleToggleAgent
+      active: sidebar.visible && sidebar.activePanel === 'agent',
+      badge: runningAgentCount > 0 ? runningAgentCount : undefined,
+      onClick: () => handleToggleSidebar('agent')
     }
   ]
 
@@ -412,15 +394,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
       {activeView === 'settings' ? (
         <SettingsView />
-      ) : activeView === 'agent' ? (
-        <AgentView
-          sessions={agentSessions}
-          activeSessionId={activeAgentSessionId}
-          onSelectSession={setActiveAgentSessionId}
-          onStartSession={handleStartAgent}
-          onContinueSession={handleContinueAgent}
-          onStopSession={handleStopAgent}
-        />
       ) : (
         <>
           {sidebar.visible && sidebar.activePanel === 'explorer' ? (
@@ -431,6 +404,23 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
             <SourceControlPanel folderPath={folderPath} onOpenDiff={handleOpenDiff} />
           ) : null}
 
+          {sidebar.visible && sidebar.activePanel === 'pull-requests' ? (
+            <PullRequestsPanel
+              gitInfo={gitInfo}
+              isLoadingGitInfo={isLoadingGitInfo}
+              onOpenPullRequest={handleOpenPullRequest}
+            />
+          ) : null}
+
+          {sidebar.visible && sidebar.activePanel === 'agent' ? (
+            <AgentPanel
+              sessions={agentSessions}
+              activeSessionId={activeAgentSessionId}
+              onSelectSession={handleSelectAgentSession}
+              onNewSession={handleNewAgentSession}
+            />
+          ) : null}
+
           <div className="flex min-w-0 flex-1 flex-col">
             <WorkspaceTabBar
               tabs={tabs}
@@ -439,15 +429,17 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
               onCloseTab={handleCloseTab}
             />
 
-            <main className={cn('min-h-0 flex-1', (activeTab?.kind === 'file' || activeTab?.kind === 'diff') ? 'overflow-hidden' : 'overflow-y-auto p-6')}>
+            <main className={cn('min-h-0 flex-1', (activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent') ? 'overflow-hidden' : 'overflow-y-auto p-6')}>
               {renderWorkspaceTabContent({
                 activeTab,
                 folderPath,
                 gitInfo,
-                gitInfoError,
                 isLoadingGitInfo,
+                agentSessions,
                 onOpenFile: handleOpenFile,
-                onOpenPullRequest: handleOpenPullRequest,
+                onStartAgent: handleStartAgent,
+                onContinueAgent: handleContinueAgent,
+                onStopAgent: handleStopAgent,
                 onPullRequestSubviewChange: handlePullRequestSubviewChange,
                 onPullRequestTitleChange: handlePullRequestTitleChange,
                 onPullRequestStateChange: handlePullRequestStateChange
@@ -464,10 +456,12 @@ function renderWorkspaceTabContent({
   activeTab,
   folderPath,
   gitInfo,
-  gitInfoError,
   isLoadingGitInfo,
+  agentSessions,
   onOpenFile,
-  onOpenPullRequest,
+  onStartAgent,
+  onContinueAgent,
+  onStopAgent,
   onPullRequestSubviewChange,
   onPullRequestTitleChange,
   onPullRequestStateChange
@@ -475,10 +469,12 @@ function renderWorkspaceTabContent({
   activeTab: WorkspaceTab | null
   folderPath: string
   gitInfo: GitRepoInfo | null | undefined
-  gitInfoError: Error | null
   isLoadingGitInfo: boolean
+  agentSessions: AgentSession[]
   onOpenFile: (path: string) => void
-  onOpenPullRequest: (number: number) => void
+  onStartAgent: (prompt: string, files?: string[]) => Promise<void>
+  onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent: (sessionId: string) => Promise<void>
   onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void
   onPullRequestTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
   onPullRequestStateChange: (tabId: WorkspaceTab['id'], prState: 'open' | 'closed' | 'merged' | 'draft') => void
@@ -506,15 +502,6 @@ function renderWorkspaceTabContent({
           onOpenFile={onOpenFile}
         />
       )
-    case 'pull-request-list':
-      return (
-        <PullRequestsView
-          gitInfo={gitInfo}
-          gitInfoError={gitInfoError}
-          isLoadingGitInfo={isLoadingGitInfo}
-          onOpenPullRequest={onOpenPullRequest}
-        />
-      )
     case 'pull-request':
       if (isLoadingGitInfo) {
         return <p className="text-sm text-foreground-muted">Checking repository metadata...</p>
@@ -533,5 +520,16 @@ function renderWorkspaceTabContent({
       ) : (
         <PlaceholderView title="Pull Request" description="Repository metadata is not available." />
       )
+    case 'agent': {
+      const agentSession = agentSessions.find((s) => s.id === activeTab.sessionId) ?? null
+      return (
+        <AgentSessionTab
+          session={agentSession}
+          onStartSession={onStartAgent}
+          onContinueSession={onContinueAgent}
+          onStopSession={onStopAgent}
+        />
+      )
+    }
   }
 }

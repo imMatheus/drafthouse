@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { cn } from '../../lib/cn'
@@ -28,9 +28,6 @@ interface AlignedPair {
 export default function DiffView({ filePath, folderPath, staged, onOpenFile }: DiffViewProps) {
   const { theme } = useTheme()
   const { settings } = useSettings()
-  const leftRef = useRef<HTMLDivElement>(null)
-  const rightRef = useRef<HTMLDivElement>(null)
-  const isSyncing = useRef(false)
 
   const { data: diffText, isLoading: isDiffLoading } = useQuery<string, Error>({
     queryKey: ['git-diff', folderPath, filePath, staged],
@@ -122,21 +119,6 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
   const leftTokenMap = buildTokenMap(alignedPairs, 'left', leftTokens)
   const rightTokenMap = buildTokenMap(alignedPairs, 'right', rightTokens)
 
-  const handleScroll = (source: 'left' | 'right'): void => {
-    if (isSyncing.current) return
-    isSyncing.current = true
-
-    const sourceEl = source === 'left' ? leftRef.current : rightRef.current
-    const targetEl = source === 'left' ? rightRef.current : leftRef.current
-
-    if (sourceEl && targetEl) {
-      targetEl.scrollTop = sourceEl.scrollTop
-      targetEl.scrollLeft = sourceEl.scrollLeft
-    }
-
-    isSyncing.current = false
-  }
-
   if (isDiffLoading || (isEmptyDiff && isFileLoading)) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -169,35 +151,48 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
       </div>
 
       {settings.diffViewMode === 'split' ? (
-        /* Split diff view */
-        <div className="flex min-h-0 flex-1">
-          <div
-            ref={leftRef}
-            className="flex-1 overflow-auto border-r border-border"
-            onScroll={() => handleScroll('left')}
-          >
-            <table className="w-full border-collapse font-mono text-xs">
-              <tbody>
-                {alignedPairs.map((pair, i) => (
-                  <SplitDiffRow key={i} line={pair.left} tokens={leftTokenMap.get(i)} side="left" />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div
-            ref={rightRef}
-            className="flex-1 overflow-auto"
-            onScroll={() => handleScroll('right')}
-          >
-            <table className="w-full border-collapse font-mono text-xs">
-              <tbody>
-                {alignedPairs.map((pair, i) => (
-                  <SplitDiffRow key={i} line={pair.right} tokens={rightTokenMap.get(i)} side="right" />
-                ))}
-              </tbody>
-            </table>
-          </div>
+        /* Split diff view — single table, fixed columns, no x-overflow */
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <table className="w-full table-fixed border-collapse font-mono text-xs">
+            <colgroup>
+              <col className="w-10" />
+              <col className="w-1/2" />
+              <col className="w-10" />
+              <col className="w-1/2" />
+            </colgroup>
+            <tbody>
+              {alignedPairs.map((pair, i) => (
+                <tr key={i}>
+                  {/* Left */}
+                  <td className={cn(
+                    'border-r border-border px-2 py-0 text-right text-foreground-subtle',
+                    pair.left?.kind === 'deletion' ? 'bg-danger/10' : pair.left ? 'bg-background' : 'bg-surface'
+                  )}>
+                    {pair.left?.oldLineNumber ?? ''}
+                  </td>
+                  <td className={cn(
+                    'overflow-hidden border-r border-border px-3 py-0 whitespace-pre-wrap break-all',
+                    pair.left?.kind === 'deletion' ? 'bg-danger/10' : pair.left ? 'bg-background' : 'bg-surface'
+                  )}>
+                    {pair.left ? <TokenizedContent tokens={leftTokenMap.get(i)} fallback={pair.left.content} /> : '\u00A0'}
+                  </td>
+                  {/* Right */}
+                  <td className={cn(
+                    'border-r border-border px-2 py-0 text-right text-foreground-subtle',
+                    pair.right?.kind === 'addition' ? 'bg-success/10' : pair.right ? 'bg-background' : 'bg-surface'
+                  )}>
+                    {pair.right?.newLineNumber ?? ''}
+                  </td>
+                  <td className={cn(
+                    'overflow-hidden px-3 py-0 whitespace-pre-wrap break-all',
+                    pair.right?.kind === 'addition' ? 'bg-success/10' : pair.right ? 'bg-background' : 'bg-surface'
+                  )}>
+                    {pair.right ? <TokenizedContent tokens={rightTokenMap.get(i)} fallback={pair.right.content} /> : '\u00A0'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         /* Unified diff view */
@@ -212,46 +207,6 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
         </div>
       )}
     </div>
-  )
-}
-
-function SplitDiffRow({
-  line,
-  tokens,
-  side
-}: {
-  line: DiffLine | null
-  tokens: HighlightedToken[] | undefined
-  side: 'left' | 'right'
-}) {
-  if (!line) {
-    return (
-      <tr className="bg-surface">
-        <td className="w-12 select-none border-r border-border bg-surface px-2 py-0 text-right text-foreground-subtle">
-          &nbsp;
-        </td>
-        <td className="px-3 py-0 whitespace-pre">&nbsp;</td>
-      </tr>
-    )
-  }
-
-  const lineNumber = side === 'left' ? line.oldLineNumber : line.newLineNumber
-
-  return (
-    <tr
-      className={cn(
-        line.kind === 'deletion' && 'bg-danger/10',
-        line.kind === 'addition' && 'bg-success/10',
-        line.kind === 'context' && 'bg-background'
-      )}
-    >
-      <td className="w-12 select-none border-r border-border px-2 py-0 text-right text-foreground-subtle">
-        {lineNumber}
-      </td>
-      <td className="px-3 py-0 whitespace-pre">
-        <TokenizedContent tokens={tokens} fallback={line.content} />
-      </td>
-    </tr>
   )
 }
 

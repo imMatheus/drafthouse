@@ -2,7 +2,6 @@ import {
   createDiffTab,
   createFileTab,
   createInitialWorkspaceSession,
-  createPullRequestListTab,
   createPullRequestTab,
   createWelcomeTab,
   type PullRequestSubview,
@@ -77,7 +76,7 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
       : tabs[0]?.id ?? null
   const rawActiveView = (session as { activeView?: unknown }).activeView
   const activeView: WorkspaceActiveView =
-    rawActiveView === 'agent' || rawActiveView === 'settings' ? rawActiveView : 'workspace'
+    rawActiveView === 'settings' ? 'settings' : 'workspace'
 
   if (hasTabsField) {
     return {
@@ -110,7 +109,7 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
   }
 }
 
-const VALID_SIDEBAR_PANELS: WorkspaceSidebarPanel[] = ['explorer', 'source-control']
+const VALID_SIDEBAR_PANELS: WorkspaceSidebarPanel[] = ['explorer', 'source-control', 'pull-requests', 'agent']
 
 function parseWorkspaceSidebarState(value: unknown, explorerVisible?: boolean): WorkspaceSidebarState {
   if (value && typeof value === 'object') {
@@ -156,8 +155,9 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
       return typeof tab.path === 'string' && tab.path.length > 0
         ? createDiffTab(tab.path, typeof tab.staged === 'boolean' ? tab.staged : false)
         : null
-    case 'pull-request-list':
-      return createPullRequestListTab()
+    case 'agent':
+      // Agent tabs are ephemeral — don't restore from session
+      return null
     case 'pull-request': {
       if (typeof tab.number !== 'number' || Number.isNaN(tab.number)) {
         return null

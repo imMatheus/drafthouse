@@ -7,7 +7,7 @@ import {
   GitPullRequestClosed,
   GitPullRequestDraft,
   Home,
-  GitGraph,
+  Terminal,
   X
 } from 'lucide-react'
 import { cn } from '../lib/cn'
@@ -120,14 +120,10 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
         icon: <FileDiff size={14} strokeWidth={1.8} className="text-accent" />,
         label: `${getPathBasename(tab.path)} (${tab.staged ? 'index' : 'working tree'})`
       }
-    case 'pull-request-list':
+    case 'agent':
       return {
-        icon: (
-          <span className="inline-flex size-5 items-center justify-center rounded-full bg-accent/15">
-            <GitGraph size={12} strokeWidth={2} className="text-accent" />
-          </span>
-        ),
-        label: 'Pull Requests'
+        icon: <Terminal size={14} strokeWidth={1.8} className="text-accent" />,
+        label: tab.title
       }
     case 'pull-request':
       return {
