@@ -1,10 +1,12 @@
 import {
+  createDiffTab,
   createFileTab,
   createInitialWorkspaceSession,
-  createPullRequestListTab,
   createPullRequestTab,
   createWelcomeTab,
   type PullRequestSubview,
+  type WorkspaceActiveView,
+  type WorkspaceSidebarPanel,
   type WorkspaceSession,
   type WorkspaceSidebarState,
   type WorkspaceTab
@@ -72,13 +74,17 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
     typeof session.activeTabId === 'string' && tabs.some((tab) => tab.id === session.activeTabId)
       ? session.activeTabId
       : tabs[0]?.id ?? null
+  const rawActiveView = (session as { activeView?: unknown }).activeView
+  const activeView: WorkspaceActiveView =
+    rawActiveView === 'settings' ? 'settings' : 'workspace'
 
   if (hasTabsField) {
     return {
       folderPath: parsedFolderPath,
       sidebar,
       tabs,
-      activeTabId
+      activeTabId,
+      activeView
     }
   }
 
@@ -89,7 +95,8 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
       folderPath: parsedFolderPath,
       sidebar,
       tabs: [fileTab],
-      activeTabId: fileTab.id
+      activeTabId: fileTab.id,
+      activeView
     }
   }
 
@@ -97,17 +104,23 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
     folderPath: parsedFolderPath,
     sidebar,
     tabs: [createWelcomeTab()],
-    activeTabId: 'welcome'
+    activeTabId: 'welcome',
+    activeView
   }
 }
+
+const VALID_SIDEBAR_PANELS: WorkspaceSidebarPanel[] = ['explorer', 'source-control', 'pull-requests', 'agent']
 
 function parseWorkspaceSidebarState(value: unknown, explorerVisible?: boolean): WorkspaceSidebarState {
   if (value && typeof value === 'object') {
     const sidebar = value as Partial<WorkspaceSidebarState>
+    const panel = VALID_SIDEBAR_PANELS.includes(sidebar.activePanel as WorkspaceSidebarPanel)
+      ? (sidebar.activePanel as WorkspaceSidebarPanel)
+      : null
 
     return {
       visible: sidebar.visible !== false,
-      activePanel: sidebar.activePanel === 'explorer' ? 'explorer' : null
+      activePanel: panel
     }
   }
 
@@ -138,8 +151,13 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
       return createWelcomeTab()
     case 'file':
       return typeof tab.path === 'string' && tab.path.length > 0 ? createFileTab(tab.path) : null
-    case 'pull-request-list':
-      return createPullRequestListTab()
+    case 'diff':
+      return typeof tab.path === 'string' && tab.path.length > 0
+        ? createDiffTab(tab.path, typeof tab.staged === 'boolean' ? tab.staged : false)
+        : null
+    case 'agent':
+      // Agent tabs are ephemeral — don't restore from session
+      return null
     case 'pull-request': {
       if (typeof tab.number !== 'number' || Number.isNaN(tab.number)) {
         return null

@@ -2,12 +2,14 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   FileDiff,
   FileMinus,
   FilePlus,
   Folder,
-  MessageSquarePlus,
+  Plus,
   Search,
   X
 } from 'lucide-react'
@@ -21,11 +23,12 @@ import type {
   PullRequestReviewLineSide
 } from '../../../../shared/types'
 import { cn } from '../../lib/cn'
+import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
 import { getLanguageFromPath, tokenizeDiffHunks, type HighlightedToken } from '../../lib/shiki'
 import MarkdownBody from './MarkdownBody'
 import ReviewThreadCard from './ReviewThreadCard'
-import { getDiffThreadKey, parsePullRequestFileDiff } from './pullRequestDiff'
+import { getDiffThreadKey, parsePullRequestFileDiff, type ParsedDiffHunk } from './pullRequestDiff'
 import { buildPullRequestReviewThreads, DiffStat, type PullRequestReviewThread } from './pullRequestShared'
 
 export default function PRFilesTab({
@@ -44,6 +47,7 @@ export default function PRFilesTab({
   threadJumpTarget: { path: string; commentId: number; nonce: number } | null
 }) {
   const [filterValue, setFilterValue] = useState('')
+  const [fileListCollapsed, setFileListCollapsed] = useState(false)
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
   const [openCommentKey, setOpenCommentKey] = useState<string | null>(null)
   const [isSubmitReviewOpen, setIsSubmitReviewOpen] = useState(false)
@@ -205,46 +209,62 @@ export default function PRFilesTab({
   return (
     <>
       <div className="flex gap-5">
-        <aside className="sticky top-1 hidden h-[calc(100vh-11rem)] w-72 shrink-0 lg:block">
-          <div className="flex items-center gap-2 px-2 py-2">
-            <Search size={14} className="shrink-0 text-foreground-subtle" />
-            <input
-              value={filterValue}
-              onChange={(event) => setFilterValue(event.target.value)}
-              placeholder="Filter files..."
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
-            />
-            {filterValue ? (
-              <button
-                type="button"
-                onClick={() => setFilterValue('')}
-                className="shrink-0 text-foreground-subtle hover:text-foreground"
-              >
-                <X size={14} />
-              </button>
-            ) : null}
-          </div>
+        <div className="sticky top-1 hidden h-[calc(100vh-11rem)] shrink-0 lg:flex">
+          {/* Collapse/expand toggle */}
+          <button
+            onClick={() => setFileListCollapsed(!fileListCollapsed)}
+            className="flex size-6 items-center justify-center self-start rounded text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+            title={fileListCollapsed ? 'Show file list' : 'Hide file list'}
+          >
+            {fileListCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </button>
 
-          <div className="h-[calc(100%-2.5rem)] overflow-y-auto">
-            {filteredFiles.length === 0 && !isLoading ? (
-              <div className="px-3 py-4 text-xs text-foreground-muted">No files match this filter.</div>
-            ) : (
-              <FileTree files={filteredFiles} activeFilePath={activeFilePath} onSelectFile={handleScrollToFile} />
+          <aside
+            className={cn(
+              'flex flex-col overflow-hidden transition-all duration-200',
+              fileListCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'
             )}
-          </div>
-
-          {draftReviewComments.length > 0 ? (
-            <div className="border-t border-border px-2 py-2">
-              <button
-                type="button"
-                onClick={() => setIsSubmitReviewOpen(true)}
-                className="w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover"
-              >
-                Submit review ({draftReviewComments.length})
-              </button>
+          >
+            <div className="flex items-center gap-2 px-2 py-2">
+              <Search size={14} className="shrink-0 text-foreground-subtle" />
+              <input
+                value={filterValue}
+                onChange={(event) => setFilterValue(event.target.value)}
+                placeholder="Filter files..."
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+              />
+              {filterValue ? (
+                <button
+                  type="button"
+                  onClick={() => setFilterValue('')}
+                  className="shrink-0 text-foreground-subtle hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
             </div>
-          ) : null}
-        </aside>
+
+            <div className="flex-1 overflow-y-auto">
+              {filteredFiles.length === 0 && !isLoading ? (
+                <div className="px-3 py-4 text-xs text-foreground-muted">No files match this filter.</div>
+              ) : (
+                <FileTree files={filteredFiles} activeFilePath={activeFilePath} onSelectFile={handleScrollToFile} />
+              )}
+            </div>
+
+            {draftReviewComments.length > 0 ? (
+              <div className="border-t border-border px-2 py-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSubmitReviewOpen(true)}
+                  className="w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover"
+                >
+                  Submit review ({draftReviewComments.length})
+                </button>
+              </div>
+            ) : null}
+          </aside>
+        </div>
 
         <div className="min-w-0 flex-1">
           {filesErrorMessage ? (
@@ -354,6 +374,7 @@ function PullRequestFileDiffCard({
   threadRef: (commentId: number, element: HTMLElement | null) => void
 }) {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const parsedDiff = parsePullRequestFileDiff(file)
   const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
 
@@ -411,133 +432,47 @@ function PullRequestFileDiffCard({
       </header>
 
       {parsedDiff.hasRenderablePatch ? (
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
-            <tbody>
-              {parsedDiff.hunks.map((hunk) => (
-                <Fragment key={hunk.id}>
-                  {hunk.header ? (
-                    <tr className="bg-interactive">
-                      <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                        ...
-                      </td>
-                      <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                        ...
-                      </td>
-                      <td className="border-r border-border px-3 py-1.5 font-mono text-[13px] text-foreground-muted">
-                        {hunk.header}
-                      </td>
-                      <td className="w-10 bg-interactive" />
-                    </tr>
-                  ) : null}
-
-                  {hunk.lines.map((line) => {
-                    const rowKey =
-                      line.commentSide && line.commentLine
-                        ? getDiffThreadKey(file.filename, line.commentSide, line.commentLine)
-                        : null
-                    const rowThreads = rowKey ? (threadsByKey.get(rowKey) ?? []) : []
-                    const draftComments = rowKey ? (draftCommentsByKey.get(rowKey) ?? []) : []
-                    const isComposerOpen = rowKey != null && openCommentKey === rowKey
-
-                    return (
-                      <Fragment key={line.id}>
-                        <tr className={getFileDiffRowClassName(line.kind)}>
-                          <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                            {line.oldLineNumber ?? ''}
-                          </td>
-                          <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                            {line.newLineNumber ?? ''}
-                          </td>
-                          <td className="border-r border-border px-3 py-1.5 font-mono text-[13px] text-foreground">
-                            <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
-                              {getFileDiffPrefix(line.kind)}
-                            </span>
-                            <DiffLineContent tokens={tokenMap.get(line.id)} fallback={line.content} />
-                          </td>
-                          <td className="w-10 px-1 py-1">
-                            {rowKey ? (
-                              <button
-                                type="button"
-                                onClick={() => onOpenComment(isComposerOpen ? null : rowKey)}
-                                className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
-                                aria-label="Add line comment"
-                              >
-                                <MessageSquarePlus size={14} />
-                              </button>
-                            ) : null}
-                          </td>
-                        </tr>
-
-                        {rowThreads.map((thread) => (
-                          <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                            <td colSpan={4} className="bg-background px-3 py-3">
-                              <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
-                            </td>
-                          </tr>
-                        ))}
-
-                        {draftComments.map(({ comment, index }) => (
-                          <tr key={`draft-${rowKey}-${index}`}>
-                            <td colSpan={4} className="bg-background px-3 py-3">
-                              <div className="rounded-xl border border-border bg-surface">
-                                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-                                  <div className="flex items-center gap-2">
-                                    {auth?.user.avatar_url ? (
-                                      <img
-                                        src={auth.user.avatar_url}
-                                        alt={auth.user.login}
-                                        className="size-7 rounded-full"
-                                      />
-                                    ) : null}
-                                    <div className="text-sm text-foreground">
-                                      <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
-                                      <span className="text-foreground-muted">pending review comment</span>
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => onRemoveDraftComment(index)}
-                                    className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
-                                    aria-label="Remove draft comment"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </div>
-                                <div className="px-4 py-4">
-                                  <MarkdownBody>{comment.body}</MarkdownBody>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-
-                        {isComposerOpen && rowKey && line.commentSide && line.commentLine ? (
-                          <tr>
-                            <td colSpan={4} className="bg-background px-3 py-3">
-                              <InlineDiffCommentComposer
-                                owner={owner}
-                                repo={repo}
-                                number={number}
-                                commitId={commitId}
-                                path={file.filename}
-                                line={line.commentLine}
-                                side={line.commentSide}
-                                onCancel={() => onOpenComment(null)}
-                                onAddDraftComment={onAddDraftComment}
-                                onInlineCommentPosted={onInlineCommentPosted}
-                              />
-                            </td>
-                          </tr>
-                        ) : null}
-                      </Fragment>
-                    )
-                  })}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        settings.diffViewMode === 'split' ? (
+          <SplitPRDiff
+            hunks={parsedDiff.hunks}
+            tokenMap={tokenMap}
+            filename={file.filename}
+            owner={owner}
+            repo={repo}
+            number={number}
+            commitId={commitId}
+            auth={auth}
+            threadsByKey={threadsByKey}
+            draftCommentsByKey={draftCommentsByKey}
+            openCommentKey={openCommentKey}
+            onOpenComment={onOpenComment}
+            onAddDraftComment={onAddDraftComment}
+            onRemoveDraftComment={onRemoveDraftComment}
+            onInlineCommentPosted={onInlineCommentPosted}
+            replyTarget={replyTarget}
+            threadRef={threadRef}
+          />
+        ) : (
+          <UnifiedPRDiff
+            hunks={parsedDiff.hunks}
+            tokenMap={tokenMap}
+            filename={file.filename}
+            owner={owner}
+            repo={repo}
+            number={number}
+            commitId={commitId}
+            auth={auth}
+            threadsByKey={threadsByKey}
+            draftCommentsByKey={draftCommentsByKey}
+            openCommentKey={openCommentKey}
+            onOpenComment={onOpenComment}
+            onAddDraftComment={onAddDraftComment}
+            onRemoveDraftComment={onRemoveDraftComment}
+            onInlineCommentPosted={onInlineCommentPosted}
+            replyTarget={replyTarget}
+            threadRef={threadRef}
+          />
+        )
       ) : (
         <div className="px-4 py-6 text-sm text-foreground-muted">
           GitHub did not return a renderable patch for this file.
@@ -1020,6 +955,356 @@ function formatFileStatus(status: string): string {
     default:
       return status
   }
+}
+
+function UnifiedPRDiff({
+  hunks,
+  tokenMap,
+  filename,
+  owner,
+  repo,
+  number,
+  commitId,
+  auth,
+  threadsByKey,
+  draftCommentsByKey,
+  openCommentKey,
+  onOpenComment,
+  onAddDraftComment,
+  onRemoveDraftComment,
+  onInlineCommentPosted,
+  replyTarget,
+  threadRef
+}: {
+  hunks: ParsedDiffHunk[]
+  tokenMap: Map<string, HighlightedToken[]>
+  filename: string
+  owner: string
+  repo: string
+  number: number
+  commitId: string
+  auth: AuthData | null | undefined
+  threadsByKey: Map<string, PullRequestReviewThread[]>
+  draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
+  openCommentKey: string | null
+  onOpenComment: (value: string | null) => void
+  onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
+  onRemoveDraftComment: (index: number) => void
+  onInlineCommentPosted: () => Promise<void>
+  replyTarget: { owner: string; repo: string; number: number }
+  threadRef: (commentId: number, element: HTMLElement | null) => void
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-collapse text-sm">
+        <tbody>
+          {hunks.map((hunk) => (
+            <Fragment key={hunk.id}>
+              {hunk.header ? (
+                <tr className="bg-interactive">
+                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">...</td>
+                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">...</td>
+                  <td className="px-3 py-1.5 font-mono text-[13px] text-foreground-muted">{hunk.header}</td>
+                </tr>
+              ) : null}
+
+              {hunk.lines.map((line) => {
+                const rowKey = line.commentSide && line.commentLine
+                  ? getDiffThreadKey(filename, line.commentSide, line.commentLine)
+                  : null
+                const rowThreads = rowKey ? (threadsByKey.get(rowKey) ?? []) : []
+                const draftComments = rowKey ? (draftCommentsByKey.get(rowKey) ?? []) : []
+                const isComposerOpen = rowKey != null && openCommentKey === rowKey
+
+                return (
+                  <Fragment key={line.id}>
+                    <tr className={cn('group', getFileDiffRowClassName(line.kind))}>
+                      <td className="relative w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                        {rowKey ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenComment(isComposerOpen ? null : rowKey)}
+                            className="absolute left-0 top-1/2 -translate-y-1/2 ml-0.5 hidden size-5 items-center justify-center rounded bg-accent text-white group-hover:inline-flex"
+                            aria-label="Add line comment"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        ) : null}
+                        {line.oldLineNumber ?? ''}
+                      </td>
+                      <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">{line.newLineNumber ?? ''}</td>
+                      <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
+                        <span className="mr-3 inline-block w-3 text-center text-foreground-muted">{getFileDiffPrefix(line.kind)}</span>
+                        <DiffLineContent tokens={tokenMap.get(line.id)} fallback={line.content} />
+                      </td>
+                    </tr>
+
+                    {rowThreads.map((thread) => (
+                      <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
+                        <td colSpan={3} className="bg-background px-3 py-3">
+                          <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
+                        </td>
+                      </tr>
+                    ))}
+
+                    {draftComments.map(({ comment, index }) => (
+                      <tr key={`draft-${rowKey}-${index}`}>
+                        <td colSpan={3} className="bg-background px-3 py-3">
+                          <div className="rounded-xl border border-border bg-surface">
+                            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                {auth?.user.avatar_url ? <img src={auth.user.avatar_url} alt={auth.user.login} className="size-7 rounded-full" /> : null}
+                                <div className="text-sm text-foreground">
+                                  <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
+                                  <span className="text-foreground-muted">pending review comment</span>
+                                </div>
+                              </div>
+                              <button type="button" onClick={() => onRemoveDraftComment(index)} className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground" aria-label="Remove draft comment">
+                                <X size={14} />
+                              </button>
+                            </div>
+                            <div className="px-4 py-4"><MarkdownBody>{comment.body}</MarkdownBody></div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {isComposerOpen && rowKey && line.commentSide && line.commentLine ? (
+                      <tr>
+                        <td colSpan={3} className="bg-background px-3 py-3">
+                          <InlineDiffCommentComposer
+                            owner={owner} repo={repo} number={number} commitId={commitId}
+                            path={filename} line={line.commentLine} side={line.commentSide}
+                            onCancel={() => onOpenComment(null)}
+                            onAddDraftComment={onAddDraftComment}
+                            onInlineCommentPosted={onInlineCommentPosted}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                )
+              })}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function SplitPRDiff({
+  hunks,
+  tokenMap,
+  filename,
+  owner,
+  repo,
+  number,
+  commitId,
+  auth,
+  threadsByKey,
+  draftCommentsByKey,
+  openCommentKey,
+  onOpenComment,
+  onAddDraftComment,
+  onRemoveDraftComment,
+  onInlineCommentPosted,
+  replyTarget,
+  threadRef
+}: {
+  hunks: ParsedDiffHunk[]
+  tokenMap: Map<string, HighlightedToken[]>
+  filename: string
+  owner: string
+  repo: string
+  number: number
+  commitId: string
+  auth: AuthData | null | undefined
+  threadsByKey: Map<string, PullRequestReviewThread[]>
+  draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
+  openCommentKey: string | null
+  onOpenComment: (value: string | null) => void
+  onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
+  onRemoveDraftComment: (index: number) => void
+  onInlineCommentPosted: () => Promise<void>
+  replyTarget: { owner: string; repo: string; number: number }
+  threadRef: (commentId: number, element: HTMLElement | null) => void
+}) {
+  // Flatten all lines from all hunks and align deletions with additions
+  const allLines = hunks.flatMap((h) => h.lines)
+
+  type AlignedPair = { left: typeof allLines[0] | null; right: typeof allLines[0] | null }
+  const pairs: AlignedPair[] = []
+  let i = 0
+
+  while (i < allLines.length) {
+    const line = allLines[i]
+
+    if (line.kind === 'context' || line.kind === 'meta' || line.kind === 'hunk') {
+      pairs.push({ left: line, right: line })
+      i++
+      continue
+    }
+
+    const deletions: typeof allLines = []
+    const additions: typeof allLines = []
+
+    while (i < allLines.length && allLines[i].kind === 'deletion') {
+      deletions.push(allLines[i])
+      i++
+    }
+    while (i < allLines.length && allLines[i].kind === 'addition') {
+      additions.push(allLines[i])
+      i++
+    }
+
+    const maxLen = Math.max(deletions.length, additions.length)
+    for (let j = 0; j < maxLen; j++) {
+      pairs.push({
+        left: j < deletions.length ? deletions[j] : null,
+        right: j < additions.length ? additions[j] : null
+      })
+    }
+  }
+
+  return (
+    <div className="overflow-hidden">
+      <table className="w-full table-fixed border-collapse text-sm">
+        <colgroup>
+          <col className="w-10" />
+          <col className="w-1/2" />
+          <col className="w-10" />
+          <col className="w-1/2" />
+        </colgroup>
+        <tbody>
+          {pairs.map((pair, idx) => {
+            const leftKey = pair.left?.commentSide && pair.left.commentLine
+              ? getDiffThreadKey(filename, pair.left.commentSide, pair.left.commentLine)
+              : null
+            const rightKey = pair.right?.commentSide && pair.right.commentLine
+              ? getDiffThreadKey(filename, pair.right.commentSide, pair.right.commentLine)
+              : null
+
+            // Collect threads and drafts from both sides
+            const leftThreads = leftKey ? (threadsByKey.get(leftKey) ?? []) : []
+            const rightThreads = rightKey && rightKey !== leftKey ? (threadsByKey.get(rightKey) ?? []) : []
+            const rowThreads = [...leftThreads, ...rightThreads]
+
+            const leftDrafts = leftKey ? (draftCommentsByKey.get(leftKey) ?? []) : []
+            const rightDrafts = rightKey && rightKey !== leftKey ? (draftCommentsByKey.get(rightKey) ?? []) : []
+            const draftComments = [...leftDrafts, ...rightDrafts]
+
+            const isLeftComposerOpen = leftKey != null && openCommentKey === leftKey
+            const isRightComposerOpen = rightKey != null && openCommentKey === rightKey
+            const activeComposerKey = isLeftComposerOpen ? leftKey : isRightComposerOpen ? rightKey : null
+            const activeComposerLine = isLeftComposerOpen ? pair.left : isRightComposerOpen ? pair.right : null
+
+            return (
+              <Fragment key={idx}>
+                <tr className="group/left group/right">
+                  {/* Left side (original) */}
+                  <td className={cn(
+                    'group/left-gutter relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    pair.left?.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
+                  )}>
+                    {leftKey && pair.left ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenComment(isLeftComposerOpen ? null : leftKey)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 ml-0.5 hidden size-5 items-center justify-center rounded bg-accent text-white group-hover/left:inline-flex"
+                        aria-label="Add line comment"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    ) : null}
+                    {pair.left?.oldLineNumber ?? ''}
+                  </td>
+                  <td className={cn(
+                    'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                    pair.left?.kind === 'deletion' ? 'bg-danger/10 text-foreground' : pair.left ? 'bg-background text-foreground' : 'bg-surface'
+                  )}>
+                    {pair.left ? (
+                      <DiffLineContent tokens={tokenMap.get(pair.left.id)} fallback={pair.left.content} />
+                    ) : '\u00A0'}
+                  </td>
+
+                  {/* Right side (modified) */}
+                  <td className={cn(
+                    'group/right-gutter relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    pair.right?.kind === 'addition' ? 'bg-success/10' : 'bg-background'
+                  )}>
+                    {rightKey && pair.right ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenComment(isRightComposerOpen ? null : rightKey)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 ml-0.5 hidden size-5 items-center justify-center rounded bg-accent text-white group-hover/right:inline-flex"
+                        aria-label="Add line comment"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    ) : null}
+                    {pair.right?.newLineNumber ?? ''}
+                  </td>
+                  <td className={cn(
+                    'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                    pair.right?.kind === 'addition' ? 'bg-success/10 text-foreground' : pair.right ? 'bg-background text-foreground' : 'bg-surface'
+                  )}>
+                    {pair.right ? (
+                      <DiffLineContent tokens={tokenMap.get(pair.right.id)} fallback={pair.right.content} />
+                    ) : '\u00A0'}
+                  </td>
+                </tr>
+
+                {rowThreads.map((thread) => (
+                  <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
+                    <td colSpan={4} className="bg-background px-3 py-3">
+                      <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
+                    </td>
+                  </tr>
+                ))}
+
+                {draftComments.map(({ comment, index }) => (
+                  <tr key={`draft-${index}`}>
+                    <td colSpan={4} className="bg-background px-3 py-3">
+                      <div className="rounded-xl border border-border bg-surface">
+                        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {auth?.user.avatar_url ? <img src={auth.user.avatar_url} alt={auth.user.login} className="size-7 rounded-full" /> : null}
+                            <div className="text-sm text-foreground">
+                              <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
+                              <span className="text-foreground-muted">pending review comment</span>
+                            </div>
+                          </div>
+                          <button type="button" onClick={() => onRemoveDraftComment(index)} className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground" aria-label="Remove draft comment">
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="px-4 py-4"><MarkdownBody>{comment.body}</MarkdownBody></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {activeComposerKey && activeComposerLine?.commentSide && activeComposerLine.commentLine ? (
+                  <tr>
+                    <td colSpan={4} className="bg-background px-3 py-3">
+                      <InlineDiffCommentComposer
+                        owner={owner} repo={repo} number={number} commitId={commitId}
+                        path={filename} line={activeComposerLine.commentLine} side={activeComposerLine.commentSide}
+                        onCancel={() => onOpenComment(null)}
+                        onAddDraftComment={onAddDraftComment}
+                        onInlineCommentPosted={onInlineCommentPosted}
+                      />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
 }
 
 function getFileDiffRowClassName(kind: 'hunk' | 'addition' | 'deletion' | 'context' | 'meta'): string {

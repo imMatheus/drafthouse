@@ -1,9 +1,11 @@
-import { app, shell, BrowserWindow, Menu, dialog } from 'electron'
+import { app, shell, BrowserWindow, Menu, dialog, net, protocol } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { registerAgentHandlers } from './agent'
 import { registerAuthHandlers } from './auth'
 import { registerFsHandlers } from './fs'
+import { registerGitHandlers } from './git'
 import { registerGitHubHandlers } from './github'
 
 function createWindow(): void {
@@ -42,6 +44,14 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  // Register custom protocol to serve local files in the renderer
+  protocol.handle('local-file', (request) => {
+    // URL format: local-file:///absolute/path/to/file
+    const url = new URL(request.url)
+    const filePath = decodeURIComponent(url.pathname)
+    return net.fetch('file://' + filePath)
+  })
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -55,6 +65,8 @@ app.whenReady().then(() => {
   registerAuthHandlers()
   registerGitHubHandlers()
   registerFsHandlers()
+  registerGitHandlers()
+  registerAgentHandlers()
 
   const menu = Menu.buildFromTemplate([
     {

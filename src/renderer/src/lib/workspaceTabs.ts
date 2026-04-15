@@ -11,8 +11,10 @@ export type WorkspaceTab =
       path: string
     }
   | {
-      id: 'pull-request-list'
-      kind: 'pull-request-list'
+      id: `diff:${string}`
+      kind: 'diff'
+      path: string
+      staged: boolean
     }
   | {
       id: `pull-request:${number}`
@@ -22,10 +24,20 @@ export type WorkspaceTab =
       title?: string
       prState?: 'open' | 'closed' | 'merged' | 'draft'
     }
+  | {
+      id: `agent:${string}`
+      kind: 'agent'
+      sessionId: string
+      title: string
+    }
+
+export type WorkspaceActiveView = 'workspace' | 'settings'
+
+export type WorkspaceSidebarPanel = 'explorer' | 'source-control' | 'pull-requests' | 'agent'
 
 export interface WorkspaceSidebarState {
   visible: boolean
-  activePanel: 'explorer' | null
+  activePanel: WorkspaceSidebarPanel | null
 }
 
 export interface WorkspaceSession {
@@ -33,6 +45,7 @@ export interface WorkspaceSession {
   sidebar: WorkspaceSidebarState
   tabs: WorkspaceTab[]
   activeTabId: WorkspaceTab['id'] | null
+  activeView: WorkspaceActiveView
 }
 
 export function createWelcomeTab(): WorkspaceTab {
@@ -47,13 +60,6 @@ export function createFileTab(path: string): WorkspaceTab {
     id: getFileTabId(path),
     kind: 'file',
     path
-  }
-}
-
-export function createPullRequestListTab(): WorkspaceTab {
-  return {
-    id: 'pull-request-list',
-    kind: 'pull-request-list'
   }
 }
 
@@ -76,7 +82,8 @@ export function createInitialWorkspaceSession(folderPath: string): WorkspaceSess
       activePanel: 'explorer'
     },
     tabs: [welcomeTab],
-    activeTabId: welcomeTab.id
+    activeTabId: welcomeTab.id,
+    activeView: 'workspace'
   }
 }
 
@@ -88,6 +95,32 @@ export function getPullRequestTabId(number: number): `pull-request:${number}` {
   return `pull-request:${number}`
 }
 
+export function createDiffTab(path: string, staged: boolean): WorkspaceTab {
+  return {
+    id: getDiffTabId(path, staged),
+    kind: 'diff',
+    path,
+    staged
+  }
+}
+
+export function getDiffTabId(path: string, staged: boolean): `diff:${string}` {
+  return `diff:${staged ? 'staged' : 'unstaged'}:${path}`
+}
+
+export function createAgentTab(sessionId: string, title: string): WorkspaceTab {
+  return {
+    id: getAgentTabId(sessionId),
+    kind: 'agent',
+    sessionId,
+    title
+  }
+}
+
+export function getAgentTabId(sessionId: string): `agent:${string}` {
+  return `agent:${sessionId}`
+}
+
 export function isPullRequestWorkspaceTab(tab: WorkspaceTab | null | undefined): boolean {
-  return tab?.kind === 'pull-request-list' || tab?.kind === 'pull-request'
+  return tab?.kind === 'pull-request'
 }

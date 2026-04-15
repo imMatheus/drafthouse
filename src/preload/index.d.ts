@@ -1,9 +1,14 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
+  AgentEvent,
+  AgentSessionSummary,
   AuthData,
   FileEntry,
   GitHubRepo,
   GitRepoInfo,
+  GitChangedFile,
+  GitBranchInfo,
+  GitLogEntry,
   GitHubBranch,
   GitHubBranchDetail,
   MergeUpstreamResult,
@@ -400,6 +405,47 @@ interface GitHubAPI {
 }
 
 // ============================================================
+// Local Git API
+// ============================================================
+
+interface GitAPI {
+  status: (cwd: string) => Promise<GitChangedFile[]>
+  branchInfo: (cwd: string) => Promise<GitBranchInfo>
+  diff: (cwd: string, filePath: string, staged: boolean) => Promise<string>
+  showFile: (cwd: string, filePath: string) => Promise<string>
+  stage: (cwd: string, filePaths: string[]) => Promise<void>
+  unstage: (cwd: string, filePaths: string[]) => Promise<void>
+  stageAll: (cwd: string) => Promise<void>
+  unstageAll: (cwd: string) => Promise<void>
+  discard: (cwd: string, filePaths: string[]) => Promise<void>
+  discardAll: (cwd: string) => Promise<void>
+  commit: (cwd: string, message: string, amend?: boolean) => Promise<void>
+  push: (cwd: string) => Promise<string>
+  pull: (cwd: string) => Promise<string>
+  stash: (cwd: string, message?: string) => Promise<void>
+  stashPop: (cwd: string) => Promise<void>
+  log: (cwd: string, count?: number) => Promise<GitLogEntry[]>
+}
+
+// ============================================================
+// Agent API
+// ============================================================
+
+interface AgentAPI {
+  start: (cwd: string, prompt: string, files?: string[]) => Promise<{ sessionId: string }>
+  continue: (
+    sessionId: string,
+    cliSessionId: string,
+    cwd: string,
+    prompt: string,
+    files?: string[]
+  ) => Promise<void>
+  stop: (sessionId: string) => Promise<void>
+  listSessions: () => Promise<AgentSessionSummary[]>
+  onEvent: (callback: (data: AgentEvent) => void) => () => void
+}
+
+// ============================================================
 // Filesystem API
 // ============================================================
 
@@ -410,6 +456,8 @@ interface FsAPI {
   getRecentFolders: () => Promise<string[]>
   openRecent: (path: string) => Promise<string>
   getGitInfo: (path: string) => Promise<GitRepoInfo | null>
+  pickFiles: () => Promise<string[]>
+  readFileDataUrl: (path: string) => Promise<string>
   onOpenFolder: (callback: (path: string) => void) => () => void
   onCloseTab: (callback: () => void) => () => void
 }
@@ -422,7 +470,9 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
+      agent: AgentAPI
       auth: AuthAPI
+      git: GitAPI
       github: GitHubAPI
       fs: FsAPI
     }

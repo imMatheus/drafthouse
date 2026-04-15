@@ -417,6 +417,64 @@ const api = {
         )
     }
   },
+  agent: {
+    start: (cwd: string, prompt: string, files?: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('agent:start', cwd, prompt, files),
+    continue: (
+      sessionId: string,
+      cliSessionId: string,
+      cwd: string,
+      prompt: string,
+      files?: string[]
+    ): Promise<unknown> =>
+      ipcRenderer.invoke('agent:continue', sessionId, cliSessionId, cwd, prompt, files),
+    stop: (sessionId: string): Promise<unknown> =>
+      ipcRenderer.invoke('agent:stop', sessionId),
+    listSessions: (): Promise<unknown> =>
+      ipcRenderer.invoke('agent:list-sessions'),
+    onEvent: (
+      callback: (data: { sessionId: string; event: unknown }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: IpcRendererEvent,
+        data: { sessionId: string; event: unknown }
+      ): void => callback(data)
+      ipcRenderer.on('agent:event', listener)
+      return () => ipcRenderer.removeListener('agent:event', listener)
+    }
+  },
+  git: {
+    status: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:status', cwd),
+    branchInfo: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:branch-info', cwd),
+    diff: (cwd: string, filePath: string, staged: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('git:diff', cwd, filePath, staged),
+    showFile: (cwd: string, filePath: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:show-file', cwd, filePath),
+    stage: (cwd: string, filePaths: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('git:stage', cwd, filePaths),
+    unstage: (cwd: string, filePaths: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('git:unstage', cwd, filePaths),
+    stageAll: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:stage-all', cwd),
+    unstageAll: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:unstage-all', cwd),
+    discard: (cwd: string, filePaths: string[]): Promise<unknown> =>
+      ipcRenderer.invoke('git:discard', cwd, filePaths),
+    discardAll: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:discard-all', cwd),
+    commit: (cwd: string, message: string, amend?: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('git:commit', cwd, message, amend),
+    push: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:push', cwd),
+    pull: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:pull', cwd),
+    stash: (cwd: string, message?: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:stash', cwd, message),
+    stashPop: (cwd: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:stash-pop', cwd),
+    log: (cwd: string, count?: number): Promise<unknown> =>
+      ipcRenderer.invoke('git:log', cwd, count)
+  },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
     readDir: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir', path),
@@ -424,6 +482,8 @@ const api = {
     getRecentFolders: (): Promise<unknown> => ipcRenderer.invoke('fs:get-recent-folders'),
     openRecent: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:open-recent', path),
     getGitInfo: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:get-git-info', path),
+    pickFiles: (): Promise<unknown> => ipcRenderer.invoke('fs:pick-files'),
+    readFileDataUrl: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-file-data-url', path),
     onOpenFolder: (callback: (path: string) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, path: string): void => callback(path)
       ipcRenderer.on('menu:open-folder', listener)

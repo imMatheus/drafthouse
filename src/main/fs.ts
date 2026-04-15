@@ -81,7 +81,7 @@ function setAllowedRoot(sender: WebContents, folderPath: string): string {
   return resolvedFolderPath
 }
 
-function requireAllowedPath(sender: WebContents, targetPath: string): string {
+export function requireAllowedPath(sender: WebContents, targetPath: string): string {
   const rootPath = allowedRoots.get(sender.id)
   if (!rootPath) {
     throw new Error('Open a folder before browsing files')
@@ -99,7 +99,7 @@ function requireAllowedPath(sender: WebContents, targetPath: string): string {
   return resolvedPath
 }
 
-function requireAllowedDirectory(sender: WebContents, dirPath: string): string {
+export function requireAllowedDirectory(sender: WebContents, dirPath: string): string {
   const resolvedPath = requireAllowedPath(sender, dirPath)
   if (!statSync(resolvedPath).isDirectory()) {
     throw new Error('Path is not a directory')
@@ -188,5 +188,26 @@ export function registerFsHandlers(): void {
 
   ipcMain.handle('fs:get-git-info', (event, dirPath: string) => {
     return getGitRepoInfo(requireAllowedDirectory(event.sender, dirPath))
+  })
+
+  ipcMain.handle('fs:pick-files', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const result = await dialog.showOpenDialog(window!, {
+      properties: ['openFile', 'multiSelections']
+    })
+    if (result.canceled) return []
+    return result.filePaths
+  })
+
+  ipcMain.handle('fs:read-file-data-url', (_event, filePath: string) => {
+    const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+    const mimeTypes: Record<string, string> = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+      bmp: 'image/bmp', ico: 'image/x-icon'
+    }
+    const mime = mimeTypes[ext] ?? 'application/octet-stream'
+    const data = readFileSync(filePath)
+    return `data:${mime};base64,${data.toString('base64')}`
   })
 }

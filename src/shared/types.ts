@@ -31,6 +31,31 @@ export interface GitRepoInfo {
 }
 
 // ============================================================
+// Local Git (CLI-based)
+// ============================================================
+
+export type GitStatusCode = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?' | '!'
+
+export interface GitChangedFile {
+  path: string
+  oldPath?: string
+  indexStatus: GitStatusCode | ' '
+  workTreeStatus: GitStatusCode | ' '
+}
+
+export interface GitBranchInfo {
+  name: string
+  upstream: string | null
+  ahead: number
+  behind: number
+}
+
+export interface GitLogEntry {
+  hash: string
+  message: string
+}
+
+// ============================================================
 // Repositories
 // ============================================================
 
@@ -456,4 +481,114 @@ export interface SubmitPullRequestReviewInput {
 export interface ReviewRequestsResult {
   users: { login: string; avatar_url: string; id: number }[]
   teams: { id: number; name: string; slug: string; description: string | null }[]
+}
+
+// ============================================================
+// Agent (Claude CLI stream-json events)
+// ============================================================
+
+export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'
+
+export interface AgentSessionSummary {
+  id: string
+  prompt: string
+  status: AgentSessionStatus
+  startedAt: number
+}
+
+// Content blocks within assistant messages
+export interface AgentContentBlockText {
+  type: 'text'
+  text: string
+}
+
+export interface AgentContentBlockToolUse {
+  type: 'tool_use'
+  id: string
+  name: string
+  input: Record<string, unknown>
+}
+
+export interface AgentContentBlockToolResult {
+  type: 'tool_result'
+  tool_use_id: string
+  content: string
+}
+
+export type AgentContentBlock =
+  | AgentContentBlockText
+  | AgentContentBlockToolUse
+  | AgentContentBlockToolResult
+
+// Stream events from claude CLI --output-format stream-json
+export interface AgentStreamInit {
+  type: 'system'
+  subtype: 'init'
+  session_id: string
+  tools: string[]
+  model: string
+}
+
+export interface AgentStreamSystem {
+  type: 'system'
+  subtype: string
+  message?: string
+  [key: string]: unknown
+}
+
+export interface AgentStreamAssistant {
+  type: 'assistant'
+  message: {
+    role: 'assistant'
+    content: AgentContentBlock[]
+    stop_reason: string | null
+    usage?: {
+      input_tokens: number
+      output_tokens: number
+    }
+  }
+  session_id: string
+}
+
+export interface AgentStreamUser {
+  type: 'user'
+  message: {
+    role: 'user'
+    content: AgentContentBlock[]
+  }
+  session_id: string
+}
+
+export interface AgentStreamResult {
+  type: 'result'
+  subtype: 'success' | 'error'
+  is_error: boolean
+  result: string
+  duration_ms: number
+  num_turns: number
+  total_cost_usd: number
+  session_id: string
+}
+
+export type AgentStreamEvent =
+  | AgentStreamInit
+  | AgentStreamSystem
+  | AgentStreamAssistant
+  | AgentStreamUser
+  | AgentStreamResult
+
+export interface AgentEvent {
+  sessionId: string
+  event: AgentStreamEvent
+}
+
+// Renderer-side agent session with accumulated events
+export interface AgentSession {
+  id: string
+  prompt: string
+  status: AgentSessionStatus
+  startedAt: number
+  events: AgentStreamEvent[]
+  cliSessionId: string | null
+  files: string[]
 }

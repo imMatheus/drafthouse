@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
 import RepoSidebar from './components/RepoSidebar'
+import { SettingsProvider } from './hooks/useSettings'
 import { ThemeProvider } from './hooks/useTheme'
 import Home from './pages/Home'
 import Login from './pages/Login'
@@ -115,9 +116,11 @@ function App(): React.JSX.Element {
 
   return (
     <ThemeProvider>
-      <AuthContext value={auth}>
-        <AppContent />
-      </AuthContext>
+      <SettingsProvider>
+        <AuthContext value={auth}>
+          <AppContent />
+        </AuthContext>
+      </SettingsProvider>
     </ThemeProvider>
   )
 }

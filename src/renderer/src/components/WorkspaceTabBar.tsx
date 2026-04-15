@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import {
   FileCode2,
+  FileDiff,
   GitMerge,
   GitPullRequest,
   GitPullRequestClosed,
   GitPullRequestDraft,
   Home,
-  GitGraph,
+  Terminal,
   X
 } from 'lucide-react'
 import { cn } from '../lib/cn'
@@ -46,7 +47,7 @@ export default function WorkspaceTabBar({ tabs, activeTabId, onSelectTab, onClos
               >
                 {icon}
                 <span
-                  className={cn('truncate text-sm font-medium', isActive ? 'text-foreground' : 'text-foreground-muted')}
+                  className={cn('truncate text-xs font-medium', isActive ? 'text-foreground' : 'text-foreground-muted')}
                 >
                   {label}
                 </span>
@@ -114,14 +115,15 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
         icon: <FileCode2 size={14} strokeWidth={1.8} className="text-foreground-subtle" />,
         label: getPathBasename(tab.path)
       }
-    case 'pull-request-list':
+    case 'diff':
       return {
-        icon: (
-          <span className="inline-flex size-5 items-center justify-center rounded-full bg-accent/15">
-            <GitGraph size={12} strokeWidth={2} className="text-accent" />
-          </span>
-        ),
-        label: 'Pull Requests'
+        icon: <FileDiff size={14} strokeWidth={1.8} className="text-accent" />,
+        label: `${getPathBasename(tab.path)} (${tab.staged ? 'index' : 'working tree'})`
+      }
+    case 'agent':
+      return {
+        icon: <Terminal size={14} strokeWidth={1.8} className="text-accent" />,
+        label: tab.title
       }
     case 'pull-request':
       return {
