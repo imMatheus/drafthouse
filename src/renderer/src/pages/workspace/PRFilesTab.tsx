@@ -33,7 +33,12 @@ import { getLanguageFromPath, tokenizeDiffHunks, type HighlightedToken } from '.
 import MarkdownBody from './MarkdownBody'
 import ReviewThreadCard from './ReviewThreadCard'
 import { getDiffThreadKey, parsePullRequestFileDiff, type ParsedDiffHunk } from './pullRequestDiff'
-import { buildPullRequestReviewThreads, DiffStat, formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
+import {
+  buildPullRequestReviewThreads,
+  DiffStat,
+  formatRelativeTime,
+  type PullRequestReviewThread
+} from './pullRequestShared'
 
 export default function PRFilesTab({
   pr,

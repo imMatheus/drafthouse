@@ -59,10 +59,7 @@ async function requestDeviceCode(): Promise<{
   return data
 }
 
-async function pollForToken(
-  deviceCode: string,
-  interval: number
-): Promise<{ token: string; scopes: string[] }> {
+async function pollForToken(deviceCode: string, interval: number): Promise<{ token: string; scopes: string[] }> {
   const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
   while (true) {
@@ -102,11 +99,7 @@ async function pollForToken(
 }
 
 async function fetchGitHubUser(token: string): Promise<GitHubUser> {
-  return fetchGitHubJson<GitHubUser>(
-    token,
-    'https://api.github.com/user',
-    'Failed to fetch user'
-  )
+  return fetchGitHubJson<GitHubUser>(token, 'https://api.github.com/user', 'Failed to fetch user')
 }
 
 export function registerAuthHandlers(): void {

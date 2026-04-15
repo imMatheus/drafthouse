@@ -20,15 +20,9 @@ export default function SettingsView() {
           <div className="mt-3 rounded-lg border border-border bg-surface p-4">
             {user && (
               <div className="flex items-center gap-3">
-                <img
-                  src={user.avatar_url}
-                  alt={user.login}
-                  className="size-10 rounded-full"
-                />
+                <img src={user.avatar_url} alt={user.login} className="size-10 rounded-full" />
                 <div className="min-w-0 flex-1">
-                  {user.name && (
-                    <p className="text-sm font-medium text-foreground">{user.name}</p>
-                  )}
+                  {user.name && <p className="text-sm font-medium text-foreground">{user.name}</p>}
                   <p className="text-xs text-foreground-muted">{user.login}</p>
                 </div>
                 <button
@@ -87,22 +81,14 @@ export default function SettingsView() {
   )
 }
 
-function DiffViewToggle({
-  value,
-  onChange
-}: {
-  value: DiffViewMode
-  onChange: (mode: DiffViewMode) => void
-}) {
+function DiffViewToggle({ value, onChange }: { value: DiffViewMode; onChange: (mode: DiffViewMode) => void }) {
   return (
     <div className="flex rounded-md border border-border">
       <button
         onClick={() => onChange('unified')}
         className={cn(
           'px-3 py-1 text-xs transition-colors',
-          value === 'unified'
-            ? 'bg-surface-hover text-foreground'
-            : 'text-foreground-muted hover:text-foreground'
+          value === 'unified' ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground'
         )}
       >
         Unified
@@ -111,9 +97,7 @@ function DiffViewToggle({
         onClick={() => onChange('split')}
         className={cn(
           'border-l border-border px-3 py-1 text-xs transition-colors',
-          value === 'split'
-            ? 'bg-surface-hover text-foreground'
-            : 'text-foreground-muted hover:text-foreground'
+          value === 'split' ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground'
         )}
       >
         Split

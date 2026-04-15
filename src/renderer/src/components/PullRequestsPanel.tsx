@@ -1,14 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  Check,
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  Search,
-  X
-} from 'lucide-react'
+import { Check, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Search, X } from 'lucide-react'
 import { cn } from '../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../shared/types'
 
@@ -18,11 +10,7 @@ interface PullRequestsPanelProps {
   onOpenPullRequest: (number: number) => void
 }
 
-export default function PullRequestsPanel({
-  gitInfo,
-  isLoadingGitInfo,
-  onOpenPullRequest
-}: PullRequestsPanelProps) {
+export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPullRequest }: PullRequestsPanelProps) {
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -37,22 +25,21 @@ export default function PullRequestsPanel({
     retry: false
   })
 
-  const filtered = prs?.filter((pr) => {
-    if (!searchQuery.trim()) return true
-    const lower = searchQuery.toLowerCase()
-    return (
-      pr.title.toLowerCase().includes(lower) ||
-      pr.user.login.toLowerCase().includes(lower) ||
-      String(pr.number).includes(lower)
-    )
-  }) ?? []
+  const filtered =
+    prs?.filter((pr) => {
+      if (!searchQuery.trim()) return true
+      const lower = searchQuery.toLowerCase()
+      return (
+        pr.title.toLowerCase().includes(lower) ||
+        pr.user.login.toLowerCase().includes(lower) ||
+        String(pr.number).includes(lower)
+      )
+    }) ?? []
 
   return (
     <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
       <div className="px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-          Pull Requests
-        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">Pull Requests</p>
       </div>
 
       {/* Search */}
@@ -66,7 +53,10 @@ export default function PullRequestsPanel({
             className="w-full bg-transparent text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none"
           />
           {searchQuery ? (
-            <button onClick={() => setSearchQuery('')} className="shrink-0 text-foreground-subtle hover:text-foreground">
+            <button
+              onClick={() => setSearchQuery('')}
+              className="shrink-0 text-foreground-subtle hover:text-foreground"
+            >
               <X size={10} />
             </button>
           ) : null}
@@ -84,9 +74,7 @@ export default function PullRequestsPanel({
         >
           <GitPullRequest size={11} />
           Open
-          {stateFilter === 'open' && prs ? (
-            <span className="text-foreground-subtle">{prs.length}</span>
-          ) : null}
+          {stateFilter === 'open' && prs ? <span className="text-foreground-subtle">{prs.length}</span> : null}
         </button>
         <button
           onClick={() => setStateFilter('closed')}
@@ -97,9 +85,7 @@ export default function PullRequestsPanel({
         >
           <Check size={11} />
           Closed
-          {stateFilter === 'closed' && prs ? (
-            <span className="text-foreground-subtle">{prs.length}</span>
-          ) : null}
+          {stateFilter === 'closed' && prs ? <span className="text-foreground-subtle">{prs.length}</span> : null}
         </button>
       </div>
 

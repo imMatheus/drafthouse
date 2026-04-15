@@ -78,10 +78,12 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
 
       setLeftTokens([])
       const lang = getLanguageFromPath(filePath)
-      tokenizeCode(fileContent, lang, theme).then((t) => {
-        setRightTokens(t)
-        setUnifiedTokens(t)
-      }).catch(() => {})
+      tokenizeCode(fileContent, lang, theme)
+        .then((t) => {
+          setRightTokens(t)
+          setUnifiedTokens(t)
+        })
+        .catch(() => {})
       return
     }
 
@@ -92,17 +94,27 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
     const lang = getLanguageFromPath(filePath)
 
     // Tokenize for split view
-    const leftCode = dl.filter((l) => l.kind !== 'addition').map((l) => l.content).join('\n')
-    const rightCode = dl.filter((l) => l.kind !== 'deletion').map((l) => l.content).join('\n')
+    const leftCode = dl
+      .filter((l) => l.kind !== 'addition')
+      .map((l) => l.content)
+      .join('\n')
+    const rightCode = dl
+      .filter((l) => l.kind !== 'deletion')
+      .map((l) => l.content)
+      .join('\n')
 
     if (leftCode) {
-      tokenizeCode(leftCode, lang, theme).then(setLeftTokens).catch(() => {})
+      tokenizeCode(leftCode, lang, theme)
+        .then(setLeftTokens)
+        .catch(() => {})
     } else {
       setLeftTokens([])
     }
 
     if (rightCode) {
-      tokenizeCode(rightCode, lang, theme).then(setRightTokens).catch(() => {})
+      tokenizeCode(rightCode, lang, theme)
+        .then(setRightTokens)
+        .catch(() => {})
     } else {
       setRightTokens([])
     }
@@ -110,7 +122,9 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
     // Tokenize for unified view (all lines in order)
     const allCode = dl.map((l) => l.content).join('\n')
     if (allCode) {
-      tokenizeCode(allCode, lang, theme).then(setUnifiedTokens).catch(() => {})
+      tokenizeCode(allCode, lang, theme)
+        .then(setUnifiedTokens)
+        .catch(() => {})
     } else {
       setUnifiedTokens([])
     }
@@ -164,30 +178,46 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
               {alignedPairs.map((pair, i) => (
                 <tr key={i}>
                   {/* Left */}
-                  <td className={cn(
-                    'border-r border-border px-2 py-0 text-right text-foreground-subtle',
-                    pair.left?.kind === 'deletion' ? 'bg-danger/10' : pair.left ? 'bg-background' : 'bg-surface'
-                  )}>
+                  <td
+                    className={cn(
+                      'border-r border-border px-2 py-0 text-right text-foreground-subtle',
+                      pair.left?.kind === 'deletion' ? 'bg-danger/10' : pair.left ? 'bg-background' : 'bg-surface'
+                    )}
+                  >
                     {pair.left?.oldLineNumber ?? ''}
                   </td>
-                  <td className={cn(
-                    'overflow-hidden border-r border-border px-3 py-0 whitespace-pre-wrap break-all',
-                    pair.left?.kind === 'deletion' ? 'bg-danger/10' : pair.left ? 'bg-background' : 'bg-surface'
-                  )}>
-                    {pair.left ? <TokenizedContent tokens={leftTokenMap.get(i)} fallback={pair.left.content} /> : '\u00A0'}
+                  <td
+                    className={cn(
+                      'overflow-hidden border-r border-border px-3 py-0 whitespace-pre-wrap break-all',
+                      pair.left?.kind === 'deletion' ? 'bg-danger/10' : pair.left ? 'bg-background' : 'bg-surface'
+                    )}
+                  >
+                    {pair.left ? (
+                      <TokenizedContent tokens={leftTokenMap.get(i)} fallback={pair.left.content} />
+                    ) : (
+                      '\u00A0'
+                    )}
                   </td>
                   {/* Right */}
-                  <td className={cn(
-                    'border-r border-border px-2 py-0 text-right text-foreground-subtle',
-                    pair.right?.kind === 'addition' ? 'bg-success/10' : pair.right ? 'bg-background' : 'bg-surface'
-                  )}>
+                  <td
+                    className={cn(
+                      'border-r border-border px-2 py-0 text-right text-foreground-subtle',
+                      pair.right?.kind === 'addition' ? 'bg-success/10' : pair.right ? 'bg-background' : 'bg-surface'
+                    )}
+                  >
                     {pair.right?.newLineNumber ?? ''}
                   </td>
-                  <td className={cn(
-                    'overflow-hidden px-3 py-0 whitespace-pre-wrap break-all',
-                    pair.right?.kind === 'addition' ? 'bg-success/10' : pair.right ? 'bg-background' : 'bg-surface'
-                  )}>
-                    {pair.right ? <TokenizedContent tokens={rightTokenMap.get(i)} fallback={pair.right.content} /> : '\u00A0'}
+                  <td
+                    className={cn(
+                      'overflow-hidden px-3 py-0 whitespace-pre-wrap break-all',
+                      pair.right?.kind === 'addition' ? 'bg-success/10' : pair.right ? 'bg-background' : 'bg-surface'
+                    )}
+                  >
+                    {pair.right ? (
+                      <TokenizedContent tokens={rightTokenMap.get(i)} fallback={pair.right.content} />
+                    ) : (
+                      '\u00A0'
+                    )}
                   </td>
                 </tr>
               ))}
@@ -210,13 +240,7 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
   )
 }
 
-function UnifiedDiffRow({
-  line,
-  tokens
-}: {
-  line: DiffLine
-  tokens: HighlightedToken[] | undefined
-}) {
+function UnifiedDiffRow({ line, tokens }: { line: DiffLine; tokens: HighlightedToken[] | undefined }) {
   return (
     <tr
       className={cn(
@@ -225,12 +249,8 @@ function UnifiedDiffRow({
         line.kind === 'context' && 'bg-background'
       )}
     >
-      <td className="w-12 select-none px-2 py-0 text-right text-foreground-subtle/50">
-        {line.oldLineNumber ?? ''}
-      </td>
-      <td className="w-12 select-none px-2 py-0 text-right text-foreground-subtle/50">
-        {line.newLineNumber ?? ''}
-      </td>
+      <td className="w-12 select-none px-2 py-0 text-right text-foreground-subtle/50">{line.oldLineNumber ?? ''}</td>
+      <td className="w-12 select-none px-2 py-0 text-right text-foreground-subtle/50">{line.newLineNumber ?? ''}</td>
       <td className="w-4 select-none py-0 text-center text-foreground-subtle">
         {line.kind === 'addition' ? '+' : line.kind === 'deletion' ? '-' : ' '}
       </td>

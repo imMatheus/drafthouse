@@ -1,9 +1,5 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  API
-} from './client'
+import { requireAuth, fetchGitHubJson, API } from './client'
 import type {
   PullRequestReview,
   PullRequestReviewComment,
@@ -39,13 +35,7 @@ export function registerReviewsHandlers(): void {
   // GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
   ipcMain.handle(
     'github:reviews:get',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      number: number,
-      reviewId: number
-    ): Promise<PullRequestReview> => {
+    async (_event, owner: string, repo: string, number: number, reviewId: number): Promise<PullRequestReview> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,
@@ -115,13 +105,7 @@ export function registerReviewsHandlers(): void {
   // DELETE /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}
   ipcMain.handle(
     'github:reviews:delete-pending',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      number: number,
-      reviewId: number
-    ): Promise<PullRequestReview> => {
+    async (_event, owner: string, repo: string, number: number, reviewId: number): Promise<PullRequestReview> => {
       const token = requireAuth()
       // DELETE returns the review object (200), not 204
       return fetchGitHubJson(

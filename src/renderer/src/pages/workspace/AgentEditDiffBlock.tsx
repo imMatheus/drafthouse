@@ -22,11 +22,7 @@ function computeDiffLines(oldStr: string, newStr: string): DiffLine[] {
 
   // Find common prefix
   let prefixLen = 0
-  while (
-    prefixLen < oldLines.length &&
-    prefixLen < newLines.length &&
-    oldLines[prefixLen] === newLines[prefixLen]
-  ) {
+  while (prefixLen < oldLines.length && prefixLen < newLines.length && oldLines[prefixLen] === newLines[prefixLen]) {
     prefixLen++
   }
 
@@ -101,11 +97,7 @@ function buildHunk(filePath: string, diffLines: DiffLine[]): ParsedDiffHunk {
   }
 }
 
-export default function AgentEditDiffBlock({
-  filePath,
-  oldString,
-  newString
-}: AgentEditDiffBlockProps) {
+export default function AgentEditDiffBlock({ filePath, oldString, newString }: AgentEditDiffBlockProps) {
   const { theme } = useTheme()
   const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
 
@@ -187,13 +179,7 @@ export default function AgentEditDiffBlock({
   )
 }
 
-function DiffLineContent({
-  tokens,
-  fallback
-}: {
-  tokens: HighlightedToken[] | undefined
-  fallback: string
-}) {
+function DiffLineContent({ tokens, fallback }: { tokens: HighlightedToken[] | undefined; fallback: string }) {
   if (!tokens) return <>{fallback}</>
 
   return (

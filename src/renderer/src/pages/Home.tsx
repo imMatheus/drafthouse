@@ -25,9 +25,7 @@ export default function Home({ onOpenFolder }: { onOpenFolder: (path: string) =>
       onOpenFolder(openedPath)
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : 'This recent folder could not be opened and was removed from the list.'
+        error instanceof Error ? error.message : 'This recent folder could not be opened and was removed from the list.'
 
       setRecentFolderError(message)
       await queryClient.invalidateQueries({ queryKey: ['recent-folders'] })

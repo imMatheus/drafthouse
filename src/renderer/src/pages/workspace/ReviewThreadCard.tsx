@@ -5,11 +5,7 @@ import type { PullRequestReviewComment } from '../../../../shared/types'
 import { cn } from '../../lib/cn'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
-import {
-  getLanguageFromPath,
-  tokenizeReviewPreviewLines,
-  type HighlightedToken
-} from '../../lib/shiki'
+import { getLanguageFromPath, tokenizeReviewPreviewLines, type HighlightedToken } from '../../lib/shiki'
 import ReactionBar from '../../components/ReactionBar'
 import MarkdownBody from './MarkdownBody'
 import { formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
@@ -36,9 +32,7 @@ export default function ReviewThreadCard({
       <div className="flex items-center justify-between gap-3 border-b border-border bg-interactive px-4 py-2">
         <div className="min-w-0 text-sm font-medium text-foreground">
           {thread.path}
-          {thread.line !== null ? (
-            <span className="text-foreground-muted">:{thread.line}</span>
-          ) : null}
+          {thread.line !== null ? <span className="text-foreground-muted">:{thread.line}</span> : null}
         </div>
         {onViewReviewThread ? (
           <button
@@ -55,26 +49,23 @@ export default function ReviewThreadCard({
 
       <div className="border-t border-border">
         <div className="flex items-start gap-3 px-4 py-4">
-          <img
-            src={topLevelComment.user.avatar_url}
-            alt={topLevelComment.user.login}
-            className="size-8 rounded-full"
-          />
+          <img src={topLevelComment.user.avatar_url} alt={topLevelComment.user.login} className="size-8 rounded-full" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-sm font-semibold text-foreground">
-                {topLevelComment.user.login}
-              </span>
-              <span className="text-sm text-foreground-muted">
-                {formatRelativeTime(topLevelComment.created_at)}
-              </span>
+              <span className="text-sm font-semibold text-foreground">{topLevelComment.user.login}</span>
+              <span className="text-sm text-foreground-muted">{formatRelativeTime(topLevelComment.created_at)}</span>
             </div>
             <div className="mt-3">
               <MarkdownBody>{topLevelComment.body}</MarkdownBody>
             </div>
             {resolvedOwner && resolvedRepo ? (
               <div className="mt-3">
-                <ReactionBar owner={resolvedOwner} repo={resolvedRepo} commentId={topLevelComment.id} commentType="pull-comment" />
+                <ReactionBar
+                  owner={resolvedOwner}
+                  repo={resolvedRepo}
+                  commentId={topLevelComment.id}
+                  commentType="pull-comment"
+                />
               </div>
             ) : null}
           </div>
@@ -83,20 +74,11 @@ export default function ReviewThreadCard({
         {replies.length > 0 ? (
           <div className="border-t border-border">
             {replies.map((reply) => (
-              <div
-                key={reply.id}
-                className="flex items-start gap-3 border-t border-border px-4 py-4 first:border-t-0"
-              >
-                <img
-                  src={reply.user.avatar_url}
-                  alt={reply.user.login}
-                  className="size-7 rounded-full"
-                />
+              <div key={reply.id} className="flex items-start gap-3 border-t border-border px-4 py-4 first:border-t-0">
+                <img src={reply.user.avatar_url} alt={reply.user.login} className="size-7 rounded-full" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-sm font-semibold text-foreground">
-                      {reply.user.login}
-                    </span>
+                    <span className="text-sm font-semibold text-foreground">{reply.user.login}</span>
                     <span className="text-sm text-foreground-muted">
                       replied {formatRelativeTime(reply.created_at)}
                     </span>
@@ -106,7 +88,12 @@ export default function ReviewThreadCard({
                   </div>
                   {resolvedOwner && resolvedRepo ? (
                     <div className="mt-3">
-                      <ReactionBar owner={resolvedOwner} repo={resolvedRepo} commentId={reply.id} commentType="pull-comment" />
+                      <ReactionBar
+                        owner={resolvedOwner}
+                        repo={resolvedRepo}
+                        commentId={reply.id}
+                        commentType="pull-comment"
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -159,7 +146,9 @@ function TokenizedContent({ tokens, fallback }: { tokens: HighlightedToken[] | u
       <>
         {tokens.map((token, i) =>
           token.color ? (
-            <span key={i} style={{ color: token.color }}>{token.content}</span>
+            <span key={i} style={{ color: token.color }}>
+              {token.content}
+            </span>
           ) : (
             <span key={i}>{token.content}</span>
           )
@@ -191,9 +180,7 @@ function ReviewDiffHunkUnified({
                   {line.newLine ?? ''}
                 </td>
                 <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
-                  <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
-                    {line.prefix}
-                  </span>
+                  <span className="mr-3 inline-block w-3 text-center text-foreground-muted">{line.prefix}</span>
                   <TokenizedContent tokens={tokenMap.get(index)} fallback={line.content} />
                 </td>
               </tr>
@@ -213,7 +200,10 @@ function ReviewDiffHunkSplit({
   tokenMap: Map<number, HighlightedToken[]>
 }) {
   // Align deletions with additions into side-by-side pairs
-  type AlignedPair = { left: { line: ReviewDiffPreviewLine; index: number } | null; right: { line: ReviewDiffPreviewLine; index: number } | null }
+  type AlignedPair = {
+    left: { line: ReviewDiffPreviewLine; index: number } | null
+    right: { line: ReviewDiffPreviewLine; index: number } | null
+  }
   const pairs: AlignedPair[] = []
   let i = 0
 
@@ -271,33 +261,53 @@ function ReviewDiffHunkSplit({
 
               return (
                 <tr key={idx}>
-                  <td className={cn(
-                    'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
-                    pair.left?.line.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
-                  )}>
+                  <td
+                    className={cn(
+                      'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                      pair.left?.line.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
+                    )}
+                  >
                     {pair.left?.line.oldLine ?? ''}
                   </td>
-                  <td className={cn(
-                    'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
-                    pair.left?.line.kind === 'deletion' ? 'bg-danger/10 text-foreground' : pair.left ? 'bg-background text-foreground' : 'bg-surface'
-                  )}>
+                  <td
+                    className={cn(
+                      'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                      pair.left?.line.kind === 'deletion'
+                        ? 'bg-danger/10 text-foreground'
+                        : pair.left
+                          ? 'bg-background text-foreground'
+                          : 'bg-surface'
+                    )}
+                  >
                     {pair.left ? (
                       <TokenizedContent tokens={tokenMap.get(pair.left.index)} fallback={pair.left.line.content} />
-                    ) : '\u00A0'}
+                    ) : (
+                      '\u00A0'
+                    )}
                   </td>
-                  <td className={cn(
-                    'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
-                    pair.right?.line.kind === 'addition' ? 'bg-success/10' : 'bg-background'
-                  )}>
+                  <td
+                    className={cn(
+                      'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                      pair.right?.line.kind === 'addition' ? 'bg-success/10' : 'bg-background'
+                    )}
+                  >
                     {pair.right?.line.newLine ?? ''}
                   </td>
-                  <td className={cn(
-                    'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
-                    pair.right?.line.kind === 'addition' ? 'bg-success/10 text-foreground' : pair.right ? 'bg-background text-foreground' : 'bg-surface'
-                  )}>
+                  <td
+                    className={cn(
+                      'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                      pair.right?.line.kind === 'addition'
+                        ? 'bg-success/10 text-foreground'
+                        : pair.right
+                          ? 'bg-background text-foreground'
+                          : 'bg-surface'
+                    )}
+                  >
                     {pair.right ? (
                       <TokenizedContent tokens={tokenMap.get(pair.right.index)} fallback={pair.right.line.content} />
-                    ) : '\u00A0'}
+                    ) : (
+                      '\u00A0'
+                    )}
                   </td>
                 </tr>
               )
@@ -422,13 +432,7 @@ function InlineReviewReplyForm({
     setErrorMessage(null)
 
     try {
-      await window.api.github.pullComments.createReply(
-        owner,
-        repo,
-        number,
-        thread.topLevelComment.id,
-        body
-      )
+      await window.api.github.pullComments.createReply(owner, repo, number, thread.topLevelComment.id, body)
       setBody('')
       setIsOpen(false)
       await queryClient.invalidateQueries({

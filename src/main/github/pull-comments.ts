@@ -1,15 +1,6 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  fetchGitHubVoid,
-  API
-} from './client'
-import type {
-  PullRequestComment,
-  PullRequestReviewComment,
-  CreateReviewCommentInput
-} from '../../shared/types'
+import { requireAuth, fetchGitHubJson, fetchGitHubVoid, API } from './client'
+import type { PullRequestComment, PullRequestReviewComment, CreateReviewCommentInput } from '../../shared/types'
 
 export function registerPullCommentsHandlers(): void {
   // ============================================================
@@ -20,12 +11,7 @@ export function registerPullCommentsHandlers(): void {
   // GET /repos/{owner}/{repo}/issues/{issue_number}/comments
   ipcMain.handle(
     'github:pull-comments:list-issue-comments',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      number: number
-    ): Promise<PullRequestComment[]> => {
+    async (_event, owner: string, repo: string, number: number): Promise<PullRequestComment[]> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,
@@ -39,13 +25,7 @@ export function registerPullCommentsHandlers(): void {
   // POST /repos/{owner}/{repo}/issues/{issue_number}/comments
   ipcMain.handle(
     'github:pull-comments:create-issue-comment',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      number: number,
-      body: string
-    ): Promise<PullRequestComment> => {
+    async (_event, owner: string, repo: string, number: number, body: string): Promise<PullRequestComment> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,
@@ -128,12 +108,7 @@ export function registerPullCommentsHandlers(): void {
   // GET /repos/{owner}/{repo}/pulls/comments/{comment_id}
   ipcMain.handle(
     'github:pull-comments:get',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      commentId: number
-    ): Promise<PullRequestReviewComment> => {
+    async (_event, owner: string, repo: string, commentId: number): Promise<PullRequestReviewComment> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,
@@ -200,13 +175,7 @@ export function registerPullCommentsHandlers(): void {
   // PATCH /repos/{owner}/{repo}/pulls/comments/{comment_id}
   ipcMain.handle(
     'github:pull-comments:update',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      commentId: number,
-      body: string
-    ): Promise<PullRequestReviewComment> => {
+    async (_event, owner: string, repo: string, commentId: number, body: string): Promise<PullRequestReviewComment> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,

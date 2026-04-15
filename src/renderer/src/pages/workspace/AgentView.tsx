@@ -23,9 +23,7 @@ export default function AgentView({
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
   const isRunning = activeSession?.status === 'running'
   const canContinue =
-    activeSession !== null &&
-    activeSession.status !== 'running' &&
-    activeSession.cliSessionId !== null
+    activeSession !== null && activeSession.status !== 'running' && activeSession.cliSessionId !== null
 
   const handleSubmit = async (prompt: string, files?: string[]): Promise<void> => {
     if (canContinue) {

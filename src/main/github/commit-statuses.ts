@@ -1,14 +1,6 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  API
-} from './client'
-import type {
-  GitHubCombinedStatus,
-  GitHubCommitStatus,
-  CommitStatusState
-} from '../../shared/types'
+import { requireAuth, fetchGitHubJson, API } from './client'
+import type { GitHubCombinedStatus, GitHubCommitStatus, CommitStatusState } from '../../shared/types'
 
 export function registerCommitStatusesHandlers(): void {
   // Get the combined status for a specific reference

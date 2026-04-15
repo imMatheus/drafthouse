@@ -89,8 +89,7 @@ export function requireAllowedPath(sender: WebContents, targetPath: string): str
 
   const resolvedPath = resolveExistingPath(targetPath)
   const pathFromRoot = relative(rootPath, resolvedPath)
-  const isInsideRoot =
-    pathFromRoot === '' || (!pathFromRoot.startsWith('..') && !isAbsolute(pathFromRoot))
+  const isInsideRoot = pathFromRoot === '' || (!pathFromRoot.startsWith('..') && !isAbsolute(pathFromRoot))
 
   if (!isInsideRoot) {
     throw new Error('Access denied for a path outside the opened folder')
@@ -142,7 +141,9 @@ function getGitRepoInfo(dirPath: string): GitRepoInfo | null {
   const configPath = join(dirPath, '.git', 'config')
   if (!existsSync(configPath)) return null
   const config = readFileSync(configPath, 'utf-8')
-  const match = config.match(/url\s*=\s*(?:https?:\/\/github\.com\/|git@github\.com:)([^/]+)\/([^/\s.]+?)(?:\.git)?\s*$/m)
+  const match = config.match(
+    /url\s*=\s*(?:https?:\/\/github\.com\/|git@github\.com:)([^/]+)\/([^/\s.]+?)(?:\.git)?\s*$/m
+  )
   if (!match) return null
   return { owner: match[1], repo: match[2] }
 }
@@ -202,9 +203,14 @@ export function registerFsHandlers(): void {
   ipcMain.handle('fs:read-file-data-url', (_event, filePath: string) => {
     const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
     const mimeTypes: Record<string, string> = {
-      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-      gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-      bmp: 'image/bmp', ico: 'image/x-icon'
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+      svg: 'image/svg+xml',
+      bmp: 'image/bmp',
+      ico: 'image/x-icon'
     }
     const mime = mimeTypes[ext] ?? 'application/octet-stream'
     const data = readFileSync(filePath)

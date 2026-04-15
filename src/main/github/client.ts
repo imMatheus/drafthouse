@@ -13,10 +13,7 @@ export function requireAuth(): string {
   return auth.token
 }
 
-export function getGitHubHeaders(
-  token: string,
-  extraHeaders: Record<string, string> = {}
-): Record<string, string> {
+export function getGitHubHeaders(token: string, extraHeaders: Record<string, string> = {}): Record<string, string> {
   return {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
@@ -108,11 +105,7 @@ export async function fetchGitHubVoid(
   }
 }
 
-export async function fetchGitHubCheck(
-  token: string,
-  url: string,
-  errorContext: string
-): Promise<boolean> {
+export async function fetchGitHubCheck(token: string, url: string, errorContext: string): Promise<boolean> {
   const response = await fetch(url, {
     headers: getGitHubHeaders(token)
   })

@@ -105,10 +105,15 @@ function FileAttachment({ filePath }: { filePath: string }) {
   useEffect(() => {
     if (!isImage) return
     let cancelled = false
-    window.api.fs.readFileDataUrl(filePath).then((url) => {
-      if (!cancelled) setDataUrl(url)
-    }).catch(() => {})
-    return () => { cancelled = true }
+    window.api.fs
+      .readFileDataUrl(filePath)
+      .then((url) => {
+        if (!cancelled) setDataUrl(url)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [filePath, isImage])
 
   if (isImage) {

@@ -26,20 +26,13 @@ function StatusIndicator({ status }: { status: AgentSession['status'] }) {
   return null
 }
 
-export default function AgentPanel({
-  sessions,
-  activeSessionId,
-  onSelectSession,
-  onNewSession
-}: AgentPanelProps) {
+export default function AgentPanel({ sessions, activeSessionId, onSelectSession, onNewSession }: AgentPanelProps) {
   const sortedSessions = [...sessions].filter((s) => !s.context?.inline).reverse()
 
   return (
     <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
       <div className="flex items-center justify-between px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-          Agent
-        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">Agent</p>
         <button
           onClick={onNewSession}
           className="flex size-5 items-center justify-center rounded text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
@@ -59,9 +52,7 @@ export default function AgentPanel({
               onClick={() => onSelectSession(session.id)}
               className={cn(
                 'flex w-full items-center gap-2 px-4 py-[3px] text-left transition-colors hover:bg-surface-hover',
-                session.id === activeSessionId
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-foreground-muted'
+                session.id === activeSessionId ? 'bg-surface-hover text-foreground' : 'text-foreground-muted'
               )}
             >
               <StatusIndicator status={session.status} />

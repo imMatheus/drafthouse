@@ -66,18 +66,14 @@ async function gitBranchInfo(cwd: string): Promise<GitBranchInfo> {
   let behind = 0
 
   try {
-    upstream = (
-      await git(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])
-    ).trim()
+    upstream = (await git(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])).trim()
   } catch {
     // No upstream configured
   }
 
   if (upstream) {
     try {
-      const counts = (
-        await git(cwd, ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'])
-      ).trim()
+      const counts = (await git(cwd, ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'])).trim()
       const parts = counts.split('\t')
       ahead = Number(parts[0]) || 0
       behind = Number(parts[1]) || 0
@@ -183,11 +179,7 @@ async function gitStashPop(cwd: string): Promise<void> {
 }
 
 async function gitLog(cwd: string, count: number): Promise<GitLogEntry[]> {
-  const output = await git(cwd, [
-    'log',
-    `--max-count=${count}`,
-    '--format=%H%n%s',
-  ])
+  const output = await git(cwd, ['log', `--max-count=${count}`, '--format=%H%n%s'])
 
   if (!output.trim()) return []
 

@@ -50,9 +50,7 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
 
   const files = status ?? []
   const stagedFiles = files.filter((f) => f.indexStatus !== ' ' && f.indexStatus !== '?')
-  const changedFiles = files.filter(
-    (f) => f.workTreeStatus !== ' ' || f.indexStatus === '?'
-  )
+  const changedFiles = files.filter((f) => f.workTreeStatus !== ' ' || f.indexStatus === '?')
 
   const invalidateGit = async (): Promise<void> => {
     await Promise.all([
@@ -170,9 +168,7 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
     <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
       {/* Header */}
       <div className="px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-          Source Control
-        </p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">Source Control</p>
       </div>
 
       {/* Branch info */}
@@ -182,12 +178,14 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
           <span className="truncate text-xs text-foreground-muted">{branchInfo.name}</span>
           {branchInfo.ahead > 0 ? (
             <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
-              {branchInfo.ahead}<ArrowUp size={10} />
+              {branchInfo.ahead}
+              <ArrowUp size={10} />
             </span>
           ) : null}
           {branchInfo.behind > 0 ? (
             <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
-              {branchInfo.behind}<ArrowDown size={10} />
+              {branchInfo.behind}
+              <ArrowDown size={10} />
             </span>
           ) : null}
         </div>
@@ -221,9 +219,7 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
                 >
                   <ArrowUp size={12} />
                   Push
-                  <span className="rounded-full bg-white/20 px-1.5 text-[10px]">
-                    {branchInfo.ahead}
-                  </span>
+                  <span className="rounded-full bg-white/20 px-1.5 text-[10px]">{branchInfo.ahead}</span>
                 </button>
               ) : (
                 <button
@@ -251,11 +247,7 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
       {/* Error display */}
       {error ? (
         <div className="mx-3 mb-2 flex items-start gap-1.5 rounded border border-danger/30 bg-danger/10 px-2 py-1.5">
-          <X
-            size={12}
-            className="mt-0.5 shrink-0 cursor-pointer text-danger"
-            onClick={() => setError(null)}
-          />
+          <X size={12} className="mt-0.5 shrink-0 cursor-pointer text-danger" onClick={() => setError(null)} />
           <p className="text-xs text-danger">{error}</p>
         </div>
       ) : null}
@@ -300,11 +292,7 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
           />
         ) : null}
 
-        {files.length === 0 ? (
-          <p className="px-4 py-4 text-xs text-foreground-subtle">
-            No changes detected
-          </p>
-        ) : null}
+        {files.length === 0 ? <p className="px-4 py-4 text-xs text-foreground-subtle">No changes detected</p> : null}
       </div>
     </div>
   )
@@ -344,17 +332,12 @@ function FileSection({
   return (
     <div>
       <div className="group flex items-center justify-between px-2 py-1 hover:bg-surface-hover">
-        <button
-          onClick={onToggle}
-          className="flex flex-1 items-center gap-1 text-left"
-        >
+        <button onClick={onToggle} className="flex flex-1 items-center gap-1 text-left">
           <ChevronRight
             size={12}
             className={cn('shrink-0 text-foreground-subtle transition-transform', isOpen && 'rotate-90')}
           />
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
-            {title}
-          </span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">{title}</span>
           <span className="text-[10px] text-foreground-subtle">{files.length}</span>
         </button>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
@@ -419,15 +402,10 @@ function FileRow({
 
   return (
     <div className="group flex items-center gap-1 py-[3px] pl-6 pr-2 hover:bg-surface-hover">
-      <button
-        onClick={onOpenDiff}
-        className="flex flex-1 items-center gap-1.5 overflow-hidden text-left"
-      >
+      <button onClick={onOpenDiff} className="flex flex-1 items-center gap-1.5 overflow-hidden text-left">
         <StatusIcon status={status} />
         <span className="truncate text-xs text-foreground">{displayName}</span>
-        {dirPath ? (
-          <span className="truncate text-[10px] text-foreground-subtle">{dirPath}</span>
-        ) : null}
+        {dirPath ? <span className="truncate text-[10px] text-foreground-subtle">{dirPath}</span> : null}
       </button>
       <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
         {onDiscard ? (

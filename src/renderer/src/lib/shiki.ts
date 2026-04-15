@@ -129,7 +129,7 @@ export function getLanguageFromPath(path: string): string {
   if (lower === 'cmakelists.txt' || lower.endsWith('.cmake')) return 'cmake'
   if (lower === '.gitignore' || lower === '.dockerignore') return 'gitignore'
 
-  const ext = filename.includes('.') ? filename.split('.').pop()?.toLowerCase() ?? '' : ''
+  const ext = filename.includes('.') ? (filename.split('.').pop()?.toLowerCase() ?? '') : ''
   return EXTENSION_TO_LANG[ext] ?? 'plaintext'
 }
 
@@ -142,11 +142,7 @@ function mapTokens(tokens: ThemedToken[]): HighlightedToken[] {
   return tokens.map((t) => ({ content: t.content, color: t.color }))
 }
 
-export async function tokenizeCode(
-  code: string,
-  langHint: string,
-  theme: AppTheme
-): Promise<HighlightedToken[][]> {
+export async function tokenizeCode(code: string, langHint: string, theme: AppTheme): Promise<HighlightedToken[][]> {
   const highlighter = await getHighlighter()
   const lang = await ensureLanguage(highlighter, langHint)
 

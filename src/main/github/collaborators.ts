@@ -1,16 +1,6 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  fetchGitHubVoid,
-  fetchGitHubCheck,
-  API
-} from './client'
-import type {
-  GitHubCollaborator,
-  GitHubCollaboratorPermission,
-  CollaboratorInvitation
-} from '../../shared/types'
+import { requireAuth, fetchGitHubJson, fetchGitHubVoid, fetchGitHubCheck, API } from './client'
+import type { GitHubCollaborator, GitHubCollaboratorPermission, CollaboratorInvitation } from '../../shared/types'
 
 export function registerCollaboratorsHandlers(): void {
   // List repository collaborators
@@ -71,19 +61,16 @@ export function registerCollaboratorsHandlers(): void {
       const token = requireAuth()
       const body = permission ? JSON.stringify({ permission }) : undefined
       // Returns 201 with invitation body for new invites, 204 for existing collaborators
-      const response = await fetch(
-        `${API}/repos/${owner}/${repo}/collaborators/${encodeURIComponent(username)}`,
-        {
-          method: 'PUT',
-          body,
-          headers: {
-            Accept: 'application/vnd.github+json',
-            Authorization: `Bearer ${token}`,
-            'X-GitHub-Api-Version': '2026-03-10',
-            ...(body ? { 'Content-Type': 'application/json' } : {})
-          }
+      const response = await fetch(`${API}/repos/${owner}/${repo}/collaborators/${encodeURIComponent(username)}`, {
+        method: 'PUT',
+        body,
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+          'X-GitHub-Api-Version': '2026-03-10',
+          ...(body ? { 'Content-Type': 'application/json' } : {})
         }
-      )
+      })
 
       if (response.status === 204) return null
       if (response.status === 201) return response.json() as Promise<CollaboratorInvitation>
@@ -117,12 +104,7 @@ export function registerCollaboratorsHandlers(): void {
   // GET /repos/{owner}/{repo}/collaborators/{username}/permission
   ipcMain.handle(
     'github:collaborators:get-permission',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      username: string
-    ): Promise<GitHubCollaboratorPermission> => {
+    async (_event, owner: string, repo: string, username: string): Promise<GitHubCollaboratorPermission> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,

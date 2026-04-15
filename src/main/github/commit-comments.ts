@@ -1,10 +1,5 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  fetchGitHubVoid,
-  API
-} from './client'
+import { requireAuth, fetchGitHubJson, fetchGitHubVoid, API } from './client'
 import type { GitHubCommitComment } from '../../shared/types'
 
 export function registerCommitCommentsHandlers(): void {
@@ -35,12 +30,7 @@ export function registerCommitCommentsHandlers(): void {
   // GET /repos/{owner}/{repo}/comments/{comment_id}
   ipcMain.handle(
     'github:commit-comments:get',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      commentId: number
-    ): Promise<GitHubCommitComment> => {
+    async (_event, owner: string, repo: string, commentId: number): Promise<GitHubCommitComment> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,
@@ -54,13 +44,7 @@ export function registerCommitCommentsHandlers(): void {
   // PATCH /repos/{owner}/{repo}/comments/{comment_id}
   ipcMain.handle(
     'github:commit-comments:update',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      commentId: number,
-      body: string
-    ): Promise<GitHubCommitComment> => {
+    async (_event, owner: string, repo: string, commentId: number, body: string): Promise<GitHubCommitComment> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,

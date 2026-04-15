@@ -48,10 +48,7 @@ export default function RepoSidebar() {
           onClick={() => setCollapsed(!collapsed)}
           className="shrink-0 rounded-md p-1 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
         >
-          <ChevronLeft
-            size={14}
-            className={cn('transition-transform duration-200', collapsed && 'rotate-180')}
-          />
+          <ChevronLeft size={14} className={cn('transition-transform duration-200', collapsed && 'rotate-180')} />
         </button>
       </div>
       <div className="flex items-center gap-1 px-3 pt-3 pb-2">

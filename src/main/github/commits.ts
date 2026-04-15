@@ -1,15 +1,6 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  API
-} from './client'
-import type {
-  GitHubCommit,
-  GitHubCommitComparison,
-  GitHubBranchShort,
-  PullRequest
-} from '../../shared/types'
+import { requireAuth, fetchGitHubJson, API } from './client'
+import type { GitHubCommit, GitHubCommitComparison, GitHubBranchShort, PullRequest } from '../../shared/types'
 
 export function registerCommitsHandlers(): void {
   // List commits
@@ -102,12 +93,7 @@ export function registerCommitsHandlers(): void {
   // GET /repos/{owner}/{repo}/commits/{commit_sha}/branches-where-head
   ipcMain.handle(
     'github:commits:list-branches-for-head',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      commitSha: string
-    ): Promise<GitHubBranchShort[]> => {
+    async (_event, owner: string, repo: string, commitSha: string): Promise<GitHubBranchShort[]> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,

@@ -17,10 +17,7 @@ export default function AgentSessionTab({
   onStopSession
 }: AgentSessionTabProps) {
   const isRunning = session?.status === 'running'
-  const canContinue =
-    session !== null &&
-    session.status !== 'running' &&
-    session.cliSessionId !== null
+  const canContinue = session !== null && session.status !== 'running' && session.cliSessionId !== null
 
   const handleSubmit = async (prompt: string, files?: string[]): Promise<void> => {
     if (canContinue) {
@@ -36,11 +33,7 @@ export default function AgentSessionTab({
       {session ? (
         <>
           <AgentConversation session={session} />
-          <AgentPromptBar
-            onSubmit={handleSubmit}
-            onStop={() => onStopSession(session.id)}
-            isRunning={isRunning}
-          />
+          <AgentPromptBar onSubmit={handleSubmit} onStop={() => onStopSession(session.id)} isRunning={isRunning} />
         </>
       ) : (
         <>
@@ -67,9 +60,7 @@ function AgentContextBanner({ context }: { context: AgentContext }) {
         {context.prTitle ? <span className="text-foreground-muted">{context.prTitle}</span> : null}
       </div>
 
-      {context.repoFullName ? (
-        <span className="text-xs text-foreground-subtle">{context.repoFullName}</span>
-      ) : null}
+      {context.repoFullName ? <span className="text-xs text-foreground-subtle">{context.repoFullName}</span> : null}
 
       {context.headBranch ? (
         <div className="flex items-center gap-1 text-xs text-foreground-muted">
@@ -84,9 +75,7 @@ function AgentContextBanner({ context }: { context: AgentContext }) {
         <div className="flex items-center gap-1 text-xs text-foreground-muted">
           <FileCode size={12} className="shrink-0" />
           <code className="rounded bg-interactive px-1 py-0.5 text-[11px]">{context.filePath}</code>
-          {context.lineNumber ? (
-            <span className="text-foreground-subtle">:{context.lineNumber}</span>
-          ) : null}
+          {context.lineNumber ? <span className="text-foreground-subtle">:{context.lineNumber}</span> : null}
         </div>
       ) : null}
     </div>

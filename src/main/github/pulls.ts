@@ -74,12 +74,7 @@ export function registerPullsHandlers(): void {
   // POST /repos/{owner}/{repo}/pulls
   ipcMain.handle(
     'github:pulls:create',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      input: CreatePullRequestInput
-    ): Promise<PullRequestDetail> => {
+    async (_event, owner: string, repo: string, input: CreatePullRequestInput): Promise<PullRequestDetail> => {
       const token = requireAuth()
       const payload: Record<string, unknown> = {
         title: input.title,
@@ -88,15 +83,12 @@ export function registerPullsHandlers(): void {
       }
       if (input.body !== undefined) payload.body = input.body
       if (input.draft !== undefined) payload.draft = input.draft
-      if (input.maintainer_can_modify !== undefined)
-        payload.maintainer_can_modify = input.maintainer_can_modify
+      if (input.maintainer_can_modify !== undefined) payload.maintainer_can_modify = input.maintainer_can_modify
       if (input.head_repo) payload.head_repo = input.head_repo
-      return fetchGitHubJson(
-        token,
-        `${API}/repos/${owner}/${repo}/pulls`,
-        `Failed to create pull request`,
-        { method: 'POST', body: JSON.stringify(payload) }
-      )
+      return fetchGitHubJson(token, `${API}/repos/${owner}/${repo}/pulls`, `Failed to create pull request`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
     }
   )
 
@@ -112,12 +104,10 @@ export function registerPullsHandlers(): void {
       input: UpdatePullRequestInput
     ): Promise<PullRequestDetail> => {
       const token = requireAuth()
-      return fetchGitHubJson(
-        token,
-        `${API}/repos/${owner}/${repo}/pulls/${number}`,
-        `Failed to update PR #${number}`,
-        { method: 'PATCH', body: JSON.stringify(input) }
-      )
+      return fetchGitHubJson(token, `${API}/repos/${owner}/${repo}/pulls/${number}`, `Failed to update PR #${number}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input)
+      })
     }
   )
 
@@ -126,12 +116,10 @@ export function registerPullsHandlers(): void {
     'github:pulls:close',
     async (_event, owner: string, repo: string, number: number): Promise<PullRequestDetail> => {
       const token = requireAuth()
-      return fetchGitHubJson(
-        token,
-        `${API}/repos/${owner}/${repo}/pulls/${number}`,
-        `Failed to close PR #${number}`,
-        { method: 'PATCH', body: JSON.stringify({ state: 'closed' }) }
-      )
+      return fetchGitHubJson(token, `${API}/repos/${owner}/${repo}/pulls/${number}`, `Failed to close PR #${number}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ state: 'closed' })
+      })
     }
   )
 
@@ -140,12 +128,10 @@ export function registerPullsHandlers(): void {
     'github:pulls:reopen',
     async (_event, owner: string, repo: string, number: number): Promise<PullRequestDetail> => {
       const token = requireAuth()
-      return fetchGitHubJson(
-        token,
-        `${API}/repos/${owner}/${repo}/pulls/${number}`,
-        `Failed to reopen PR #${number}`,
-        { method: 'PATCH', body: JSON.stringify({ state: 'open' }) }
-      )
+      return fetchGitHubJson(token, `${API}/repos/${owner}/${repo}/pulls/${number}`, `Failed to reopen PR #${number}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ state: 'open' })
+      })
     }
   )
 
@@ -163,8 +149,7 @@ export function registerPullsHandlers(): void {
     ): Promise<PaginatedPullRequestCommits> => {
       const token = requireAuth()
       const sanitizedPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1
-      const sanitizedPerPage =
-        Number.isFinite(perPage) && perPage > 0 ? Math.min(100, Math.floor(perPage)) : 10
+      const sanitizedPerPage = Number.isFinite(perPage) && perPage > 0 ? Math.min(100, Math.floor(perPage)) : 10
 
       const items = await fetchGitHubJson<PullRequestCommit[]>(
         token,
@@ -254,38 +239,32 @@ export function registerPullsHandlers(): void {
   )
 
   // Convert a pull request to draft (GraphQL)
-  ipcMain.handle(
-    'github:pulls:convert-to-draft',
-    async (_event, nodeId: string): Promise<void> => {
-      const token = requireAuth()
-      await fetchGitHubGraphQL(
-        token,
-        `mutation($id: ID!) {
+  ipcMain.handle('github:pulls:convert-to-draft', async (_event, nodeId: string): Promise<void> => {
+    const token = requireAuth()
+    await fetchGitHubGraphQL(
+      token,
+      `mutation($id: ID!) {
           convertPullRequestToDraft(input: { pullRequestId: $id }) {
             pullRequest { isDraft }
           }
         }`,
-        { id: nodeId },
-        'Failed to convert PR to draft'
-      )
-    }
-  )
+      { id: nodeId },
+      'Failed to convert PR to draft'
+    )
+  })
 
   // Mark a pull request as ready for review (GraphQL)
-  ipcMain.handle(
-    'github:pulls:mark-ready',
-    async (_event, nodeId: string): Promise<void> => {
-      const token = requireAuth()
-      await fetchGitHubGraphQL(
-        token,
-        `mutation($id: ID!) {
+  ipcMain.handle('github:pulls:mark-ready', async (_event, nodeId: string): Promise<void> => {
+    const token = requireAuth()
+    await fetchGitHubGraphQL(
+      token,
+      `mutation($id: ID!) {
           markPullRequestAsReadyForReview(input: { pullRequestId: $id }) {
             pullRequest { isDraft }
           }
         }`,
-        { id: nodeId },
-        'Failed to mark PR as ready for review'
-      )
-    }
-  )
+      { id: nodeId },
+      'Failed to mark PR as ready for review'
+    )
+  })
 }

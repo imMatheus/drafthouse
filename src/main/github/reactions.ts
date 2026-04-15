@@ -1,23 +1,12 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  fetchGitHubVoid,
-  fetchGitHubPaginatedCollection,
-  API
-} from './client'
+import { requireAuth, fetchGitHubJson, fetchGitHubVoid, fetchGitHubPaginatedCollection, API } from './client'
 import type { GitHubReaction, ReactionContent } from '../../shared/types'
 
 export function registerReactionsHandlers(): void {
   // List reactions for an issue comment (conversation tab comments)
   ipcMain.handle(
     'github:reactions:list-for-issue-comment',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      commentId: number
-    ): Promise<GitHubReaction[]> => {
+    async (_event, owner: string, repo: string, commentId: number): Promise<GitHubReaction[]> => {
       const token = requireAuth()
       return fetchGitHubPaginatedCollection<GitHubReaction>(
         token,
@@ -53,12 +42,7 @@ export function registerReactionsHandlers(): void {
   // List reactions for a pull request review comment (inline code comments)
   ipcMain.handle(
     'github:reactions:list-for-pull-comment',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      commentId: number
-    ): Promise<GitHubReaction[]> => {
+    async (_event, owner: string, repo: string, commentId: number): Promise<GitHubReaction[]> => {
       const token = requireAuth()
       return fetchGitHubPaginatedCollection<GitHubReaction>(
         token,
@@ -94,12 +78,7 @@ export function registerReactionsHandlers(): void {
   // Delete a reaction (works for both issue comments and review comments)
   ipcMain.handle(
     'github:reactions:delete',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      reactionId: number
-    ): Promise<void> => {
+    async (_event, owner: string, repo: string, reactionId: number): Promise<void> => {
       const token = requireAuth()
       return fetchGitHubVoid(
         token,

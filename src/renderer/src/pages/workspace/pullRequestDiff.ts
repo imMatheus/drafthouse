@@ -1,8 +1,4 @@
-import type {
-  PullRequestFile,
-  PullRequestReviewComment,
-  PullRequestReviewLineSide
-} from '../../../../shared/types'
+import type { PullRequestFile, PullRequestReviewComment, PullRequestReviewLineSide } from '../../../../shared/types'
 
 export type ParsedDiffLineKind = 'hunk' | 'addition' | 'deletion' | 'context' | 'meta'
 
@@ -133,16 +129,9 @@ export function parsePullRequestFileDiff(file: PullRequestFile): ParsedPullReque
   }
 }
 
-export function getReviewCommentAnchor(
-  comment: PullRequestReviewComment
-): ReviewThreadAnchor | null {
+export function getReviewCommentAnchor(comment: PullRequestReviewComment): ReviewThreadAnchor | null {
   const side = normalizeReviewCommentSide(comment.side ?? comment.start_side)
-  const line =
-    comment.line ??
-    comment.original_line ??
-    comment.start_line ??
-    comment.original_start_line ??
-    null
+  const line = comment.line ?? comment.original_line ?? comment.start_line ?? comment.original_start_line ?? null
 
   if (!side || typeof line !== 'number' || Number.isNaN(line)) {
     return null
@@ -154,9 +143,7 @@ export function getReviewCommentAnchor(
   }
 }
 
-function normalizeReviewCommentSide(
-  value: string | null | undefined
-): PullRequestReviewLineSide | null {
+function normalizeReviewCommentSide(value: string | null | undefined): PullRequestReviewLineSide | null {
   if (value === 'LEFT' || value === 'RIGHT') {
     return value
   }
@@ -164,10 +151,6 @@ function normalizeReviewCommentSide(
   return null
 }
 
-export function getDiffThreadKey(
-  path: string,
-  side: PullRequestReviewLineSide,
-  line: number
-): string {
+export function getDiffThreadKey(path: string, side: PullRequestReviewLineSide, line: number): string {
   return `${path}::${side}::${line}`
 }

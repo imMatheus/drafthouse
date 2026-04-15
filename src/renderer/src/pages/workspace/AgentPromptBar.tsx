@@ -115,11 +115,7 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">
             {files.map((filePath) => (
-              <FilePreview
-                key={filePath}
-                filePath={filePath}
-                onRemove={() => handleRemoveFile(filePath)}
-              />
+              <FilePreview key={filePath} filePath={filePath} onRemove={() => handleRemoveFile(filePath)} />
             ))}
           </div>
         )}
@@ -183,18 +179,21 @@ function FilePreview({ filePath, onRemove }: { filePath: string; onRemove: () =>
   useEffect(() => {
     if (!isImage) return
     let cancelled = false
-    window.api.fs.readFileDataUrl(filePath).then((url) => {
-      if (!cancelled) setDataUrl(url)
-    }).catch(() => {})
-    return () => { cancelled = true }
+    window.api.fs
+      .readFileDataUrl(filePath)
+      .then((url) => {
+        if (!cancelled) setDataUrl(url)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
   }, [filePath, isImage])
 
   if (isImage) {
     return (
       <div className="group relative size-20 overflow-hidden rounded-lg border border-border bg-interactive">
-        {dataUrl && (
-          <img src={dataUrl} alt={fileName} className="size-full object-cover" />
-        )}
+        {dataUrl && <img src={dataUrl} alt={fileName} className="size-full object-cover" />}
         <button
           onClick={onRemove}
           className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground-subtle opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"

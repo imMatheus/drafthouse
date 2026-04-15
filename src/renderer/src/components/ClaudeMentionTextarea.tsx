@@ -28,8 +28,7 @@ export default function ClaudeMentionTextarea({
   const hasClaudePrefix = enabled && /^@claude/i.test(value.trimStart())
 
   const mentionMatch = enabled ? value.trimStart().match(/^@(\w*)$/) : null
-  const showMentionMenu =
-    mentionMatch !== null && 'claude'.startsWith(mentionMatch[1].toLowerCase())
+  const showMentionMenu = mentionMatch !== null && 'claude'.startsWith(mentionMatch[1].toLowerCase())
 
   const acceptMention = (): void => {
     onChange('@claude ')
@@ -57,12 +56,8 @@ export default function ClaudeMentionTextarea({
           className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm"
           aria-hidden
         >
-          <span className="rounded-sm bg-accent/15 font-medium text-accent">
-            {value.match(/^@claude/i)?.[0]}
-          </span>
-          <span className="text-foreground">
-            {value.slice(value.match(/^@claude/i)?.[0]?.length ?? 0)}
-          </span>
+          <span className="rounded-sm bg-accent/15 font-medium text-accent">{value.match(/^@claude/i)?.[0]}</span>
+          <span className="text-foreground">{value.slice(value.match(/^@claude/i)?.[0]?.length ?? 0)}</span>
         </div>
       )}
       <textarea

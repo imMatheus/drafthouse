@@ -19,9 +19,7 @@ import {
 function AppContent(): React.JSX.Element {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
-  const [workspaceSession, setWorkspaceSession] = useState<WorkspaceSession | null>(() =>
-    loadWorkspaceSession()
-  )
+  const [workspaceSession, setWorkspaceSession] = useState<WorkspaceSession | null>(() => loadWorkspaceSession())
 
   const persistWorkspaceSession = (
     updater: WorkspaceSession | null | ((current: WorkspaceSession | null) => WorkspaceSession | null)
@@ -40,9 +38,7 @@ function AppContent(): React.JSX.Element {
   }
 
   const openWorkspace = (folderPath: string): void => {
-    persistWorkspaceSession(
-      loadWorkspaceSessionForFolder(folderPath) ?? createInitialWorkspaceSession(folderPath)
-    )
+    persistWorkspaceSession(loadWorkspaceSessionForFolder(folderPath) ?? createInitialWorkspaceSession(folderPath))
     navigate('/workspace')
   }
 

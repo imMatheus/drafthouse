@@ -1,15 +1,6 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  API
-} from './client'
-import type {
-  GitHubBranch,
-  GitHubBranchDetail,
-  MergeUpstreamResult,
-  BranchMergeResult
-} from '../../shared/types'
+import { requireAuth, fetchGitHubJson, API } from './client'
+import type { GitHubBranch, GitHubBranchDetail, MergeUpstreamResult, BranchMergeResult } from '../../shared/types'
 
 export function registerBranchesHandlers(): void {
   // List branches
@@ -54,13 +45,7 @@ export function registerBranchesHandlers(): void {
   // POST /repos/{owner}/{repo}/branches/{branch}/rename
   ipcMain.handle(
     'github:branches:rename',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      branch: string,
-      newName: string
-    ): Promise<GitHubBranch> => {
+    async (_event, owner: string, repo: string, branch: string, newName: string): Promise<GitHubBranch> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,
@@ -75,12 +60,7 @@ export function registerBranchesHandlers(): void {
   // POST /repos/{owner}/{repo}/merge-upstream
   ipcMain.handle(
     'github:branches:sync-fork',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      branch: string
-    ): Promise<MergeUpstreamResult> => {
+    async (_event, owner: string, repo: string, branch: string): Promise<MergeUpstreamResult> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,
@@ -106,12 +86,10 @@ export function registerBranchesHandlers(): void {
       const token = requireAuth()
       const payload: Record<string, string> = { base, head }
       if (commitMessage) payload.commit_message = commitMessage
-      return fetchGitHubJson(
-        token,
-        `${API}/repos/${owner}/${repo}/merges`,
-        `Failed to merge ${head} into ${base}`,
-        { method: 'POST', body: JSON.stringify(payload) }
-      )
+      return fetchGitHubJson(token, `${API}/repos/${owner}/${repo}/merges`, `Failed to merge ${head} into ${base}`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
     }
   )
 }

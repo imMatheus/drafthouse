@@ -76,11 +76,7 @@ function SystemMessage({ event }: { event: AgentStreamSystem }) {
   const message = event.message
   if (!message) return null
 
-  return (
-    <div className="mb-2 text-xs text-foreground-subtle italic">
-      {message}
-    </div>
-  )
+  return <div className="mb-2 text-xs text-foreground-subtle italic">{message}</div>
 }
 
 function ContentBlock({ block }: { block: AgentContentBlock }) {
@@ -140,9 +136,7 @@ function ToolUseBlock({ name, input }: { name: string; input: Record<string, unk
           className={cn('shrink-0 text-foreground-subtle transition-transform', expanded && 'rotate-90')}
         />
         <span className="font-medium text-foreground">{name}</span>
-        {summary && (
-          <span className="truncate text-foreground-subtle">{summary}</span>
-        )}
+        {summary && <span className="truncate text-foreground-subtle">{summary}</span>}
       </button>
 
       {expanded && (
@@ -167,10 +161,7 @@ function ToolResultBlock({ content }: { content: string }) {
         {displayContent}
       </pre>
       {isLong && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="mt-1 text-xs text-accent hover:text-accent-hover"
-        >
+        <button onClick={() => setExpanded(!expanded)} className="mt-1 text-xs text-accent hover:text-accent-hover">
           {expanded ? 'Show less' : 'Show more'}
         </button>
       )}

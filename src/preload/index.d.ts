@@ -73,13 +73,7 @@ interface GitHubBranchesAPI {
   get: (owner: string, repo: string, branch: string) => Promise<GitHubBranchDetail>
   rename: (owner: string, repo: string, branch: string, newName: string) => Promise<GitHubBranch>
   syncFork: (owner: string, repo: string, branch: string) => Promise<MergeUpstreamResult>
-  merge: (
-    owner: string,
-    repo: string,
-    base: string,
-    head: string,
-    commitMessage?: string
-  ) => Promise<BranchMergeResult>
+  merge: (owner: string, repo: string, base: string, head: string, commitMessage?: string) => Promise<BranchMergeResult>
 }
 
 interface GitHubCollaboratorsAPI {
@@ -94,18 +88,9 @@ interface GitHubCollaboratorsAPI {
     }
   ) => Promise<GitHubCollaborator[]>
   check: (owner: string, repo: string, username: string) => Promise<boolean>
-  add: (
-    owner: string,
-    repo: string,
-    username: string,
-    permission?: string
-  ) => Promise<CollaboratorInvitation | null>
+  add: (owner: string, repo: string, username: string, permission?: string) => Promise<CollaboratorInvitation | null>
   remove: (owner: string, repo: string, username: string) => Promise<void>
-  getPermission: (
-    owner: string,
-    repo: string,
-    username: string
-  ) => Promise<GitHubCollaboratorPermission>
+  getPermission: (owner: string, repo: string, username: string) => Promise<GitHubCollaboratorPermission>
 }
 
 interface GitHubCommitsAPI {
@@ -135,11 +120,7 @@ interface GitHubCommitsAPI {
     basehead: string,
     options?: { page?: number; perPage?: number }
   ) => Promise<GitHubCommitComparison>
-  listBranchesForHead: (
-    owner: string,
-    repo: string,
-    commitSha: string
-  ) => Promise<GitHubBranchShort[]>
+  listBranchesForHead: (owner: string, repo: string, commitSha: string) => Promise<GitHubBranchShort[]>
   listPullRequests: (
     owner: string,
     repo: string,
@@ -155,12 +136,7 @@ interface GitHubCommitCommentsAPI {
     options?: { perPage?: number; page?: number }
   ) => Promise<GitHubCommitComment[]>
   get: (owner: string, repo: string, commentId: number) => Promise<GitHubCommitComment>
-  update: (
-    owner: string,
-    repo: string,
-    commentId: number,
-    body: string
-  ) => Promise<GitHubCommitComment>
+  update: (owner: string, repo: string, commentId: number, body: string) => Promise<GitHubCommitComment>
   delete: (owner: string, repo: string, commentId: number) => Promise<void>
   listForCommit: (
     owner: string,
@@ -219,17 +195,8 @@ interface GitHubPullsAPI {
     }
   ) => Promise<PullRequest[]>
   get: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
-  create: (
-    owner: string,
-    repo: string,
-    input: CreatePullRequestInput
-  ) => Promise<PullRequestDetail>
-  update: (
-    owner: string,
-    repo: string,
-    number: number,
-    input: UpdatePullRequestInput
-  ) => Promise<PullRequestDetail>
+  create: (owner: string, repo: string, input: CreatePullRequestInput) => Promise<PullRequestDetail>
+  update: (owner: string, repo: string, number: number, input: UpdatePullRequestInput) => Promise<PullRequestDetail>
   close: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
   reopen: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
   listCommits: (
@@ -249,28 +216,14 @@ interface GitHubPullsAPI {
     commitTitle?: string,
     commitMessage?: string
   ) => Promise<PullRequestMergeResult>
-  updateBranch: (
-    owner: string,
-    repo: string,
-    number: number,
-    expectedHeadSha?: string
-  ) => Promise<UpdateBranchResult>
+  updateBranch: (owner: string, repo: string, number: number, expectedHeadSha?: string) => Promise<UpdateBranchResult>
   convertToDraft: (nodeId: string) => Promise<void>
   markReady: (nodeId: string) => Promise<void>
 }
 
 interface GitHubPullCommentsAPI {
-  listIssueComments: (
-    owner: string,
-    repo: string,
-    number: number
-  ) => Promise<PullRequestComment[]>
-  createIssueComment: (
-    owner: string,
-    repo: string,
-    number: number,
-    body: string
-  ) => Promise<PullRequestComment>
+  listIssueComments: (owner: string, repo: string, number: number) => Promise<PullRequestComment[]>
+  createIssueComment: (owner: string, repo: string, number: number, body: string) => Promise<PullRequestComment>
   listForPull: (
     owner: string,
     repo: string,
@@ -308,12 +261,7 @@ interface GitHubPullCommentsAPI {
     commentId: number,
     body: string
   ) => Promise<PullRequestReviewComment>
-  update: (
-    owner: string,
-    repo: string,
-    commentId: number,
-    body: string
-  ) => Promise<PullRequestReviewComment>
+  update: (owner: string, repo: string, commentId: number, body: string) => Promise<PullRequestReviewComment>
   delete: (owner: string, repo: string, commentId: number) => Promise<void>
 }
 
@@ -326,13 +274,7 @@ interface GitHubReviewRequestsAPI {
     reviewers?: string[],
     teamReviewers?: string[]
   ) => Promise<PullRequestDetail>
-  remove: (
-    owner: string,
-    repo: string,
-    number: number,
-    reviewers: string[],
-    teamReviewers?: string[]
-  ) => Promise<void>
+  remove: (owner: string, repo: string, number: number, reviewers: string[], teamReviewers?: string[]) => Promise<void>
 }
 
 interface GitHubReviewsAPI {
@@ -342,31 +284,15 @@ interface GitHubReviewsAPI {
     number: number,
     options?: { perPage?: number; page?: number }
   ) => Promise<PullRequestReview[]>
-  get: (
-    owner: string,
-    repo: string,
-    number: number,
-    reviewId: number
-  ) => Promise<PullRequestReview>
+  get: (owner: string, repo: string, number: number, reviewId: number) => Promise<PullRequestReview>
   create: (
     owner: string,
     repo: string,
     number: number,
     input: SubmitPullRequestReviewInput
   ) => Promise<PullRequestReview>
-  update: (
-    owner: string,
-    repo: string,
-    number: number,
-    reviewId: number,
-    body: string
-  ) => Promise<PullRequestReview>
-  deletePending: (
-    owner: string,
-    repo: string,
-    number: number,
-    reviewId: number
-  ) => Promise<PullRequestReview>
+  update: (owner: string, repo: string, number: number, reviewId: number, body: string) => Promise<PullRequestReview>
+  deletePending: (owner: string, repo: string, number: number, reviewId: number) => Promise<PullRequestReview>
   listComments: (
     owner: string,
     repo: string,
@@ -394,9 +320,19 @@ interface GitHubReviewsAPI {
 
 interface GitHubReactionsAPI {
   listForIssueComment: (owner: string, repo: string, commentId: number) => Promise<GitHubReaction[]>
-  createForIssueComment: (owner: string, repo: string, commentId: number, content: ReactionContent) => Promise<GitHubReaction>
+  createForIssueComment: (
+    owner: string,
+    repo: string,
+    commentId: number,
+    content: ReactionContent
+  ) => Promise<GitHubReaction>
   listForPullComment: (owner: string, repo: string, commentId: number) => Promise<GitHubReaction[]>
-  createForPullComment: (owner: string, repo: string, commentId: number, content: ReactionContent) => Promise<GitHubReaction>
+  createForPullComment: (
+    owner: string,
+    repo: string,
+    commentId: number,
+    content: ReactionContent
+  ) => Promise<GitHubReaction>
   delete: (owner: string, repo: string, reactionId: number) => Promise<void>
 }
 
@@ -444,13 +380,7 @@ interface GitAPI {
 
 interface AgentAPI {
   start: (cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string) => Promise<{ sessionId: string }>
-  continue: (
-    sessionId: string,
-    cliSessionId: string,
-    cwd: string,
-    prompt: string,
-    files?: string[]
-  ) => Promise<void>
+  continue: (sessionId: string, cliSessionId: string, cwd: string, prompt: string, files?: string[]) => Promise<void>
   stop: (sessionId: string) => Promise<void>
   listSessions: () => Promise<AgentSessionSummary[]>
   onEvent: (callback: (data: AgentEvent) => void) => () => void

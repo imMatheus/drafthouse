@@ -552,10 +552,7 @@ export interface AgentContentBlockToolResult {
   content: string
 }
 
-export type AgentContentBlock =
-  | AgentContentBlockText
-  | AgentContentBlockToolUse
-  | AgentContentBlockToolResult
+export type AgentContentBlock = AgentContentBlockText | AgentContentBlockToolUse | AgentContentBlockToolResult
 
 // Stream events from claude CLI --output-format stream-json
 export interface AgentStreamInit {

@@ -1,25 +1,13 @@
 import { ipcMain } from 'electron'
-import {
-  requireAuth,
-  fetchGitHubJson,
-  API
-} from './client'
-import type {
-  PullRequestDetail,
-  ReviewRequestsResult
-} from '../../shared/types'
+import { requireAuth, fetchGitHubJson, API } from './client'
+import type { PullRequestDetail, ReviewRequestsResult } from '../../shared/types'
 
 export function registerReviewRequestsHandlers(): void {
   // Get all requested reviewers for a pull request
   // GET /repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers
   ipcMain.handle(
     'github:review-requests:get',
-    async (
-      _event,
-      owner: string,
-      repo: string,
-      number: number
-    ): Promise<ReviewRequestsResult> => {
+    async (_event, owner: string, repo: string, number: number): Promise<ReviewRequestsResult> => {
       const token = requireAuth()
       return fetchGitHubJson(
         token,

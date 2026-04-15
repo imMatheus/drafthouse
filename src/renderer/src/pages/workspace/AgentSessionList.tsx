@@ -57,9 +57,7 @@ export default function AgentSessionList({
               onClick={() => onSelectSession(session.id)}
               className={cn(
                 'flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors',
-                session.id === activeSessionId
-                  ? 'bg-surface-hover'
-                  : 'hover:bg-surface-hover'
+                session.id === activeSessionId ? 'bg-surface-hover' : 'hover:bg-surface-hover'
               )}
             >
               <StatusIndicator status={session.status} />

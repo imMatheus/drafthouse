@@ -22,11 +22,35 @@ function sendAgentEvent(session: AgentProcess, event: AgentStreamEvent): void {
 }
 
 const BINARY_EXTENSIONS = new Set([
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg',
-  'mp3', 'mp4', 'wav', 'avi', 'mov', 'mkv',
-  'zip', 'tar', 'gz', 'rar', '7z',
-  'pdf', 'doc', 'docx', 'xls', 'xlsx',
-  'exe', 'dll', 'so', 'dylib', 'wasm'
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'ico',
+  'svg',
+  'mp3',
+  'mp4',
+  'wav',
+  'avi',
+  'mov',
+  'mkv',
+  'zip',
+  'tar',
+  'gz',
+  'rar',
+  '7z',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'exe',
+  'dll',
+  'so',
+  'dylib',
+  'wasm'
 ])
 
 function isBinaryFile(filePath: string): boolean {
@@ -54,11 +78,7 @@ function buildPromptWithFiles(prompt: string, files?: string[]): string {
   return `${fileRefs}\n\n${prompt}`
 }
 
-function buildCliArgs(options: {
-  prompt: string
-  resumeSessionId?: string
-  appendSystemPrompt?: string
-}): string[] {
+function buildCliArgs(options: { prompt: string; resumeSessionId?: string; appendSystemPrompt?: string }): string[] {
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions']
 
   if (options.resumeSessionId) {
@@ -73,10 +93,7 @@ function buildCliArgs(options: {
   return args
 }
 
-function wireChildProcess(
-  child: ChildProcess,
-  sessionId: string
-): void {
+function wireChildProcess(child: ChildProcess, sessionId: string): void {
   let buffer = ''
 
   child.stdout?.on('data', (chunk: Buffer) => {
@@ -149,11 +166,11 @@ export function startAgentSession(
   const sessionId = randomUUID()
   const fullPrompt = buildPromptWithFiles(prompt, files)
 
-  const child = spawn(
-    'claude',
-    buildCliArgs({ prompt: fullPrompt, appendSystemPrompt }),
-    { cwd, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] }
-  )
+  const child = spawn('claude', buildCliArgs({ prompt: fullPrompt, appendSystemPrompt }), {
+    cwd,
+    env: { ...process.env },
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
 
   const agentProcess: AgentProcess = {
     id: sessionId,
@@ -182,11 +199,11 @@ export function continueAgentSession(
   const existingSession = sessions.get(existingSessionId)
   const fullPrompt = buildPromptWithFiles(prompt, files)
 
-  const child = spawn(
-    'claude',
-    buildCliArgs({ prompt: fullPrompt, resumeSessionId: cliSessionId }),
-    { cwd, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] }
-  )
+  const child = spawn('claude', buildCliArgs({ prompt: fullPrompt, resumeSessionId: cliSessionId }), {
+    cwd,
+    env: { ...process.env },
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
 
   if (existingSession) {
     existingSession.childProcess = child
@@ -198,23 +215,13 @@ export function continueAgentSession(
 }
 
 export function registerAgentHandlers(): void {
-  ipcMain.handle(
-    'agent:start',
-    (event, cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string) => {
-      return startAgentSession(cwd, prompt, files, event.sender, appendSystemPrompt)
-    }
-  )
+  ipcMain.handle('agent:start', (event, cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string) => {
+    return startAgentSession(cwd, prompt, files, event.sender, appendSystemPrompt)
+  })
 
   ipcMain.handle(
     'agent:continue',
-    (
-      event,
-      sessionId: string,
-      cliSessionId: string,
-      cwd: string,
-      prompt: string,
-      files?: string[]
-    ) => {
+    (event, sessionId: string, cliSessionId: string, cwd: string, prompt: string, files?: string[]) => {
       continueAgentSession(sessionId, cliSessionId, cwd, prompt, files, event.sender)
     }
   )

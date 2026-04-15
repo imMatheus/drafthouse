@@ -235,9 +235,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   }
 
   const handleStartAgent = async (prompt: string, files?: string[], context?: AgentContext): Promise<void> => {
-    const { sessionId } = await window.api.agent.start(
-      folderPath, prompt, files, context?.systemPromptSuffix
-    )
+    const { sessionId } = await window.api.agent.start(folderPath, prompt, files, context?.systemPromptSuffix)
 
     const newSession: AgentSession = {
       id: sessionId,
@@ -259,7 +257,9 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
     const tabTitle = context
       ? `${context.label}: ${prompt.length > 20 ? prompt.slice(0, 20) + '...' : prompt}`
-      : (prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt)
+      : prompt.length > 30
+        ? prompt.slice(0, 30) + '...'
+        : prompt
     const newTab = createAgentTab(sessionId, tabTitle)
     const nextTabs = tabs.filter((tab) => !(tab.kind === 'agent' && tab.sessionId === 'new')).concat(newTab)
 
@@ -363,11 +363,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
     // Remove inline flag so it appears in the agent panel
     setAgentSessions((prev) =>
-      prev.map((s) =>
-        s.id === sessionId && s.context
-          ? { ...s, context: { ...s.context, inline: false } }
-          : s
-      )
+      prev.map((s) => (s.id === sessionId && s.context ? { ...s, context: { ...s.context, inline: false } } : s))
     )
     setActiveAgentSessionId(sessionId)
 
