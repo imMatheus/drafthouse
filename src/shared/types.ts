@@ -510,6 +510,12 @@ export interface AgentContext {
   label: string
   /** When true, session is rendered inline (e.g. in a PR view) and hidden from the agent panel */
   inline?: boolean
+  /** For diff-line sessions: the file path this session is anchored to */
+  filePath?: string
+  /** For diff-line sessions: the line number this session is anchored to */
+  lineNumber?: number
+  /** For diff-line sessions: which side of the diff ('LEFT' or 'RIGHT') */
+  side?: string
 }
 
 export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'

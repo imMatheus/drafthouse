@@ -9,11 +9,13 @@ import {
   FileMinus,
   FilePlus,
   Folder,
+  MessageSquare,
   Plus,
   Search,
   X
 } from 'lucide-react'
 import type {
+  AgentSession,
   AuthData,
   PullRequestDetail,
   PullRequestFile,
@@ -22,6 +24,8 @@ import type {
   PullRequestReviewEvent,
   PullRequestReviewLineSide
 } from '../../../../shared/types'
+import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
+import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import { cn } from '../../lib/cn'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
@@ -37,7 +41,12 @@ export default function PRFilesTab({
   repo,
   draftReviewComments,
   onDraftReviewCommentsChange,
-  threadJumpTarget
+  threadJumpTarget,
+  agentSessions,
+  onAskClaude,
+  onContinueAgent,
+  onStopAgent,
+  onPromoteAgent
 }: {
   pr: PullRequestDetail
   owner: string
@@ -45,6 +54,17 @@ export default function PRFilesTab({
   draftReviewComments: PullRequestReviewDraftComment[]
   onDraftReviewCommentsChange: (comments: PullRequestReviewDraftComment[]) => void
   threadJumpTarget: { path: string; commentId: number; nonce: number } | null
+  agentSessions?: AgentSession[]
+  onAskClaude?: (
+    prompt: string,
+    filePath: string,
+    lineNumber: number,
+    lineContent: string,
+    side: PullRequestReviewLineSide
+  ) => Promise<void>
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
 }) {
   const [filterValue, setFilterValue] = useState('')
   const [fileListCollapsed, setFileListCollapsed] = useState(false)
@@ -90,6 +110,11 @@ export default function PRFilesTab({
     const fileThreads = threadsByFile.get(thread.path) ?? []
     fileThreads.push(thread)
     threadsByFile.set(thread.path, fileThreads)
+  }
+
+  const commentCountsByFile = new Map<string, number>()
+  for (const comment of reviewComments ?? []) {
+    commentCountsByFile.set(comment.path, (commentCountsByFile.get(comment.path) ?? 0) + 1)
   }
 
   const threadsByKey = new Map<string, PullRequestReviewThread[]>()
@@ -210,14 +235,15 @@ export default function PRFilesTab({
     <>
       <div className="flex gap-2">
         <div className="sticky top-1 hidden h-[calc(100vh-11rem)] shrink-0 lg:flex">
-          {/* Collapse/expand toggle */}
-          <button
-            onClick={() => setFileListCollapsed(!fileListCollapsed)}
-            className="flex size-6 items-center justify-center self-start rounded text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
-            title={fileListCollapsed ? 'Show file list' : 'Hide file list'}
-          >
-            {fileListCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-          </button>
+          {fileListCollapsed ? (
+            <button
+              onClick={() => setFileListCollapsed(false)}
+              className="flex size-6 -translate-x-1.5 items-center justify-center self-start rounded text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+              title="Show file list"
+            >
+              <ChevronRight size={14} />
+            </button>
+          ) : null}
 
           <aside
             className={cn(
@@ -242,13 +268,25 @@ export default function PRFilesTab({
                   <X size={14} />
                 </button>
               ) : null}
+              <button
+                onClick={() => setFileListCollapsed(true)}
+                className="flex size-6 shrink-0 items-center justify-center rounded text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+                title="Hide file list"
+              >
+                <ChevronLeft size={14} />
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {filteredFiles.length === 0 && !isLoading ? (
                 <div className="px-3 py-4 text-xs text-foreground-muted">No files match this filter.</div>
               ) : (
-                <FileTree files={filteredFiles} activeFilePath={activeFilePath} onSelectFile={handleScrollToFile} />
+                <FileTree
+                  files={filteredFiles}
+                  activeFilePath={activeFilePath}
+                  commentCountsByFile={commentCountsByFile}
+                  onSelectFile={handleScrollToFile}
+                />
               )}
             </div>
 
@@ -290,6 +328,13 @@ export default function PRFilesTab({
                 draftCommentsByKey={draftCommentsByKey}
                 openCommentKey={openCommentKey}
                 onOpenComment={setOpenCommentKey}
+                onAskClaude={onAskClaude}
+                fileAgentSessions={(agentSessions ?? []).filter(
+                  (s) => s.context?.filePath === file.filename && s.context?.inline
+                )}
+                onContinueAgent={onContinueAgent}
+                onStopAgent={onStopAgent}
+                onPromoteAgent={onPromoteAgent}
                 onAddDraftComment={handleAddDraftComment}
                 onRemoveDraftComment={handleRemoveDraftComment}
                 onInlineCommentPosted={handleInlineCommentPosted}
@@ -350,6 +395,11 @@ function PullRequestFileDiffCard({
   draftCommentsByKey,
   openCommentKey,
   onOpenComment,
+  onAskClaude,
+  fileAgentSessions,
+  onContinueAgent,
+  onStopAgent,
+  onPromoteAgent,
   onAddDraftComment,
   onRemoveDraftComment,
   onInlineCommentPosted,
@@ -367,6 +417,17 @@ function PullRequestFileDiffCard({
   draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
   openCommentKey: string | null
   onOpenComment: (value: string | null) => void
+  onAskClaude?: (
+    prompt: string,
+    filePath: string,
+    lineNumber: number,
+    lineContent: string,
+    side: PullRequestReviewLineSide
+  ) => Promise<void>
+  fileAgentSessions: AgentSession[]
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
   onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
   onRemoveDraftComment: (index: number) => void
   onInlineCommentPosted: () => Promise<void>
@@ -446,6 +507,11 @@ function PullRequestFileDiffCard({
             draftCommentsByKey={draftCommentsByKey}
             openCommentKey={openCommentKey}
             onOpenComment={onOpenComment}
+            onAskClaude={onAskClaude}
+            fileAgentSessions={fileAgentSessions}
+            onContinueAgent={onContinueAgent}
+            onStopAgent={onStopAgent}
+            onPromoteAgent={onPromoteAgent}
             onAddDraftComment={onAddDraftComment}
             onRemoveDraftComment={onRemoveDraftComment}
             onInlineCommentPosted={onInlineCommentPosted}
@@ -466,6 +532,11 @@ function PullRequestFileDiffCard({
             draftCommentsByKey={draftCommentsByKey}
             openCommentKey={openCommentKey}
             onOpenComment={onOpenComment}
+            onAskClaude={onAskClaude}
+            fileAgentSessions={fileAgentSessions}
+            onContinueAgent={onContinueAgent}
+            onStopAgent={onStopAgent}
+            onPromoteAgent={onPromoteAgent}
             onAddDraftComment={onAddDraftComment}
             onRemoveDraftComment={onRemoveDraftComment}
             onInlineCommentPosted={onInlineCommentPosted}
@@ -502,10 +573,12 @@ function InlineDiffCommentComposer({
   commitId,
   path,
   line,
+  lineContent,
   side,
   onCancel,
   onAddDraftComment,
-  onInlineCommentPosted
+  onInlineCommentPosted,
+  onAskClaude
 }: {
   owner: string
   repo: string
@@ -513,17 +586,36 @@ function InlineDiffCommentComposer({
   commitId: string
   path: string
   line: number
+  lineContent: string
   side: PullRequestReviewLineSide
   onCancel: () => void
   onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
   onInlineCommentPosted: () => Promise<void>
+  onAskClaude?: (
+    prompt: string,
+    filePath: string,
+    lineNumber: number,
+    lineContent: string,
+    side: PullRequestReviewLineSide
+  ) => Promise<void>
 }) {
   const [body, setBody] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  const claudeMention = isClaudeMention(body)
+
   const handleAddSingleComment = async (): Promise<void> => {
     if (!body.trim() || isSubmitting) return
+
+    if (claudeMention && onAskClaude) {
+      const prompt = extractClaudePrompt(body)
+      if (!prompt) return
+      await onAskClaude(prompt, path, line, lineContent, side)
+      setBody('')
+      onCancel()
+      return
+    }
 
     setIsSubmitting(true)
     setErrorMessage(null)
@@ -550,16 +642,22 @@ function InlineDiffCommentComposer({
       <div className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
         Comment on {path}:{line}
       </div>
-      <textarea
+      <ClaudeMentionTextarea
         value={body}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={setBody}
         placeholder="Leave a comment"
-        className="min-h-28 w-full resize-y bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+        className="min-h-28"
+        menuLabel="Ask about this line"
+        enabled={!!onAskClaude}
       />
       {errorMessage ? <p className="px-4 text-sm text-danger">{errorMessage}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
         <p className="text-xs text-foreground-subtle">
-          {side === 'LEFT' ? 'Commenting on the deleted side' : 'Commenting on the updated side'}
+          {claudeMention
+            ? 'Claude will respond in the conversation tab with line context'
+            : side === 'LEFT'
+              ? 'Commenting on the deleted side'
+              : 'Commenting on the updated side'}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -569,25 +667,27 @@ function InlineDiffCommentComposer({
           >
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!body.trim()) return
-              onAddDraftComment({ body, path, line, side })
-              setBody('')
-            }}
-            disabled={!body.trim() || isSubmitting}
-            className="rounded-md border border-border bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Add to review
-          </button>
+          {!claudeMention && (
+            <button
+              type="button"
+              onClick={() => {
+                if (!body.trim()) return
+                onAddDraftComment({ body, path, line, side })
+                setBody('')
+              }}
+              disabled={!body.trim() || isSubmitting}
+              className="rounded-md border border-border bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Add to review
+            </button>
+          )}
           <button
             type="button"
             onClick={handleAddSingleComment}
             disabled={!body.trim() || isSubmitting}
             className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isSubmitting ? 'Adding...' : 'Add comment'}
+            {isSubmitting ? 'Adding...' : claudeMention ? 'Ask Claude' : 'Add comment'}
           </button>
         </div>
       </div>
@@ -801,10 +901,12 @@ function collapseSingleChildFolders(nodes: FileTreeNode[]): FileTreeNode[] {
 function FileTree({
   files,
   activeFilePath,
+  commentCountsByFile,
   onSelectFile
 }: {
   files: PullRequestFile[]
   activeFilePath: string | null
+  commentCountsByFile: Map<string, number>
   onSelectFile: (path: string) => void
 }) {
   const tree = buildFileTree(files)
@@ -818,6 +920,7 @@ function FileTree({
             file={node.file}
             depth={0}
             isActive={activeFilePath === node.path}
+            commentCount={commentCountsByFile.get(node.path) ?? 0}
             onClick={() => onSelectFile(node.path)}
           />
         ) : (
@@ -826,6 +929,7 @@ function FileTree({
             node={node}
             depth={0}
             activeFilePath={activeFilePath}
+            commentCountsByFile={commentCountsByFile}
             onSelectFile={onSelectFile}
           />
         )
@@ -838,11 +942,13 @@ function FileTreeFolder({
   node,
   depth,
   activeFilePath,
+  commentCountsByFile,
   onSelectFile
 }: {
   node: FileTreeNode
   depth: number
   activeFilePath: string | null
+  commentCountsByFile: Map<string, number>
   onSelectFile: (path: string) => void
 }) {
   const [isOpen, setIsOpen] = useState(true)
@@ -871,6 +977,7 @@ function FileTreeFolder({
                 file={child.file}
                 depth={depth + 1}
                 isActive={activeFilePath === child.path}
+                commentCount={commentCountsByFile.get(child.path) ?? 0}
                 onClick={() => onSelectFile(child.path)}
               />
             ) : (
@@ -879,6 +986,7 @@ function FileTreeFolder({
                 node={child}
                 depth={depth + 1}
                 activeFilePath={activeFilePath}
+                commentCountsByFile={commentCountsByFile}
                 onSelectFile={onSelectFile}
               />
             )
@@ -893,11 +1001,13 @@ function FileTreeFileButton({
   file,
   depth,
   isActive,
+  commentCount,
   onClick
 }: {
   file: PullRequestFile
   depth: number
   isActive: boolean
+  commentCount: number
   onClick: () => void
 }) {
   const name = file.filename.split('/').pop() ?? file.filename
@@ -907,13 +1017,19 @@ function FileTreeFileButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-1.5 py-1 text-left text-xs transition-colors',
+        'flex w-full items-center gap-1.5 py-1 pr-3 text-left text-xs transition-colors',
         isActive ? 'bg-surface-hover text-foreground' : 'text-foreground hover:bg-surface-hover'
       )}
       style={{ paddingLeft: 8 + depth * 16 + 20 }}
     >
       <FileStatusIcon status={file.status} />
-      <span className="truncate">{name}</span>
+      <span className="min-w-0 flex-1 truncate">{name}</span>
+      {commentCount > 0 ? (
+        <span className="flex shrink-0 items-center gap-1 text-foreground-subtle">
+          <MessageSquare size={12} />
+          <span className="text-[11px]">{commentCount}</span>
+        </span>
+      ) : null}
     </button>
   )
 }
@@ -970,6 +1086,11 @@ function UnifiedPRDiff({
   draftCommentsByKey,
   openCommentKey,
   onOpenComment,
+  onAskClaude,
+  fileAgentSessions,
+  onContinueAgent,
+  onStopAgent,
+  onPromoteAgent,
   onAddDraftComment,
   onRemoveDraftComment,
   onInlineCommentPosted,
@@ -988,6 +1109,17 @@ function UnifiedPRDiff({
   draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
   openCommentKey: string | null
   onOpenComment: (value: string | null) => void
+  onAskClaude?: (
+    prompt: string,
+    filePath: string,
+    lineNumber: number,
+    lineContent: string,
+    side: PullRequestReviewLineSide
+  ) => Promise<void>
+  fileAgentSessions: AgentSession[]
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
   onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
   onRemoveDraftComment: (index: number) => void
   onInlineCommentPosted: () => Promise<void>
@@ -1101,14 +1233,32 @@ function UnifiedPRDiff({
                             commitId={commitId}
                             path={filename}
                             line={line.commentLine}
+                            lineContent={line.content}
                             side={line.commentSide}
                             onCancel={() => onOpenComment(null)}
                             onAddDraftComment={onAddDraftComment}
                             onInlineCommentPosted={onInlineCommentPosted}
+                            onAskClaude={onAskClaude}
                           />
                         </td>
                       </tr>
                     ) : null}
+
+                    {line.commentLine &&
+                      fileAgentSessions
+                        .filter((s) => s.context?.lineNumber === line.commentLine)
+                        .map((session) => (
+                          <tr key={`agent-${session.id}`}>
+                            <td colSpan={3} className="bg-background px-3 py-3">
+                              <InlineAgentResponseCard
+                                session={session}
+                                onStop={() => onStopAgent?.(session.id)}
+                                onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                                onOpenInChat={() => onPromoteAgent?.(session.id)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
                   </Fragment>
                 )
               })}
@@ -1133,6 +1283,11 @@ function SplitPRDiff({
   draftCommentsByKey,
   openCommentKey,
   onOpenComment,
+  onAskClaude,
+  fileAgentSessions,
+  onContinueAgent,
+  onStopAgent,
+  onPromoteAgent,
   onAddDraftComment,
   onRemoveDraftComment,
   onInlineCommentPosted,
@@ -1151,6 +1306,17 @@ function SplitPRDiff({
   draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
   openCommentKey: string | null
   onOpenComment: (value: string | null) => void
+  onAskClaude?: (
+    prompt: string,
+    filePath: string,
+    lineNumber: number,
+    lineContent: string,
+    side: PullRequestReviewLineSide
+  ) => Promise<void>
+  fileAgentSessions: AgentSession[]
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
   onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
   onRemoveDraftComment: (index: number) => void
   onInlineCommentPosted: () => Promise<void>
@@ -1351,10 +1517,12 @@ function SplitPRDiff({
                         commitId={commitId}
                         path={filename}
                         line={pair.left.commentLine}
+                        lineContent={pair.left.content}
                         side={pair.left.commentSide}
                         onCancel={() => onOpenComment(null)}
                         onAddDraftComment={onAddDraftComment}
                         onInlineCommentPosted={onInlineCommentPosted}
+                        onAskClaude={onAskClaude}
                       />
                     </td>
                     <td colSpan={2} className="bg-background" />
@@ -1372,14 +1540,52 @@ function SplitPRDiff({
                         commitId={commitId}
                         path={filename}
                         line={pair.right.commentLine}
+                        lineContent={pair.right.content}
                         side={pair.right.commentSide}
                         onCancel={() => onOpenComment(null)}
                         onAddDraftComment={onAddDraftComment}
                         onInlineCommentPosted={onInlineCommentPosted}
+                        onAskClaude={onAskClaude}
                       />
                     </td>
                   </tr>
                 ) : null}
+
+                {fileAgentSessions
+                  .filter(
+                    (s) =>
+                      s.context?.lineNumber === pair.left?.commentLine ||
+                      s.context?.lineNumber === pair.right?.commentLine
+                  )
+                  .map((session) => (
+                    <tr key={`agent-${session.id}`}>
+                      {session.context?.side === 'RIGHT' ? (
+                        <>
+                          <td colSpan={2} className="bg-background" />
+                          <td colSpan={2} className="bg-background px-3 py-3">
+                            <InlineAgentResponseCard
+                              session={session}
+                              onStop={() => onStopAgent?.(session.id)}
+                              onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                              onOpenInChat={() => onPromoteAgent?.(session.id)}
+                            />
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td colSpan={2} className="bg-background px-3 py-3">
+                            <InlineAgentResponseCard
+                              session={session}
+                              onStop={() => onStopAgent?.(session.id)}
+                              onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                              onOpenInChat={() => onPromoteAgent?.(session.id)}
+                            />
+                          </td>
+                          <td colSpan={2} className="bg-background" />
+                        </>
+                      )}
+                    </tr>
+                  ))}
               </Fragment>
             )
           })}

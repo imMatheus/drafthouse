@@ -52,3 +52,48 @@ export function buildPullRequestAgentContext(params: {
     inline: true
   }
 }
+
+export function buildDiffLineAgentContext(params: {
+  owner: string
+  repo: string
+  pr: PullRequestDetail
+  filePath: string
+  lineNumber: number
+  lineContent: string
+  side: 'LEFT' | 'RIGHT'
+}): AgentContext {
+  const { owner, repo, pr, filePath, lineNumber, lineContent, side } = params
+  const sideLabel = side === 'LEFT' ? 'original (deleted)' : 'modified (added/current)'
+
+  const systemPromptSuffix = [
+    `You are assisting with a pull request code review on a specific line of code.`,
+    ``,
+    `## Pull Request Details`,
+    `- Repository: ${owner}/${repo}`,
+    `- PR #${pr.number}: ${pr.title}`,
+    `- Branch: \`${pr.head.ref}\` -> \`${pr.base.ref}\``,
+    ``,
+    `## Code Context`,
+    `- File: \`${filePath}\``,
+    `- Line ${lineNumber} (${sideLabel} side)`,
+    `\`\`\``,
+    lineContent,
+    `\`\`\``,
+    ``,
+    `## Instructions`,
+    `- The code for branch \`${pr.head.ref}\` is checked out in the working directory.`,
+    `- Read the full file \`${filePath}\` to understand the surrounding context.`,
+    `- You can run \`git diff ${pr.base.ref}...${pr.head.ref} -- ${filePath}\` to see the full diff for this file.`,
+    `- Focus your answer on the specific line and file referenced above.`
+  ].join('\n')
+
+  return {
+    source: 'pull-request',
+    systemPromptSuffix,
+    label: `PR #${pr.number}`,
+    inline: true,
+    filePath,
+    lineNumber,
+    side
+  }
+}
