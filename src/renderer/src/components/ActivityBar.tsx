@@ -38,7 +38,7 @@ export default function ActivityBar({ items, onSettingsClick, settingsActive }: 
             >
               <Icon size={18} strokeWidth={1.75} />
               {item.badge != null && item.badge > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-white">
+                <span className="absolute bottom-0.5 right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[8px] font-bold text-white">
                   {item.badge}
                 </span>
               )}

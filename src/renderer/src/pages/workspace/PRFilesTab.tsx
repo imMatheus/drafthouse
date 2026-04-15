@@ -208,7 +208,7 @@ export default function PRFilesTab({
 
   return (
     <>
-      <div className="flex gap-5">
+      <div className="flex gap-2">
         <div className="sticky top-1 hidden h-[calc(100vh-11rem)] shrink-0 lg:flex">
           {/* Collapse/expand toggle */}
           <button
@@ -1002,16 +1002,21 @@ function UnifiedPRDiff({
             <Fragment key={hunk.id}>
               {hunk.header ? (
                 <tr className="bg-interactive">
-                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">...</td>
-                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">...</td>
+                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                    ...
+                  </td>
+                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                    ...
+                  </td>
                   <td className="px-3 py-1.5 font-mono text-[13px] text-foreground-muted">{hunk.header}</td>
                 </tr>
               ) : null}
 
               {hunk.lines.map((line) => {
-                const rowKey = line.commentSide && line.commentLine
-                  ? getDiffThreadKey(filename, line.commentSide, line.commentLine)
-                  : null
+                const rowKey =
+                  line.commentSide && line.commentLine
+                    ? getDiffThreadKey(filename, line.commentSide, line.commentLine)
+                    : null
                 const rowThreads = rowKey ? (threadsByKey.get(rowKey) ?? []) : []
                 const draftComments = rowKey ? (draftCommentsByKey.get(rowKey) ?? []) : []
                 const isComposerOpen = rowKey != null && openCommentKey === rowKey
@@ -1032,9 +1037,13 @@ function UnifiedPRDiff({
                         ) : null}
                         {line.oldLineNumber ?? ''}
                       </td>
-                      <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">{line.newLineNumber ?? ''}</td>
+                      <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                        {line.newLineNumber ?? ''}
+                      </td>
                       <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
-                        <span className="mr-3 inline-block w-3 text-center text-foreground-muted">{getFileDiffPrefix(line.kind)}</span>
+                        <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
+                          {getFileDiffPrefix(line.kind)}
+                        </span>
                         <DiffLineContent tokens={tokenMap.get(line.id)} fallback={line.content} />
                       </td>
                     </tr>
@@ -1053,17 +1062,30 @@ function UnifiedPRDiff({
                           <div className="rounded-xl border border-border bg-surface">
                             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                               <div className="flex items-center gap-2">
-                                {auth?.user.avatar_url ? <img src={auth.user.avatar_url} alt={auth.user.login} className="size-7 rounded-full" /> : null}
+                                {auth?.user.avatar_url ? (
+                                  <img
+                                    src={auth.user.avatar_url}
+                                    alt={auth.user.login}
+                                    className="size-7 rounded-full"
+                                  />
+                                ) : null}
                                 <div className="text-sm text-foreground">
                                   <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
                                   <span className="text-foreground-muted">pending review comment</span>
                                 </div>
                               </div>
-                              <button type="button" onClick={() => onRemoveDraftComment(index)} className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground" aria-label="Remove draft comment">
+                              <button
+                                type="button"
+                                onClick={() => onRemoveDraftComment(index)}
+                                className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+                                aria-label="Remove draft comment"
+                              >
                                 <X size={14} />
                               </button>
                             </div>
-                            <div className="px-4 py-4"><MarkdownBody>{comment.body}</MarkdownBody></div>
+                            <div className="px-4 py-4">
+                              <MarkdownBody>{comment.body}</MarkdownBody>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -1073,8 +1095,13 @@ function UnifiedPRDiff({
                       <tr>
                         <td colSpan={3} className="bg-background px-3 py-3">
                           <InlineDiffCommentComposer
-                            owner={owner} repo={repo} number={number} commitId={commitId}
-                            path={filename} line={line.commentLine} side={line.commentSide}
+                            owner={owner}
+                            repo={repo}
+                            number={number}
+                            commitId={commitId}
+                            path={filename}
+                            line={line.commentLine}
+                            side={line.commentSide}
                             onCancel={() => onOpenComment(null)}
                             onAddDraftComment={onAddDraftComment}
                             onInlineCommentPosted={onInlineCommentPosted}
@@ -1133,7 +1160,7 @@ function SplitPRDiff({
   // Flatten all lines from all hunks and align deletions with additions
   const allLines = hunks.flatMap((h) => h.lines)
 
-  type AlignedPair = { left: typeof allLines[0] | null; right: typeof allLines[0] | null }
+  type AlignedPair = { left: (typeof allLines)[0] | null; right: (typeof allLines)[0] | null }
   const pairs: AlignedPair[] = []
   let i = 0
 
@@ -1178,12 +1205,14 @@ function SplitPRDiff({
         </colgroup>
         <tbody>
           {pairs.map((pair, idx) => {
-            const leftKey = pair.left?.commentSide && pair.left.commentLine
-              ? getDiffThreadKey(filename, pair.left.commentSide, pair.left.commentLine)
-              : null
-            const rightKey = pair.right?.commentSide && pair.right.commentLine
-              ? getDiffThreadKey(filename, pair.right.commentSide, pair.right.commentLine)
-              : null
+            const leftKey =
+              pair.left?.commentSide && pair.left.commentLine
+                ? getDiffThreadKey(filename, pair.left.commentSide, pair.left.commentLine)
+                : null
+            const rightKey =
+              pair.right?.commentSide && pair.right.commentLine
+                ? getDiffThreadKey(filename, pair.right.commentSide, pair.right.commentLine)
+                : null
 
             // Collect threads and drafts from both sides
             const leftThreads = leftKey ? (threadsByKey.get(leftKey) ?? []) : []
@@ -1201,10 +1230,12 @@ function SplitPRDiff({
               <Fragment key={idx}>
                 <tr>
                   {/* Left side (original) */}
-                  <td className={cn(
-                    'group/left relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
-                    pair.left?.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
-                  )}>
+                  <td
+                    className={cn(
+                      'group/left relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                      pair.left?.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
+                    )}
+                  >
                     {leftKey && pair.left ? (
                       <button
                         type="button"
@@ -1217,20 +1248,30 @@ function SplitPRDiff({
                     ) : null}
                     {pair.left?.oldLineNumber ?? ''}
                   </td>
-                  <td className={cn(
-                    'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
-                    pair.left?.kind === 'deletion' ? 'bg-danger/10 text-foreground' : pair.left ? 'bg-background text-foreground' : 'bg-surface'
-                  )}>
+                  <td
+                    className={cn(
+                      'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                      pair.left?.kind === 'deletion'
+                        ? 'bg-danger/10 text-foreground'
+                        : pair.left
+                          ? 'bg-background text-foreground'
+                          : 'bg-surface'
+                    )}
+                  >
                     {pair.left ? (
                       <DiffLineContent tokens={tokenMap.get(pair.left.id)} fallback={pair.left.content} />
-                    ) : '\u00A0'}
+                    ) : (
+                      '\u00A0'
+                    )}
                   </td>
 
                   {/* Right side (modified) */}
-                  <td className={cn(
-                    'group/right relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
-                    pair.right?.kind === 'addition' ? 'bg-success/10' : 'bg-background'
-                  )}>
+                  <td
+                    className={cn(
+                      'group/right relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                      pair.right?.kind === 'addition' ? 'bg-success/10' : 'bg-background'
+                    )}
+                  >
                     {rightKey && pair.right ? (
                       <button
                         type="button"
@@ -1243,13 +1284,21 @@ function SplitPRDiff({
                     ) : null}
                     {pair.right?.newLineNumber ?? ''}
                   </td>
-                  <td className={cn(
-                    'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
-                    pair.right?.kind === 'addition' ? 'bg-success/10 text-foreground' : pair.right ? 'bg-background text-foreground' : 'bg-surface'
-                  )}>
+                  <td
+                    className={cn(
+                      'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                      pair.right?.kind === 'addition'
+                        ? 'bg-success/10 text-foreground'
+                        : pair.right
+                          ? 'bg-background text-foreground'
+                          : 'bg-surface'
+                    )}
+                  >
                     {pair.right ? (
                       <DiffLineContent tokens={tokenMap.get(pair.right.id)} fallback={pair.right.content} />
-                    ) : '\u00A0'}
+                    ) : (
+                      '\u00A0'
+                    )}
                   </td>
                 </tr>
 
@@ -1267,17 +1316,26 @@ function SplitPRDiff({
                       <div className="rounded-xl border border-border bg-surface">
                         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                           <div className="flex items-center gap-2">
-                            {auth?.user.avatar_url ? <img src={auth.user.avatar_url} alt={auth.user.login} className="size-7 rounded-full" /> : null}
+                            {auth?.user.avatar_url ? (
+                              <img src={auth.user.avatar_url} alt={auth.user.login} className="size-7 rounded-full" />
+                            ) : null}
                             <div className="text-sm text-foreground">
                               <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
                               <span className="text-foreground-muted">pending review comment</span>
                             </div>
                           </div>
-                          <button type="button" onClick={() => onRemoveDraftComment(index)} className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground" aria-label="Remove draft comment">
+                          <button
+                            type="button"
+                            onClick={() => onRemoveDraftComment(index)}
+                            className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+                            aria-label="Remove draft comment"
+                          >
                             <X size={14} />
                           </button>
                         </div>
-                        <div className="px-4 py-4"><MarkdownBody>{comment.body}</MarkdownBody></div>
+                        <div className="px-4 py-4">
+                          <MarkdownBody>{comment.body}</MarkdownBody>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -1287,8 +1345,13 @@ function SplitPRDiff({
                   <tr>
                     <td colSpan={2} className="bg-background px-3 py-3">
                       <InlineDiffCommentComposer
-                        owner={owner} repo={repo} number={number} commitId={commitId}
-                        path={filename} line={pair.left.commentLine} side={pair.left.commentSide}
+                        owner={owner}
+                        repo={repo}
+                        number={number}
+                        commitId={commitId}
+                        path={filename}
+                        line={pair.left.commentLine}
+                        side={pair.left.commentSide}
                         onCancel={() => onOpenComment(null)}
                         onAddDraftComment={onAddDraftComment}
                         onInlineCommentPosted={onInlineCommentPosted}
@@ -1303,8 +1366,13 @@ function SplitPRDiff({
                     <td colSpan={2} className="bg-background" />
                     <td colSpan={2} className="bg-background px-3 py-3">
                       <InlineDiffCommentComposer
-                        owner={owner} repo={repo} number={number} commitId={commitId}
-                        path={filename} line={pair.right.commentLine} side={pair.right.commentSide}
+                        owner={owner}
+                        repo={repo}
+                        number={number}
+                        commitId={commitId}
+                        path={filename}
+                        line={pair.right.commentLine}
+                        side={pair.right.commentSide}
                         onCancel={() => onOpenComment(null)}
                         onAddDraftComment={onAddDraftComment}
                         onInlineCommentPosted={onInlineCommentPosted}
