@@ -57,11 +57,16 @@ function buildPromptWithFiles(prompt: string, files?: string[]): string {
 function buildCliArgs(options: {
   prompt: string
   resumeSessionId?: string
+  appendSystemPrompt?: string
 }): string[] {
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions']
 
   if (options.resumeSessionId) {
     args.push('--resume', options.resumeSessionId)
+  }
+
+  if (options.appendSystemPrompt) {
+    args.push('--append-system-prompt', options.appendSystemPrompt)
   }
 
   args.push(options.prompt)
@@ -138,14 +143,15 @@ export function startAgentSession(
   cwd: string,
   prompt: string,
   files: string[] | undefined,
-  webContents: WebContents
+  webContents: WebContents,
+  appendSystemPrompt?: string
 ): { sessionId: string } {
   const sessionId = randomUUID()
   const fullPrompt = buildPromptWithFiles(prompt, files)
 
   const child = spawn(
     'claude',
-    buildCliArgs({ prompt: fullPrompt }),
+    buildCliArgs({ prompt: fullPrompt, appendSystemPrompt }),
     { cwd, env: { ...process.env }, stdio: ['pipe', 'pipe', 'pipe'] }
   )
 
@@ -194,8 +200,8 @@ export function continueAgentSession(
 export function registerAgentHandlers(): void {
   ipcMain.handle(
     'agent:start',
-    (event, cwd: string, prompt: string, files?: string[]) => {
-      return startAgentSession(cwd, prompt, files, event.sender)
+    (event, cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string) => {
+      return startAgentSession(cwd, prompt, files, event.sender, appendSystemPrompt)
     }
   )
 

@@ -18,18 +18,23 @@ import {
   ListOrdered,
   MessageSquare,
   Pencil,
-  Quote
+  Quote,
+  Sparkles
 } from 'lucide-react'
 import type {
+  AgentContext,
   AuthData,
   PullRequestComment,
   PullRequestDetail,
+  PullRequestFile,
   PullRequestMergeMethod,
   PullRequestReview,
   PullRequestReviewComment,
   PullRequestReviewDraftComment
 } from '../../../../shared/types'
+import { buildPullRequestAgentContext } from '../../lib/agentContext'
 import { cn } from '../../lib/cn'
+import { extractClaudePrompt, isClaudeMention } from '../../lib/claudeMention'
 import type { PullRequestSubview } from '../../lib/workspaceTabs'
 import MarkdownBody from './MarkdownBody'
 import PRCommitsTab from './PRCommitsTab'
@@ -50,6 +55,7 @@ interface PullRequestDetailViewProps {
   onSubviewChange: (subview: PullRequestSubview) => void
   onTitleChange?: (title: string) => void
   onStateChange?: (prState: 'open' | 'closed' | 'merged' | 'draft') => void
+  onStartAgent?: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
 }
 
 export default function PullRequestDetailView({
@@ -59,7 +65,8 @@ export default function PullRequestDetailView({
   subview,
   onSubviewChange,
   onTitleChange,
-  onStateChange
+  onStateChange,
+  onStartAgent
 }: PullRequestDetailViewProps) {
   const [draftReviewComments, setDraftReviewComments] = useState<PullRequestReviewDraftComment[]>(
     []
@@ -206,6 +213,7 @@ export default function PullRequestDetailView({
                     nonce: Date.now()
                   })
                 }}
+                onStartAgent={onStartAgent}
               />
             </div>
             <div className="hidden w-48 shrink-0 lg:block">
@@ -267,12 +275,14 @@ function PRConversationTab({
   pr,
   owner,
   repo,
-  onViewReviewThread
+  onViewReviewThread,
+  onStartAgent
 }: {
   pr: PullRequestDetail
   owner: string
   repo: string
   onViewReviewThread: (thread: PullRequestReviewThread) => void
+  onStartAgent?: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
 }) {
   const {
     data: comments,
@@ -332,7 +342,7 @@ function PRConversationTab({
         />
       ))}
 
-      <CommentBox owner={owner} repo={repo} number={pr.number} />
+      <CommentBox owner={owner} repo={repo} number={pr.number} pr={pr} onStartAgent={onStartAgent} />
       <PRActionBar pr={pr} owner={owner} repo={repo} />
     </div>
   )
@@ -717,7 +727,19 @@ function PRDescriptionCard({
   )
 }
 
-function CommentBox({ owner, repo, number }: { owner: string; repo: string; number: number }) {
+function CommentBox({
+  owner,
+  repo,
+  number,
+  pr,
+  onStartAgent
+}: {
+  owner: string
+  repo: string
+  number: number
+  pr: PullRequestDetail
+  onStartAgent?: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
+}) {
   const [body, setBody] = useState('')
   const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -729,6 +751,27 @@ function CommentBox({ owner, repo, number }: { owner: string; repo: string; numb
     queryFn: () => window.api.auth.getUser(),
     retry: false
   })
+
+  const { data: prFiles } = useQuery<PullRequestFile[], Error>({
+    queryKey: ['pull-request-files', owner, repo, number],
+    queryFn: () => window.api.github.pulls.listFiles(owner, repo, number),
+    retry: false
+  })
+
+  const claudeMention = isClaudeMention(body)
+  const hasClaudePrefix = /^@claude/i.test(body.trimStart())
+
+  // Show autocomplete when user types @ at the start and it's a prefix of "@claude"
+  const mentionMatch = body.trimStart().match(/^@(\w*)$/)
+  const showMentionMenu =
+    !!onStartAgent &&
+    mentionMatch !== null &&
+    'claude'.startsWith(mentionMatch[1].toLowerCase())
+
+  const acceptMention = (): void => {
+    setBody('@claude ')
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
 
   const wrapSelection = (before: string, after: string, placeholder: string): void => {
     const textarea = textareaRef.current
@@ -768,6 +811,24 @@ function CommentBox({ owner, repo, number }: { owner: string; repo: string; numb
 
   const handleSubmit = async (): Promise<void> => {
     if (!body.trim() || isSubmitting) return
+
+    if (claudeMention && onStartAgent) {
+      const agentPrompt = extractClaudePrompt(body)
+      if (!agentPrompt) return
+
+      const context = buildPullRequestAgentContext({
+        owner,
+        repo,
+        pr,
+        files: prFiles
+      })
+
+      setBody('')
+      setActiveTab('write')
+      await onStartAgent(agentPrompt, undefined, context)
+      return
+    }
+
     setIsSubmitting(true)
     try {
       await window.api.github.pullComments.createIssueComment(owner, repo, number, body)
@@ -893,13 +954,63 @@ function CommentBox({ owner, repo, number }: { owner: string; repo: string; numb
         </div>
 
         {activeTab === 'write' ? (
-          <textarea
-            ref={textareaRef}
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="Add your comment here..."
-            className="min-h-[140px] w-full resize-y bg-transparent p-4 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
-          />
+          <div className="relative">
+            {/* Highlight overlay — mirrors textarea text with @claude in accent color */}
+            {hasClaudePrefix && (
+              <div
+                className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words p-4 text-sm"
+                aria-hidden
+              >
+                <span className="font-medium text-accent">
+                  {body.match(/^@claude/i)?.[0]}
+                </span>
+                <span className="text-foreground">
+                  {body.slice(body.match(/^@claude/i)?.[0]?.length ?? 0)}
+                </span>
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              onKeyDown={(e) => {
+                if (showMentionMenu && (e.key === 'Tab' || e.key === 'Enter')) {
+                  e.preventDefault()
+                  acceptMention()
+                }
+                if (showMentionMenu && e.key === 'Escape') {
+                  e.preventDefault()
+                  setBody('')
+                }
+              }}
+              placeholder="Add your comment here..."
+              className={cn(
+                'min-h-[140px] w-full resize-y bg-transparent p-4 text-sm placeholder:text-foreground-subtle focus:outline-none',
+                hasClaudePrefix ? 'text-transparent caret-foreground' : 'text-foreground'
+              )}
+            />
+            {/* Autocomplete dropdown */}
+            {showMentionMenu && (
+              <div className="absolute left-4 top-10 z-10 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    acceptMention()
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-surface-hover"
+                >
+                  <span className="flex size-6 items-center justify-center rounded-md bg-accent/15 text-accent">
+                    <Sparkles size={14} />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">claude</p>
+                    <p className="text-xs text-foreground-muted">Ask about this PR</p>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
           <div className="min-h-[140px]">
             {body ? (
@@ -911,13 +1022,17 @@ function CommentBox({ owner, repo, number }: { owner: string; repo: string; numb
         )}
 
         <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <p className="text-xs text-foreground-subtle">Markdown is supported</p>
+          <p className="text-xs text-foreground-subtle">
+            {claudeMention
+              ? 'This will open a Claude agent session with PR context'
+              : 'Markdown is supported'}
+          </p>
           <button
             onClick={handleSubmit}
             disabled={!body.trim() || isSubmitting}
             className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isSubmitting ? 'Commenting...' : 'Comment'}
+            {isSubmitting ? 'Commenting...' : claudeMention ? 'Ask Claude' : 'Comment'}
           </button>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Files, GitBranch, GitGraph, Terminal } from 'lucide-react'
 import { Navigate } from 'react-router-dom'
-import type { AgentSession, GitChangedFile, GitRepoInfo } from '../../../shared/types'
+import type { AgentContext, AgentSession, GitChangedFile, GitRepoInfo } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import ActivityBar from '../components/ActivityBar'
 import AgentPanel from '../components/AgentPanel'
@@ -47,10 +47,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([])
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
 
-  const {
-    data: gitInfo,
-    isLoading: isLoadingGitInfo
-  } = useQuery<GitRepoInfo | null, Error>({
+  const { data: gitInfo, isLoading: isLoadingGitInfo } = useQuery<GitRepoInfo | null, Error>({
     queryKey: ['git-info', folderPath],
     queryFn: () => window.api.fs.getGitInfo(folderPath),
     retry: false
@@ -188,9 +185,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
     onUpdateSession({
       ...session,
-      sidebar: isActive
-        ? { visible: false, activePanel: panel }
-        : { visible: true, activePanel: panel }
+      sidebar: isActive ? { visible: false, activePanel: panel } : { visible: true, activePanel: panel }
     })
   }
 
@@ -235,8 +230,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
   }
 
-  const handleStartAgent = async (prompt: string, files?: string[]): Promise<void> => {
-    const { sessionId } = await window.api.agent.start(folderPath, prompt, files)
+  const handleStartAgent = async (prompt: string, files?: string[], context?: AgentContext): Promise<void> => {
+    const { sessionId } = await window.api.agent.start(
+      folderPath, prompt, files, context?.systemPromptSuffix
+    )
 
     const newSession: AgentSession = {
       id: sessionId,
@@ -245,18 +242,19 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       startedAt: Date.now(),
       events: [],
       cliSessionId: null,
-      files: files ?? []
+      files: files ?? [],
+      context
     }
 
     setAgentSessions((prev) => [...prev, newSession])
     setActiveAgentSessionId(sessionId)
 
     // Replace the "new session" tab with the real session tab
-    const truncatedPrompt = prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt
-    const newTab = createAgentTab(sessionId, truncatedPrompt)
-    const nextTabs = tabs
-      .filter((tab) => !(tab.kind === 'agent' && tab.sessionId === 'new'))
-      .concat(newTab)
+    const tabTitle = context
+      ? `${context.label}: ${prompt.length > 20 ? prompt.slice(0, 20) + '...' : prompt}`
+      : (prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt)
+    const newTab = createAgentTab(sessionId, tabTitle)
+    const nextTabs = tabs.filter((tab) => !(tab.kind === 'agent' && tab.sessionId === 'new')).concat(newTab)
 
     onUpdateSession({
       ...session,
@@ -265,21 +263,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
-  const handleContinueAgent = async (
-    agentSessionId: string,
-    prompt: string,
-    files?: string[]
-  ): Promise<void> => {
+  const handleContinueAgent = async (agentSessionId: string, prompt: string, files?: string[]): Promise<void> => {
     const existingSession = agentSessions.find((s) => s.id === agentSessionId)
     if (!existingSession?.cliSessionId) return
 
-    await window.api.agent.continue(
-      existingSession.id,
-      existingSession.cliSessionId,
-      folderPath,
-      prompt,
-      files
-    )
+    await window.api.agent.continue(existingSession.id, existingSession.cliSessionId, folderPath, prompt, files)
 
     // Mark session as running again and add a synthetic user message
     setAgentSessions((prev) =>
@@ -309,9 +297,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     setActiveAgentSessionId(sessionId)
     const agentSession = agentSessions.find((s) => s.id === sessionId)
     if (agentSession) {
-      const truncatedPrompt = agentSession.prompt.length > 30
-        ? agentSession.prompt.slice(0, 30) + '...'
-        : agentSession.prompt
+      const truncatedPrompt =
+        agentSession.prompt.length > 30 ? agentSession.prompt.slice(0, 30) + '...' : agentSession.prompt
       openOrFocusTab(createAgentTab(sessionId, truncatedPrompt))
     }
   }
@@ -324,9 +311,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const handleStopAgent = async (sessionId: string): Promise<void> => {
     await window.api.agent.stop(sessionId)
 
-    setAgentSessions((prev) =>
-      prev.map((s) => (s.id === sessionId ? { ...s, status: 'cancelled' as const } : s))
-    )
+    setAgentSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'cancelled' as const } : s)))
   }
 
   const handlePullRequestSubviewChange = (tabId: WorkspaceTab['id'], subview: PullRequestSubview): void => {
@@ -452,7 +437,14 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
               onCloseTab={handleCloseTab}
             />
 
-            <main className={cn('min-h-0 flex-1', (activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent') ? 'overflow-hidden' : 'overflow-y-auto p-6')}>
+            <main
+              className={cn(
+                'min-h-0 flex-1',
+                activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent'
+                  ? 'overflow-hidden'
+                  : 'overflow-y-auto p-5'
+              )}
+            >
               {renderWorkspaceTabContent({
                 activeTab,
                 folderPath,
@@ -495,7 +487,7 @@ function renderWorkspaceTabContent({
   isLoadingGitInfo: boolean
   agentSessions: AgentSession[]
   onOpenFile: (path: string) => void
-  onStartAgent: (prompt: string, files?: string[]) => Promise<void>
+  onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent: (sessionId: string) => Promise<void>
   onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void
@@ -518,12 +510,7 @@ function renderWorkspaceTabContent({
       return <FilesView filePath={activeTab.path} folderPath={folderPath} />
     case 'diff':
       return (
-        <DiffView
-          filePath={activeTab.path}
-          folderPath={folderPath}
-          staged={activeTab.staged}
-          onOpenFile={onOpenFile}
-        />
+        <DiffView filePath={activeTab.path} folderPath={folderPath} staged={activeTab.staged} onOpenFile={onOpenFile} />
       )
     case 'pull-request':
       if (isLoadingGitInfo) {
@@ -539,6 +526,7 @@ function renderWorkspaceTabContent({
           onSubviewChange={(subview) => onPullRequestSubviewChange(activeTab.id, subview)}
           onTitleChange={(title) => onPullRequestTitleChange(activeTab.id, title)}
           onStateChange={(prState) => onPullRequestStateChange(activeTab.id, prState)}
+          onStartAgent={onStartAgent}
         />
       ) : (
         <PlaceholderView title="Pull Request" description="Repository metadata is not available." />

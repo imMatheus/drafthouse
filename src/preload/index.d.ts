@@ -432,7 +432,7 @@ interface GitAPI {
 // ============================================================
 
 interface AgentAPI {
-  start: (cwd: string, prompt: string, files?: string[]) => Promise<{ sessionId: string }>
+  start: (cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string) => Promise<{ sessionId: string }>
   continue: (
     sessionId: string,
     cliSessionId: string,

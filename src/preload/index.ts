@@ -418,8 +418,8 @@ const api = {
     }
   },
   agent: {
-    start: (cwd: string, prompt: string, files?: string[]): Promise<unknown> =>
-      ipcRenderer.invoke('agent:start', cwd, prompt, files),
+    start: (cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string): Promise<unknown> =>
+      ipcRenderer.invoke('agent:start', cwd, prompt, files, appendSystemPrompt),
     continue: (
       sessionId: string,
       cliSessionId: string,

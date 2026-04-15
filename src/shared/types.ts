@@ -487,6 +487,15 @@ export interface ReviewRequestsResult {
 // Agent (Claude CLI stream-json events)
 // ============================================================
 
+export interface AgentContext {
+  /** e.g. "pull-request", "issue", "source-control" */
+  source: string
+  /** Text appended to the Claude system prompt via --append-system-prompt */
+  systemPromptSuffix: string
+  /** Human-readable label shown in the agent tab title, e.g. "PR #42" */
+  label: string
+}
+
 export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'
 
 export interface AgentSessionSummary {
@@ -591,4 +600,5 @@ export interface AgentSession {
   events: AgentStreamEvent[]
   cliSessionId: string | null
   files: string[]
+  context?: AgentContext
 }
