@@ -49,7 +49,12 @@ export function buildPullRequestAgentContext(params: {
     source: 'pull-request',
     systemPromptSuffix,
     label: `PR #${pr.number}`,
-    inline: true
+    inline: true,
+    prNumber: pr.number,
+    prTitle: pr.title,
+    headBranch: pr.head.ref,
+    baseBranch: pr.base.ref,
+    repoFullName: `${owner}/${repo}`
   }
 }
 
@@ -94,6 +99,11 @@ export function buildDiffLineAgentContext(params: {
     inline: true,
     filePath,
     lineNumber,
-    side
+    side,
+    prNumber: pr.number,
+    prTitle: pr.title,
+    headBranch: pr.head.ref,
+    baseBranch: pr.base.ref,
+    repoFullName: `${owner}/${repo}`
   }
 }

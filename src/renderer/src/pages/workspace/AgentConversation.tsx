@@ -42,19 +42,19 @@ export default function AgentConversation({ session }: AgentConversationProps) {
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-6">
         {/* Initial user prompt */}
-        <div className="mb-6 flex justify-end">
-          <div className="max-w-[80%] rounded-2xl bg-surface px-4 py-2.5">
-            {session.files.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {session.files.map((filePath) => (
-                  <FileAttachment key={filePath} filePath={filePath} />
-                ))}
-              </div>
-            )}
-            {session.prompt && (
+        <div className="mb-6 flex flex-col items-end gap-2">
+          {session.files.length > 0 && (
+            <div className="flex max-w-[80%] flex-wrap gap-1.5">
+              {session.files.map((filePath) => (
+                <FileAttachment key={filePath} filePath={filePath} />
+              ))}
+            </div>
+          )}
+          {session.prompt && (
+            <div className="max-w-[80%] rounded-2xl bg-surface px-4 py-2.5">
               <p className="text-sm text-foreground whitespace-pre-wrap">{session.prompt}</p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Events */}
@@ -113,8 +113,15 @@ function FileAttachment({ filePath }: { filePath: string }) {
 
   if (isImage) {
     return (
-      <div className="size-16 overflow-hidden rounded-md border border-border">
-        {dataUrl && <img src={dataUrl} alt={fileName} className="size-full object-cover" />}
+      <div className="overflow-hidden rounded-md border border-border">
+        {dataUrl ? (
+          <img src={dataUrl} alt={fileName} className="max-h-48 max-w-xs object-contain" />
+        ) : (
+          <div className="flex items-center gap-1.5 px-2 py-1">
+            <FileText size={12} className="shrink-0 text-foreground-subtle" />
+            <span className="text-xs text-foreground-muted">{fileName}</span>
+          </div>
+        )}
       </div>
     )
   }

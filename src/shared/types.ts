@@ -516,6 +516,12 @@ export interface AgentContext {
   lineNumber?: number
   /** For diff-line sessions: which side of the diff ('LEFT' or 'RIGHT') */
   side?: string
+  /** Display info for the context banner in the agent chat view */
+  prNumber?: number
+  prTitle?: string
+  headBranch?: string
+  baseBranch?: string
+  repoFullName?: string
 }
 
 export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'

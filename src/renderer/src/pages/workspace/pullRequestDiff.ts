@@ -108,15 +108,7 @@ export function parsePullRequestFileDiff(file: PullRequestFile): ParsedPullReque
     }
 
     if (rawLine.startsWith('\\')) {
-      currentHunk.lines.push({
-        id: `${currentHunk.id}-line-${lineIndex}`,
-        kind: 'meta',
-        content: rawLine,
-        oldLineNumber: null,
-        newLineNumber: null,
-        commentSide: null,
-        commentLine: null
-      })
+      // Skip git metadata lines like "\ No newline at end of file"
       continue
     }
 
