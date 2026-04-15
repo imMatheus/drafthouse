@@ -1196,15 +1196,13 @@ function SplitPRDiff({
 
             const isLeftComposerOpen = leftKey != null && openCommentKey === leftKey
             const isRightComposerOpen = rightKey != null && openCommentKey === rightKey
-            const activeComposerKey = isLeftComposerOpen ? leftKey : isRightComposerOpen ? rightKey : null
-            const activeComposerLine = isLeftComposerOpen ? pair.left : isRightComposerOpen ? pair.right : null
 
             return (
               <Fragment key={idx}>
-                <tr className="group/left group/right">
+                <tr>
                   {/* Left side (original) */}
                   <td className={cn(
-                    'group/left-gutter relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    'group/left relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
                     pair.left?.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
                   )}>
                     {leftKey && pair.left ? (
@@ -1230,7 +1228,7 @@ function SplitPRDiff({
 
                   {/* Right side (modified) */}
                   <td className={cn(
-                    'group/right-gutter relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                    'group/right relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
                     pair.right?.kind === 'addition' ? 'bg-success/10' : 'bg-background'
                   )}>
                     {rightKey && pair.right ? (
@@ -1285,12 +1283,28 @@ function SplitPRDiff({
                   </tr>
                 ))}
 
-                {activeComposerKey && activeComposerLine?.commentSide && activeComposerLine.commentLine ? (
+                {isLeftComposerOpen && leftKey && pair.left?.commentSide && pair.left.commentLine ? (
                   <tr>
-                    <td colSpan={4} className="bg-background px-3 py-3">
+                    <td colSpan={2} className="bg-background px-3 py-3">
                       <InlineDiffCommentComposer
                         owner={owner} repo={repo} number={number} commitId={commitId}
-                        path={filename} line={activeComposerLine.commentLine} side={activeComposerLine.commentSide}
+                        path={filename} line={pair.left.commentLine} side={pair.left.commentSide}
+                        onCancel={() => onOpenComment(null)}
+                        onAddDraftComment={onAddDraftComment}
+                        onInlineCommentPosted={onInlineCommentPosted}
+                      />
+                    </td>
+                    <td colSpan={2} className="bg-background" />
+                  </tr>
+                ) : null}
+
+                {isRightComposerOpen && rightKey && pair.right?.commentSide && pair.right.commentLine ? (
+                  <tr>
+                    <td colSpan={2} className="bg-background" />
+                    <td colSpan={2} className="bg-background px-3 py-3">
+                      <InlineDiffCommentComposer
+                        owner={owner} repo={repo} number={number} commitId={commitId}
+                        path={filename} line={pair.right.commentLine} side={pair.right.commentSide}
                         onCancel={() => onOpenComment(null)}
                         onAddDraftComment={onAddDraftComment}
                         onInlineCommentPosted={onInlineCommentPosted}

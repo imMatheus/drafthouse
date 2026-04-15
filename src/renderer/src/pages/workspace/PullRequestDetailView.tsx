@@ -17,6 +17,7 @@ import {
   List,
   ListOrdered,
   MessageSquare,
+  Pencil,
   Quote
 } from 'lucide-react'
 import type {
@@ -311,20 +312,7 @@ function PRConversationTab({
 
   return (
     <div className="flex flex-col gap-4">
-      {pr.body ? (
-        <div className="rounded-lg border border-border bg-surface">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-            <img src={pr.user.avatar_url} alt={pr.user.login} className="size-6 rounded-full" />
-            <span className="text-sm font-medium text-foreground">{pr.user.login}</span>
-            <span className="text-xs text-foreground-subtle">
-              commented {formatRelativeTime(pr.created_at)}
-            </span>
-          </div>
-          <MarkdownBody>{pr.body}</MarkdownBody>
-        </div>
-      ) : (
-        <p className="text-sm text-foreground-subtle">No description provided.</p>
-      )}
+      <PRDescriptionCard pr={pr} owner={owner} repo={repo} />
 
       {conversationError ? (
         <div className="rounded-lg border border-border bg-surface px-4 py-3">
@@ -535,6 +523,198 @@ function formatReviewStateLabel(state: string): string {
     default:
       return state
   }
+}
+
+function PRDescriptionCard({
+  pr,
+  owner,
+  repo
+}: {
+  pr: PullRequestDetail
+  owner: string
+  repo: string
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editBody, setEditBody] = useState(pr.body ?? '')
+  const [editTab, setEditTab] = useState<'write' | 'preview'>('write')
+  const [isSaving, setIsSaving] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const queryClient = useQueryClient()
+
+  const handleEdit = (): void => {
+    setEditBody(pr.body ?? '')
+    setEditTab('write')
+    setIsEditing(true)
+  }
+
+  const handleCancel = (): void => {
+    setIsEditing(false)
+  }
+
+  const handleSave = async (): Promise<void> => {
+    if (isSaving) return
+    setIsSaving(true)
+    try {
+      await window.api.github.pulls.update(owner, repo, pr.number, { body: editBody })
+      setIsEditing(false)
+      queryClient.invalidateQueries({ queryKey: ['pull-request', owner, repo, pr.number] })
+    } catch (err) {
+      console.error('Failed to update PR description:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const wrapSelection = (before: string, after: string, placeholder: string): void => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = editBody.substring(start, end)
+    const content = selected || placeholder
+    const newText = editBody.substring(0, start) + before + content + after + editBody.substring(end)
+    setEditBody(newText)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      if (selected) {
+        textarea.setSelectionRange(start + before.length, start + before.length + content.length)
+      } else {
+        textarea.setSelectionRange(start + before.length, start + before.length + placeholder.length)
+      }
+    })
+  }
+
+  const insertAtLineStart = (prefix: string): void => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const lineStart = editBody.lastIndexOf('\n', start - 1) + 1
+    const newText = editBody.substring(0, lineStart) + prefix + editBody.substring(lineStart)
+    setEditBody(newText)
+    requestAnimationFrame(() => {
+      textarea.focus()
+      const pos = start + prefix.length
+      textarea.setSelectionRange(pos, pos)
+    })
+  }
+
+  const toolbarBtnClass =
+    'rounded p-1.5 text-foreground-muted hover:bg-surface-hover hover:text-foreground transition-colors'
+
+  if (isEditing) {
+    return (
+      <div className="rounded-lg border border-border bg-surface">
+        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+          <div className="flex">
+            <button
+              onClick={() => setEditTab('write')}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                editTab === 'write' ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              Write
+            </button>
+            <button
+              onClick={() => setEditTab('preview')}
+              className={cn(
+                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                editTab === 'preview' ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              Preview
+            </button>
+          </div>
+
+          {editTab === 'write' ? (
+            <div className="flex items-center gap-0.5">
+              <button type="button" title="Heading" className={toolbarBtnClass} onClick={() => insertAtLineStart('### ')}>
+                <Heading size={14} />
+              </button>
+              <button type="button" title="Bold" className={toolbarBtnClass} onClick={() => wrapSelection('**', '**', 'bold text')}>
+                <Bold size={14} />
+              </button>
+              <button type="button" title="Italic" className={toolbarBtnClass} onClick={() => wrapSelection('_', '_', 'italic text')}>
+                <Italic size={14} />
+              </button>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <button type="button" title="Unordered list" className={toolbarBtnClass} onClick={() => insertAtLineStart('- ')}>
+                <List size={14} />
+              </button>
+              <button type="button" title="Ordered list" className={toolbarBtnClass} onClick={() => insertAtLineStart('1. ')}>
+                <ListOrdered size={14} />
+              </button>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <button type="button" title="Code" className={toolbarBtnClass} onClick={() => wrapSelection('`', '`', 'code')}>
+                <Code size={14} />
+              </button>
+              <button type="button" title="Link" className={toolbarBtnClass} onClick={() => wrapSelection('[', '](url)', 'link text')}>
+                <Link size={14} />
+              </button>
+              <button type="button" title="Quote" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')}>
+                <Quote size={14} />
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        {editTab === 'write' ? (
+          <textarea
+            ref={textareaRef}
+            value={editBody}
+            onChange={(e) => setEditBody(e.target.value)}
+            placeholder="Add a description..."
+            className="min-h-[180px] w-full resize-y bg-transparent p-4 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+          />
+        ) : (
+          <div className="min-h-[180px]">
+            {editBody ? <MarkdownBody>{editBody}</MarkdownBody> : <p className="p-4 text-foreground-subtle">Nothing to preview</p>}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+          <button
+            onClick={handleCancel}
+            disabled={isSaving}
+            className="rounded-md bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-hover disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void handleSave()}
+            disabled={isSaving}
+            className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:opacity-40"
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <img src={pr.user.avatar_url} alt={pr.user.login} className="size-6 rounded-full" />
+        <span className="text-sm font-medium text-foreground">{pr.user.login}</span>
+        <span className="text-xs text-foreground-subtle">
+          commented {formatRelativeTime(pr.created_at)}
+        </span>
+        <button
+          onClick={handleEdit}
+          className="ml-auto rounded p-1 text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+          title="Edit description"
+        >
+          <Pencil size={14} />
+        </button>
+      </div>
+      {pr.body ? (
+        <MarkdownBody>{pr.body}</MarkdownBody>
+      ) : (
+        <p className="p-4 text-sm text-foreground-subtle">No description provided.</p>
+      )}
+    </div>
+  )
 }
 
 function CommentBox({ owner, repo, number }: { owner: string; repo: string; number: number }) {
