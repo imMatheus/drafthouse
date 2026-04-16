@@ -309,11 +309,62 @@ export default function MonacoDiffWithComments({
 
       const lineContent = modified.split('\n')[lineNumber - 1] ?? ''
 
-      const zoneEntry = createViewZone(
-        modifiedEditor,
-        'modified',
-        lineNumber,
-        () => (
+      const zoneEntry = createViewZone(modifiedEditor, 'modified', lineNumber, () => (
+        <>
+          {threads.map((thread) => (
+            <div key={`thread-${thread.id}`} ref={(el) => p.threadRef(thread.id, el)}>
+              {p.renderInlineThread(thread, p.replyTarget)}
+            </div>
+          ))}
+          {drafts.map(({ comment, index }) => (
+            <div key={`draft-${key}-${index}`}>
+              {p.renderDraftComment({ comment, index, auth: p.auth, onRemove: p.onRemoveDraftComment })}
+            </div>
+          ))}
+          {isComposerOpen
+            ? p.renderCommentComposer({
+                owner: p.owner,
+                repo: p.repo,
+                number: p.number,
+                commitId: p.commitId,
+                path: p.filename,
+                line: lineNumber,
+                lineContent,
+                side: 'RIGHT',
+                onCancel: () => p.onOpenComment(null),
+                onAddDraftComment: p.onAddDraftComment,
+                onInlineCommentPosted: p.onInlineCommentPosted,
+                onAskClaude: p.onAskClaude
+              })
+            : null}
+          {agentSessions.map((session) => (
+            <div key={`agent-${session.id}`}>
+              {p.renderAgentCard({
+                session,
+                onStop: () => p.onStopAgent?.(session.id),
+                onContinue: (prompt) => p.onContinueAgent?.(session.id, prompt),
+                onOpenInChat: () => p.onPromoteAgent?.(session.id)
+              })}
+            </div>
+          ))}
+        </>
+      ))
+      if (zoneEntry) newZones.push(zoneEntry)
+    }
+
+    // Process LEFT side lines (original editor) - only in split mode
+    if (p.renderSideBySide) {
+      for (let lineNumber = 1; lineNumber <= originalLineCount; lineNumber++) {
+        const key = getDiffThreadKey(p.filename, 'LEFT', lineNumber)
+        const threads = p.threadsByKey.get(key) ?? []
+        const drafts = p.draftCommentsByKey.get(key) ?? []
+        const isComposerOpen = p.openCommentKey === key
+
+        if (threads.length === 0 && drafts.length === 0 && !isComposerOpen) continue
+
+        const lineContent = original.split('\n')[lineNumber - 1] ?? ''
+
+        const zoneEntry = createViewZone(originalEditor, 'original', lineNumber, () => (
           <>
             {threads.map((thread) => (
               <div key={`thread-${thread.id}`} ref={(el) => p.threadRef(thread.id, el)}>
@@ -334,76 +385,15 @@ export default function MonacoDiffWithComments({
                   path: p.filename,
                   line: lineNumber,
                   lineContent,
-                  side: 'RIGHT',
+                  side: 'LEFT',
                   onCancel: () => p.onOpenComment(null),
                   onAddDraftComment: p.onAddDraftComment,
                   onInlineCommentPosted: p.onInlineCommentPosted,
                   onAskClaude: p.onAskClaude
                 })
               : null}
-            {agentSessions.map((session) => (
-              <div key={`agent-${session.id}`}>
-                {p.renderAgentCard({
-                  session,
-                  onStop: () => p.onStopAgent?.(session.id),
-                  onContinue: (prompt) => p.onContinueAgent?.(session.id, prompt),
-                  onOpenInChat: () => p.onPromoteAgent?.(session.id)
-                })}
-              </div>
-            ))}
           </>
-        )
-      )
-      if (zoneEntry) newZones.push(zoneEntry)
-    }
-
-    // Process LEFT side lines (original editor) - only in split mode
-    if (p.renderSideBySide) {
-      for (let lineNumber = 1; lineNumber <= originalLineCount; lineNumber++) {
-        const key = getDiffThreadKey(p.filename, 'LEFT', lineNumber)
-        const threads = p.threadsByKey.get(key) ?? []
-        const drafts = p.draftCommentsByKey.get(key) ?? []
-        const isComposerOpen = p.openCommentKey === key
-
-        if (threads.length === 0 && drafts.length === 0 && !isComposerOpen) continue
-
-        const lineContent = original.split('\n')[lineNumber - 1] ?? ''
-
-        const zoneEntry = createViewZone(
-          originalEditor,
-          'original',
-          lineNumber,
-          () => (
-            <>
-              {threads.map((thread) => (
-                <div key={`thread-${thread.id}`} ref={(el) => p.threadRef(thread.id, el)}>
-                  {p.renderInlineThread(thread, p.replyTarget)}
-                </div>
-              ))}
-              {drafts.map(({ comment, index }) => (
-                <div key={`draft-${key}-${index}`}>
-                  {p.renderDraftComment({ comment, index, auth: p.auth, onRemove: p.onRemoveDraftComment })}
-                </div>
-              ))}
-              {isComposerOpen
-                ? p.renderCommentComposer({
-                    owner: p.owner,
-                    repo: p.repo,
-                    number: p.number,
-                    commitId: p.commitId,
-                    path: p.filename,
-                    line: lineNumber,
-                    lineContent,
-                    side: 'LEFT',
-                    onCancel: () => p.onOpenComment(null),
-                    onAddDraftComment: p.onAddDraftComment,
-                    onInlineCommentPosted: p.onInlineCommentPosted,
-                    onAskClaude: p.onAskClaude
-                  })
-                : null}
-            </>
-          )
-        )
+        ))
         if (zoneEntry) newZones.push(zoneEntry)
       }
     } else {
@@ -468,9 +458,7 @@ export default function MonacoDiffWithComments({
     domNode.style.zIndex = '10'
 
     const root = createRoot(domNode)
-    root.render(
-      <div className="px-3 py-2">{renderContent()}</div>
-    )
+    root.render(<div className="px-3 py-2">{renderContent()}</div>)
 
     // Observe the domNode's size so we can update the view zone height dynamically
     const observer = new ResizeObserver((entries) => {

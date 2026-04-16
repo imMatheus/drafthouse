@@ -339,9 +339,9 @@ const api = {
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
     readDir: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir', path),
+    readDirRecursive: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir-recursive', path),
     readFile: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-file', path),
-    writeFile: (path: string, content: string): Promise<unknown> =>
-      ipcRenderer.invoke('fs:write-file', path, content),
+    writeFile: (path: string, content: string): Promise<unknown> => ipcRenderer.invoke('fs:write-file', path, content),
     getRecentFolders: (): Promise<unknown> => ipcRenderer.invoke('fs:get-recent-folders'),
     openRecent: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:open-recent', path),
     getGitInfo: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:get-git-info', path),

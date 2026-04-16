@@ -395,6 +395,7 @@ interface AgentAPI {
 interface FsAPI {
   openFolder: () => Promise<string | null>
   readDir: (path: string) => Promise<FileEntry[]>
+  readDirRecursive: (path: string) => Promise<string[]>
   readFile: (path: string) => Promise<string>
   writeFile: (path: string, content: string) => Promise<void>
   getRecentFolders: () => Promise<string[]>

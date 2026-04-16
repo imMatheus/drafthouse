@@ -6,6 +6,7 @@ import { Navigate } from 'react-router-dom'
 import type { AgentContext, AgentSession, GitChangedFile, GitRepoInfo } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import ActivityBar from '../components/ActivityBar'
+import CommandPalette from '../components/CommandPalette'
 import AgentPanel from '../components/AgentPanel'
 import ExplorerPanel from '../components/ExplorerPanel'
 import PullRequestsPanel from '../components/PullRequestsPanel'
@@ -46,6 +47,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   // Agent state
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([])
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
   const { data: gitInfo, isLoading: isLoadingGitInfo } = useQuery<GitRepoInfo | null, Error>({
     queryKey: ['git-info', folderPath],
@@ -209,6 +211,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault()
         handleToggleSidebarVisibility()
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen((prev) => !prev)
       }
     }
 
@@ -490,6 +496,17 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           </div>
         </>
       )}
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        folderPath={folderPath}
+        gitInfo={gitInfo}
+        agentSessions={agentSessions}
+        onOpenFile={handleOpenFile}
+        onOpenPullRequest={handleOpenPullRequest}
+        onSelectAgentSession={handleSelectAgentSession}
+      />
     </div>
   )
 }

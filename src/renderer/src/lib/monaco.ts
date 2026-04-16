@@ -1,4 +1,12 @@
 import * as monaco from 'monaco-editor'
+// @ts-expect-error — no type declarations for this ESM entry point
+import {
+  typescriptDefaults,
+  javascriptDefaults,
+  JsxEmit,
+  ScriptTarget,
+  ModuleResolutionKind
+} from 'monaco-editor/esm/vs/language/typescript/monaco.contribution'
 import { loader } from '@monaco-editor/react'
 import { getLanguageFromPath } from './shiki'
 
@@ -9,35 +17,50 @@ loader.config({ monaco })
 window.MonacoEnvironment = {
   getWorker(_workerId: string, label: string) {
     if (label === 'typescript' || label === 'javascript') {
-      return new Worker(
-        new URL('monaco-editor/esm/vs/language/typescript/ts.worker.js', import.meta.url),
-        { type: 'module' }
-      )
+      return new Worker(new URL('monaco-editor/esm/vs/language/typescript/ts.worker.js', import.meta.url), {
+        type: 'module'
+      })
     }
     if (label === 'json') {
-      return new Worker(
-        new URL('monaco-editor/esm/vs/language/json/json.worker.js', import.meta.url),
-        { type: 'module' }
-      )
+      return new Worker(new URL('monaco-editor/esm/vs/language/json/json.worker.js', import.meta.url), {
+        type: 'module'
+      })
     }
     if (label === 'css' || label === 'scss' || label === 'less') {
-      return new Worker(
-        new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url),
-        { type: 'module' }
-      )
+      return new Worker(new URL('monaco-editor/esm/vs/language/css/css.worker.js', import.meta.url), { type: 'module' })
     }
     if (label === 'html' || label === 'handlebars' || label === 'razor') {
-      return new Worker(
-        new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url),
-        { type: 'module' }
-      )
+      return new Worker(new URL('monaco-editor/esm/vs/language/html/html.worker.js', import.meta.url), {
+        type: 'module'
+      })
     }
-    return new Worker(
-      new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url),
-      { type: 'module' }
-    )
+    return new Worker(new URL('monaco-editor/esm/vs/editor/editor.worker.js', import.meta.url), { type: 'module' })
   }
 }
+
+// Configure TypeScript/JavaScript to support JSX and disable diagnostics
+// (we're a file viewer, not a full IDE — no tsconfig or node_modules available)
+typescriptDefaults.setCompilerOptions({
+  jsx: JsxEmit.ReactJSX,
+  allowJs: true,
+  allowNonTsExtensions: true,
+  target: ScriptTarget.ESNext,
+  moduleResolution: ModuleResolutionKind.NodeJs
+})
+typescriptDefaults.setDiagnosticsOptions({
+  noSemanticValidation: true,
+  noSyntaxValidation: true
+})
+javascriptDefaults.setCompilerOptions({
+  jsx: JsxEmit.ReactJSX,
+  allowJs: true,
+  allowNonTsExtensions: true,
+  target: ScriptTarget.ESNext
+})
+javascriptDefaults.setDiagnosticsOptions({
+  noSemanticValidation: true,
+  noSyntaxValidation: true
+})
 
 // GitHub Dark theme
 monaco.editor.defineTheme('drafthouse-dark', {
@@ -149,8 +172,38 @@ export function getMonacoTheme(appTheme: 'dark' | 'light'): string {
   return appTheme === 'dark' ? 'drafthouse-dark' : 'drafthouse-light'
 }
 
+// Monaco uses different language IDs than Shiki for some languages.
+// Map Shiki IDs to Monaco IDs where they differ.
+const SHIKI_TO_MONACO: Record<string, string> = {
+  tsx: 'typescript',
+  jsx: 'javascript',
+  bash: 'shell',
+  zsh: 'shell',
+  fish: 'shell',
+  jsonc: 'json',
+  sass: 'scss',
+  proto: 'protobuf',
+  makefile: 'shell',
+  cmake: 'plaintext',
+  gitignore: 'plaintext',
+  dockerignore: 'plaintext',
+  dotenv: 'ini',
+  log: 'plaintext',
+  nim: 'plaintext',
+  zig: 'plaintext',
+  prisma: 'plaintext',
+  terraform: 'hcl',
+  svelte: 'html',
+  vue: 'html',
+  ocaml: 'fsharp',
+  haskell: 'plaintext',
+  erlang: 'plaintext',
+  toml: 'ini'
+}
+
 export function getMonacoLanguage(filePath: string): string {
-  return getLanguageFromPath(filePath)
+  const shikiLang = getLanguageFromPath(filePath)
+  return SHIKI_TO_MONACO[shikiLang] ?? shikiLang
 }
 
 export const BASE_EDITOR_OPTIONS: monaco.editor.IStandaloneEditorConstructionOptions = {

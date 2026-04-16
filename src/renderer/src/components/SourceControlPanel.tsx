@@ -1,23 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronRight,
-  FileDiff,
-  FilePlus,
-  FileQuestion,
-  FileX,
-  GitBranch,
-  Minus,
-  Plus,
-  Undo2,
-  X
-} from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ChevronRight, GitBranch, Minus, Plus, Undo2, X } from 'lucide-react'
 import type { GitBranchInfo, GitChangedFile, GitStatusCode } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
+import { FileIcon } from './FileIcon'
 
 interface SourceControlPanelProps {
   folderPath: string
@@ -403,11 +390,11 @@ function FileRow({
   return (
     <div className="group flex items-center gap-1 py-[3px] pl-6 pr-2 hover:bg-surface-hover">
       <button onClick={onOpenDiff} className="flex flex-1 items-center gap-1.5 overflow-hidden text-left">
-        <StatusIcon status={status} />
+        <FileIcon name={displayName} />
         <span className="truncate text-xs text-foreground">{displayName}</span>
         {dirPath ? <span className="truncate text-[10px] text-foreground-subtle">{dirPath}</span> : null}
       </button>
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+      <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
         {onDiscard ? (
           <button
             onClick={onDiscard}
@@ -428,25 +415,6 @@ function FileRow({
       <StatusBadge status={status} />
     </div>
   )
-}
-
-function StatusIcon({ status }: { status: GitStatusCode | ' ' }) {
-  switch (status) {
-    case 'M':
-      return <FileDiff size={14} className="shrink-0 text-accent" />
-    case 'A':
-      return <FilePlus size={14} className="shrink-0 text-success" />
-    case 'D':
-      return <FileX size={14} className="shrink-0 text-danger" />
-    case 'R':
-      return <FileDiff size={14} className="shrink-0 text-purple" />
-    case '?':
-      return <FileQuestion size={14} className="shrink-0 text-success" />
-    case 'U':
-      return <FileDiff size={14} className="shrink-0 text-danger" />
-    default:
-      return <FileDiff size={14} className="shrink-0 text-foreground-subtle" />
-  }
 }
 
 function StatusBadge({ status }: { status: GitStatusCode | ' ' }) {
