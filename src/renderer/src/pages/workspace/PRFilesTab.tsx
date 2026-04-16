@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronDown,
@@ -33,13 +33,21 @@ import { useTheme } from '../../hooks/useTheme'
 import { getLanguageFromPath, tokenizeCode, tokenizeDiffHunks, type HighlightedToken } from '../../lib/shiki'
 import MarkdownBody from './MarkdownBody'
 import ReviewThreadCard from './ReviewThreadCard'
-import { getDiffThreadKey, parsePullRequestFileDiff, type ParsedDiffHunk, type ParsedDiffLine } from './pullRequestDiff'
+import {
+  getDiffThreadKey,
+  parsePullRequestFileDiff,
+  type ParsedDiffHunk,
+  type ParsedDiffLine,
+  type ParsedPullRequestFileDiff
+} from './pullRequestDiff'
 import {
   buildPullRequestReviewThreads,
   DiffStat,
   formatRelativeTime,
   type PullRequestReviewThread
 } from './pullRequestShared'
+
+const EMPTY_FILES: PullRequestFile[] = []
 
 // ────────────────────────────────────────────────────────────
 // Main PRFilesTab (unchanged from before)
@@ -109,10 +117,11 @@ export default function PRFilesTab({
     retry: false
   })
 
-  const allFiles = files ?? []
-  const filteredFiles = allFiles.filter((file) =>
-    file.filename.toLowerCase().includes(filterValue.trim().toLowerCase())
-  )
+  const allFiles = files ?? EMPTY_FILES
+  const trimmedFilter = filterValue.trim().toLowerCase()
+  const filteredFiles =
+    trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
+  const fileTree = useMemo(() => buildFileTree(filteredFiles), [filteredFiles])
   const reviewThreads = buildPullRequestReviewThreads(reviewComments ?? [])
 
   const threadsByFile = new Map<string, PullRequestReviewThread[]>()
@@ -270,7 +279,7 @@ export default function PRFilesTab({
                 <div className="px-3 py-4 text-xs text-foreground-muted">No files match this filter.</div>
               ) : (
                 <FileTree
-                  files={filteredFiles}
+                  tree={fileTree}
                   activeFilePath={activeFilePath}
                   commentCountsByFile={commentCountsByFile}
                   onSelectFile={handleScrollToFile}
@@ -415,7 +424,8 @@ function PullRequestFileDiffCard({
 }) {
   const { theme } = useTheme()
   const { settings } = useSettings()
-  const parsedDiff = parsePullRequestFileDiff(file)
+  const diffShape = useMemo(() => buildDiffShape(file), [file.patch, file.filename])
+  const { parsed: parsedDiff, hunkGaps, beforeFirstGap, gapAfterByStartLine, pairsByHunkId } = diffShape
   const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set())
   const [expandedLines, setExpandedLines] = useState<Map<string, ExpandedContextLines>>(new Map())
@@ -423,7 +433,7 @@ function PullRequestFileDiffCard({
   useEffect(() => {
     const lang = getLanguageFromPath(file.filename)
     tokenizeDiffHunks(parsedDiff.hunks, lang, theme).then(setTokenMap)
-  }, [file.patch, file.filename, theme])
+  }, [parsedDiff, theme])
 
   // Lazily fetch full file content for expanding gaps
   const { data: fullFileContent } = useQuery<string, Error>({
@@ -486,8 +496,15 @@ function PullRequestFileDiffCard({
   const unanchoredThreads = fileThreads.filter((thread) => !anchoredThreadIds.has(thread.id))
   const replyTarget = { owner, repo, number }
 
-  // Compute gaps between hunks for expand separators
-  const hunkGaps = computeHunkGaps(parsedDiff.hunks)
+  // Index agent sessions by line number so diff rows don't filter the whole list each render
+  const sessionsByLineNumber = new Map<number, AgentSession[]>()
+  for (const session of fileAgentSessions) {
+    const lineNum = session.context?.lineNumber
+    if (typeof lineNum !== 'number') continue
+    const bucket = sessionsByLineNumber.get(lineNum)
+    if (bucket) bucket.push(session)
+    else sessionsByLineNumber.set(lineNum, [session])
+  }
 
   const diffProps = {
     hunks: parsedDiff.hunks,
@@ -503,7 +520,7 @@ function PullRequestFileDiffCard({
     openCommentKey,
     onOpenComment,
     onAskClaude,
-    fileAgentSessions,
+    sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
     onPromoteAgent,
@@ -513,6 +530,9 @@ function PullRequestFileDiffCard({
     replyTarget,
     threadRef,
     hunkGaps,
+    beforeFirstGap,
+    gapAfterByStartLine,
+    pairsByHunkId,
     expandedGaps,
     expandedLines,
     onExpandGap: handleExpandGap
@@ -597,6 +617,35 @@ interface ExpandedContextLines {
   tokens: HighlightedToken[][] | null
 }
 
+type AlignedPair = { left: ParsedDiffLine | null; right: ParsedDiffLine | null }
+
+interface DiffShape {
+  parsed: ParsedPullRequestFileDiff
+  hunkGaps: HunkGap[]
+  beforeFirstGap: HunkGap | null
+  gapAfterByStartLine: Map<number, HunkGap>
+  pairsByHunkId: Map<string, AlignedPair[]>
+}
+
+function buildDiffShape(file: PullRequestFile): DiffShape {
+  const parsed = parsePullRequestFileDiff(file)
+  const hunkGaps = computeHunkGaps(parsed.hunks)
+
+  let beforeFirstGap: HunkGap | null = null
+  const gapAfterByStartLine = new Map<number, HunkGap>()
+  for (const gap of hunkGaps) {
+    if (gap.afterNewLine === 1) beforeFirstGap = gap
+    else gapAfterByStartLine.set(gap.afterNewLine, gap)
+  }
+
+  const pairsByHunkId = new Map<string, AlignedPair[]>()
+  for (const hunk of parsed.hunks) {
+    pairsByHunkId.set(hunk.id, computeSplitPairs(hunk.lines))
+  }
+
+  return { parsed, hunkGaps, beforeFirstGap, gapAfterByStartLine, pairsByHunkId }
+}
+
 function computeHunkGaps(hunks: ParsedDiffHunk[]): HunkGap[] {
   const gaps: HunkGap[] = []
 
@@ -643,19 +692,42 @@ function computeHunkGaps(hunks: ParsedDiffHunk[]): HunkGap[] {
   return gaps
 }
 
-function getGapBetweenHunks(hunkGaps: HunkGap[], prevHunk: ParsedDiffHunk, nextHunk: ParsedDiffHunk): HunkGap | null {
+function getGapAfterHunk(gapAfterByStartLine: Map<number, HunkGap>, prevHunk: ParsedDiffHunk): HunkGap | null {
   const lastLine = prevHunk.lines[prevHunk.lines.length - 1]
-  const nextFirstLine = nextHunk.lines[0]
-  if (!lastLine || !nextFirstLine) return null
-
-  const lastNewLine = (lastLine.newLineNumber ?? lastLine.oldLineNumber ?? 0) + 1
-  const nextNewLine = nextFirstLine.newLineNumber ?? nextFirstLine.oldLineNumber ?? 0
-
-  return hunkGaps.find((g) => g.afterNewLine === lastNewLine && g.beforeNewLine === nextNewLine) ?? null
+  if (!lastLine) return null
+  const afterNewLine = (lastLine.newLineNumber ?? lastLine.oldLineNumber ?? 0) + 1
+  return gapAfterByStartLine.get(afterNewLine) ?? null
 }
 
-function getGapBeforeFirstHunk(hunkGaps: HunkGap[]): HunkGap | null {
-  return hunkGaps.find((g) => g.afterNewLine === 1) ?? null
+function computeSplitPairs(lines: ParsedDiffLine[]): AlignedPair[] {
+  const pairs: AlignedPair[] = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.kind === 'context' || line.kind === 'meta' || line.kind === 'hunk') {
+      pairs.push({ left: line, right: line })
+      i++
+      continue
+    }
+    const deletions: ParsedDiffLine[] = []
+    const additions: ParsedDiffLine[] = []
+    while (i < lines.length && lines[i].kind === 'deletion') {
+      deletions.push(lines[i])
+      i++
+    }
+    while (i < lines.length && lines[i].kind === 'addition') {
+      additions.push(lines[i])
+      i++
+    }
+    const maxLen = Math.max(deletions.length, additions.length)
+    for (let j = 0; j < maxLen; j++) {
+      pairs.push({
+        left: j < deletions.length ? deletions[j] : null,
+        right: j < additions.length ? additions[j] : null
+      })
+    }
+  }
+  return pairs
 }
 
 // ────────────────────────────────────────────────────────────
@@ -682,7 +754,7 @@ interface HunkDiffProps {
     lineContent: string,
     side: PullRequestReviewLineSide
   ) => Promise<void>
-  fileAgentSessions: AgentSession[]
+  sessionsByLineNumber: Map<number, AgentSession[]>
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent?: (sessionId: string) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void
@@ -692,6 +764,9 @@ interface HunkDiffProps {
   replyTarget: { owner: string; repo: string; number: number }
   threadRef: (commentId: number, element: HTMLElement | null) => void
   hunkGaps: HunkGap[]
+  beforeFirstGap: HunkGap | null
+  gapAfterByStartLine: Map<number, HunkGap>
+  pairsByHunkId: Map<string, AlignedPair[]>
   expandedGaps: Set<string>
   expandedLines: Map<string, ExpandedContextLines>
   onExpandGap: (gapKey: string) => void
@@ -813,7 +888,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
     openCommentKey,
     onOpenComment,
     onAskClaude,
-    fileAgentSessions,
+    sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
     onPromoteAgent,
@@ -822,13 +897,14 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
     onInlineCommentPosted,
     replyTarget,
     threadRef,
-    hunkGaps,
+    beforeFirstGap,
+    gapAfterByStartLine,
     expandedGaps,
     expandedLines,
     onExpandGap
   } = props
 
-  const beforeGap = getGapBeforeFirstHunk(hunkGaps)
+  const beforeGap = beforeFirstGap
 
   return (
     <div className="overflow-x-auto">
@@ -939,10 +1015,8 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                       </tr>
                     ) : null}
 
-                    {line.commentLine &&
-                      fileAgentSessions
-                        .filter((s) => s.context?.lineNumber === line.commentLine)
-                        .map((session) => (
+                    {line.commentLine
+                      ? (sessionsByLineNumber.get(line.commentLine) ?? []).map((session) => (
                           <tr key={`agent-${session.id}`}>
                             <td colSpan={3} className="bg-background px-3 py-3">
                               <InlineAgentResponseCard
@@ -953,7 +1027,8 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                               />
                             </td>
                           </tr>
-                        ))}
+                        ))
+                      : null}
                   </Fragment>
                 )
               })}
@@ -961,7 +1036,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
               {/* Expand separator between this hunk and the next */}
               {hunkIndex < hunks.length - 1
                 ? (() => {
-                    const gap = getGapBetweenHunks(hunkGaps, hunk, hunks[hunkIndex + 1])
+                    const gap = getGapAfterHunk(gapAfterByStartLine, hunk)
                     if (!gap) return null
                     return (
                       <>
@@ -1005,7 +1080,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
     openCommentKey,
     onOpenComment,
     onAskClaude,
-    fileAgentSessions,
+    sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
     onPromoteAgent,
@@ -1014,13 +1089,15 @@ function SplitHunkDiff(props: HunkDiffProps) {
     onInlineCommentPosted,
     replyTarget,
     threadRef,
-    hunkGaps,
+    beforeFirstGap,
+    gapAfterByStartLine,
+    pairsByHunkId,
     expandedGaps,
     expandedLines,
     onExpandGap
   } = props
 
-  const beforeGap = getGapBeforeFirstHunk(hunkGaps)
+  const beforeGap = beforeFirstGap
 
   return (
     <div className="overflow-hidden">
@@ -1047,37 +1124,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
           ) : null}
 
           {hunks.map((hunk, hunkIndex) => {
-            // Align deletions with additions for split view
-            const allLines = hunk.lines
-            type AlignedPair = { left: (typeof allLines)[0] | null; right: (typeof allLines)[0] | null }
-            const pairs: AlignedPair[] = []
-            let i = 0
-
-            while (i < allLines.length) {
-              const line = allLines[i]
-              if (line.kind === 'context' || line.kind === 'meta' || line.kind === 'hunk') {
-                pairs.push({ left: line, right: line })
-                i++
-                continue
-              }
-              const deletions: typeof allLines = []
-              const additions: typeof allLines = []
-              while (i < allLines.length && allLines[i].kind === 'deletion') {
-                deletions.push(allLines[i])
-                i++
-              }
-              while (i < allLines.length && allLines[i].kind === 'addition') {
-                additions.push(allLines[i])
-                i++
-              }
-              const maxLen = Math.max(deletions.length, additions.length)
-              for (let j = 0; j < maxLen; j++) {
-                pairs.push({
-                  left: j < deletions.length ? deletions[j] : null,
-                  right: j < additions.length ? additions[j] : null
-                })
-              }
-            }
+            const pairs = pairsByHunkId.get(hunk.id) ?? []
 
             return (
               <Fragment key={hunk.id}>
@@ -1266,13 +1313,14 @@ function SplitHunkDiff(props: HunkDiffProps) {
                         </tr>
                       ) : null}
 
-                      {fileAgentSessions
-                        .filter(
-                          (s) =>
-                            s.context?.lineNumber === pair.left?.commentLine ||
-                            s.context?.lineNumber === pair.right?.commentLine
-                        )
-                        .map((session) => (
+                      {(() => {
+                        const leftLine = pair.left?.commentLine
+                        const rightLine = pair.right?.commentLine
+                        const leftSessions = leftLine != null ? (sessionsByLineNumber.get(leftLine) ?? []) : []
+                        const rightSessions =
+                          rightLine != null && rightLine !== leftLine ? (sessionsByLineNumber.get(rightLine) ?? []) : []
+                        const pairSessions = leftSessions.length === 0 ? rightSessions : leftSessions.concat(rightSessions)
+                        return pairSessions.map((session) => (
                           <tr key={`agent-${session.id}`}>
                             {session.context?.side === 'RIGHT' ? (
                               <>
@@ -1300,14 +1348,15 @@ function SplitHunkDiff(props: HunkDiffProps) {
                               </>
                             )}
                           </tr>
-                        ))}
+                        ))
+                      })()}
                     </Fragment>
                   )
                 })}
 
                 {hunkIndex < hunks.length - 1
                   ? (() => {
-                      const gap = getGapBetweenHunks(hunkGaps, hunk, hunks[hunkIndex + 1])
+                      const gap = getGapAfterHunk(gapAfterByStartLine, hunk)
                       if (!gap) return null
                       return (
                         <>
@@ -1796,17 +1845,16 @@ function collapseSingleChildFolders(nodes: FileTreeNode[]): FileTreeNode[] {
 }
 
 function FileTree({
-  files,
+  tree,
   activeFilePath,
   commentCountsByFile,
   onSelectFile
 }: {
-  files: PullRequestFile[]
+  tree: FileTreeNode[]
   activeFilePath: string | null
   commentCountsByFile: Map<string, number>
   onSelectFile: (path: string) => void
 }) {
-  const tree = buildFileTree(files)
   return (
     <div className="py-1">
       {tree.map((node) =>

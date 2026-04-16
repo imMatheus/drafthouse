@@ -440,7 +440,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           ) : null}
 
           {sidebar.visible && sidebar.activePanel === 'source-control' ? (
-            <SourceControlPanel folderPath={folderPath} onOpenDiff={handleOpenDiff} />
+            <SourceControlPanel folderPath={folderPath} gitInfo={gitInfo} onOpenDiff={handleOpenDiff} onOpenPullRequest={handleOpenPullRequest} />
           ) : null}
 
           {sidebar.visible && sidebar.activePanel === 'pull-requests' ? (
