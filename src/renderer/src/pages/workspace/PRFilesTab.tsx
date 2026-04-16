@@ -29,6 +29,7 @@ import type {
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import { FolderIcon } from '../../components/FileIcon'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
+import ReactionBar from '../../components/ReactionBar'
 import { cn } from '../../lib/cn'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
@@ -860,11 +861,11 @@ function ExpandedContextRows({
         const lineTokens = data.tokens?.[i]
         return (
           <tr key={`expanded-${gapKey}-${i}`} className="bg-background">
-            <td className="border-border text-foreground-subtle w-12 border-r px-3 py-0 text-right font-mono text-xs select-none">
+            <td className="text-foreground-subtle w-12 px-3 py-0 text-center font-mono text-xs select-none">
               {lineNum}
             </td>
             {colSpan >= 3 ? (
-              <td className="border-border text-foreground-subtle w-12 border-r px-3 py-0 text-right font-mono text-xs select-none">
+              <td className="text-foreground-subtle w-12 px-3 py-0 text-center font-mono text-xs select-none">
                 {lineNum}
               </td>
             ) : null}
@@ -884,6 +885,12 @@ function getFileDiffRowClassName(kind: ParsedDiffLine['kind']): string {
   if (kind === 'deletion') return 'bg-danger/10'
   if (kind === 'meta') return 'bg-surface'
   return 'bg-background'
+}
+
+function getFileDiffLineNumClassName(kind: ParsedDiffLine['kind']): string {
+  if (kind === 'addition') return 'bg-success/20'
+  if (kind === 'deletion') return 'bg-danger/20'
+  return ''
 }
 
 function getFileDiffPrefix(kind: ParsedDiffLine['kind']): string {
@@ -952,12 +959,8 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
             <Fragment key={hunk.id}>
               {hunk.header ? (
                 <tr className="bg-interactive">
-                  <td className="border-border text-foreground-subtle w-12 border-r px-3 py-1.5 text-right font-mono text-xs">
-                    ...
-                  </td>
-                  <td className="border-border text-foreground-subtle w-12 border-r px-3 py-1.5 text-right font-mono text-xs">
-                    ...
-                  </td>
+                  <td className="text-foreground-subtle w-12 px-3 py-1.5 text-center font-mono text-xs">...</td>
+                  <td className="text-foreground-subtle w-12 px-3 py-1.5 text-center font-mono text-xs">...</td>
                   <td className="text-foreground-muted px-3 py-1.5 font-mono text-[13px]">{hunk.header}</td>
                 </tr>
               ) : null}
@@ -974,7 +977,12 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                 return (
                   <Fragment key={line.id}>
                     <tr className={cn('group', getFileDiffRowClassName(line.kind))}>
-                      <td className="border-border text-foreground-subtle relative w-12 border-r px-3 py-0 text-right font-mono text-xs">
+                      <td
+                        className={cn(
+                          'text-foreground-subtle relative w-12 px-3 py-0 text-center font-mono text-xs',
+                          getFileDiffLineNumClassName(line.kind)
+                        )}
+                      >
                         {rowKey ? (
                           <button
                             type="button"
@@ -987,7 +995,12 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                         ) : null}
                         {line.oldLineNumber ?? ''}
                       </td>
-                      <td className="border-border text-foreground-subtle w-12 border-r px-3 py-0 text-right font-mono text-xs">
+                      <td
+                        className={cn(
+                          'text-foreground-subtle w-12 px-3 py-0 text-center font-mono text-xs',
+                          getFileDiffLineNumClassName(line.kind)
+                        )}
+                      >
                         {line.newLineNumber ?? ''}
                       </td>
                       <td className="text-foreground px-3 py-0 font-mono text-[13px] whitespace-pre">
@@ -1000,7 +1013,10 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
                     {rowThreads.map((thread) => (
                       <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                        <td colSpan={3} className="border-border bg-background border-b px-4 py-1">
+                        <td
+                          colSpan={3}
+                          className={cn('border-border border-b px-4 py-2', getFileDiffRowClassName(line.kind))}
+                        >
                           <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                         </td>
                       </tr>
@@ -1008,7 +1024,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
                     {draftComments.map(({ comment, index }) => (
                       <tr key={`draft-${rowKey}-${index}`}>
-                        <td colSpan={3} className="bg-background px-3 py-3">
+                        <td colSpan={3} className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
                           <DraftCommentCard
                             comment={comment}
                             auth={auth}
@@ -1020,7 +1036,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
                     {isComposerOpen && rowKey && line.commentSide && line.commentLine ? (
                       <tr>
-                        <td colSpan={3} className="bg-background px-3 py-3">
+                        <td colSpan={3} className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
                           <InlineDiffCommentComposer
                             owner={owner}
                             repo={repo}
@@ -1042,7 +1058,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                     {line.commentLine
                       ? (sessionsByLineNumber.get(line.commentLine) ?? []).map((session) => (
                           <tr key={`agent-${session.id}`}>
-                            <td colSpan={3} className="bg-background px-3 py-3">
+                            <td colSpan={3} className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
                               <InlineAgentResponseCard
                                 session={session}
                                 onStop={() => onStopAgent?.(session.id)}
@@ -1176,7 +1192,6 @@ function SplitHunkDiff(props: HunkDiffProps) {
 
                   const leftDrafts = leftKey ? (draftCommentsByKey.get(leftKey) ?? []) : []
                   const rightDrafts = rightKey && rightKey !== leftKey ? (draftCommentsByKey.get(rightKey) ?? []) : []
-                  const draftComments = [...leftDrafts, ...rightDrafts]
 
                   const isLeftComposerOpen = leftKey != null && openCommentKey === leftKey
                   const isRightComposerOpen = rightKey != null && openCommentKey === rightKey
@@ -1186,8 +1201,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       <tr>
                         <td
                           className={cn(
-                            'group/left border-border text-foreground-subtle relative border-r px-2 py-0 text-right font-mono text-xs',
-                            pair.left?.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
+                            'group/left text-foreground-subtle relative px-2 py-0 text-center font-mono text-xs',
+                            pair.left?.kind === 'deletion' ? 'bg-danger/20' : 'bg-background'
                           )}
                         >
                           {leftKey && pair.left ? (
@@ -1220,8 +1235,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
                         </td>
                         <td
                           className={cn(
-                            'group/right border-border text-foreground-subtle relative border-r px-2 py-0 text-right font-mono text-xs',
-                            pair.right?.kind === 'addition' ? 'bg-success/10' : 'bg-background'
+                            'group/right text-foreground-subtle relative px-1 py-0 text-center font-mono text-xs',
+                            pair.right?.kind === 'addition' ? 'bg-success/20' : 'bg-background'
                           )}
                         >
                           {rightKey && pair.right ? (
@@ -1260,19 +1275,19 @@ function SplitHunkDiff(props: HunkDiffProps) {
                           <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
                             {isLeft ? (
                               <>
-                                <td className="border-border border-r" />
-                                <td className="border-border border-r px-3 py-2 align-top">
+                                <td className="bg-danger/20" />
+                                <td className="border-border border-r bg-danger/10 p-1.5 align-top">
                                   <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                                 </td>
-                                <td className="border-border border-r" />
-                                <td />
+                                <td className="bg-success/20" />
+                                <td className="bg-success/10" />
                               </>
                             ) : (
                               <>
-                                <td className="border-border border-r" />
-                                <td className="border-border border-r" />
-                                <td className="border-border border-r" />
-                                <td className="px-3 py-2 align-top">
+                                <td className="bg-danger/20" />
+                                <td className="border-border border-r bg-danger/10" />
+                                <td className="bg-success/20" />
+                                <td className="bg-success/10 px-3 py-2 align-top">
                                   <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                                 </td>
                               </>
@@ -1281,9 +1296,22 @@ function SplitHunkDiff(props: HunkDiffProps) {
                         )
                       })}
 
-                      {draftComments.map(({ comment, index }) => (
-                        <tr key={`draft-${index}`}>
-                          <td colSpan={4} className="bg-background px-3 py-3">
+                      {leftDrafts.map(({ comment, index }) => (
+                        <tr key={`draft-left-${index}`}>
+                          <td colSpan={2} className="bg-danger/10 px-3 py-3">
+                            <DraftCommentCard
+                              comment={comment}
+                              auth={auth}
+                              onRemove={() => onRemoveDraftComment(index)}
+                            />
+                          </td>
+                          <td colSpan={2} className="bg-success/10" />
+                        </tr>
+                      ))}
+                      {rightDrafts.map(({ comment, index }) => (
+                        <tr key={`draft-right-${index}`}>
+                          <td colSpan={2} className="bg-danger/10" />
+                          <td colSpan={2} className="bg-success/10 px-3 py-3">
                             <DraftCommentCard
                               comment={comment}
                               auth={auth}
@@ -1295,7 +1323,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
 
                       {isLeftComposerOpen && leftKey && pair.left?.commentSide && pair.left.commentLine ? (
                         <tr>
-                          <td colSpan={2} className="bg-background px-3 py-3">
+                          <td colSpan={2} className="bg-danger/10 px-3 py-3">
                             <InlineDiffCommentComposer
                               owner={owner}
                               repo={repo}
@@ -1311,14 +1339,14 @@ function SplitHunkDiff(props: HunkDiffProps) {
                               onAskClaude={onAskClaude}
                             />
                           </td>
-                          <td colSpan={2} className="bg-background" />
+                          <td colSpan={2} className="bg-success/10" />
                         </tr>
                       ) : null}
 
                       {isRightComposerOpen && rightKey && pair.right?.commentSide && pair.right.commentLine ? (
                         <tr>
-                          <td colSpan={2} className="bg-background" />
-                          <td colSpan={2} className="bg-background px-3 py-3">
+                          <td colSpan={2} className="bg-danger/10" />
+                          <td colSpan={2} className="bg-success/10 px-3 py-3">
                             <InlineDiffCommentComposer
                               owner={owner}
                               repo={repo}
@@ -1349,8 +1377,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
                           <tr key={`agent-${session.id}`}>
                             {session.context?.side === 'RIGHT' ? (
                               <>
-                                <td colSpan={2} className="bg-background" />
-                                <td colSpan={2} className="bg-background px-3 py-3">
+                                <td colSpan={2} className="bg-danger/10" />
+                                <td colSpan={2} className="bg-success/10 px-3 py-3">
                                   <InlineAgentResponseCard
                                     session={session}
                                     onStop={() => onStopAgent?.(session.id)}
@@ -1361,7 +1389,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                               </>
                             ) : (
                               <>
-                                <td colSpan={2} className="bg-background px-3 py-3">
+                                <td colSpan={2} className="bg-danger/10 px-3 py-3">
                                   <InlineAgentResponseCard
                                     session={session}
                                     onStop={() => onStopAgent?.(session.id)}
@@ -1369,7 +1397,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                                     onOpenInChat={() => onPromoteAgent?.(session.id)}
                                   />
                                 </td>
-                                <td colSpan={2} className="bg-background" />
+                                <td colSpan={2} className="bg-success/10" />
                               </>
                             )}
                           </tr>
@@ -1423,15 +1451,11 @@ function SplitExpandedContextRows({
         const lineTokens = data.tokens?.[i]
         return (
           <tr key={`expanded-${gapKey}-${i}`} className="bg-background">
-            <td className="border-border text-foreground-subtle border-r px-2 py-0 text-right font-mono text-xs">
-              {lineNum}
-            </td>
+            <td className="text-foreground-subtle px-2 py-0 text-center font-mono text-xs">{lineNum}</td>
             <td className="border-border text-foreground overflow-hidden border-r px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap">
               <DiffLineContent tokens={lineTokens} fallback={line} />
             </td>
-            <td className="border-border text-foreground-subtle border-r px-2 py-0 text-right font-mono text-xs">
-              {lineNum}
-            </td>
+            <td className="text-foreground-subtle px-2 py-0 text-center font-mono text-xs">{lineNum}</td>
             <td className="text-foreground overflow-hidden px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap">
               <DiffLineContent tokens={lineTokens} fallback={line} />
             </td>
@@ -1525,9 +1549,9 @@ function InlineDiffThread({
   const allComments = [thread.topLevelComment, ...thread.replies]
 
   return (
-    <div>
+    <div className="bg-surface p-3 space-y-2 rounded-md border border-border">
       {allComments.map((comment) => (
-        <div key={comment.id} className="py-2">
+        <div key={comment.id}>
           <div className="flex items-center gap-2">
             <img src={comment.user.avatar_url} alt={comment.user.login} className="size-5 rounded-full" />
             <span className="text-foreground text-xs font-semibold">{comment.user.login}</span>
@@ -1536,9 +1560,17 @@ function InlineDiffThread({
           <div className="mt-2">
             <MarkdownBody className="">{comment.body}</MarkdownBody>
           </div>
+          <div className="mt-2">
+            <ReactionBar
+              owner={replyTarget.owner}
+              repo={replyTarget.repo}
+              commentId={comment.id}
+              commentType="pull-comment"
+            />
+          </div>
         </div>
       ))}
-      <div className="pt-1 pb-1">
+      <div className="">
         <textarea
           value={replyBody}
           onChange={(e) => setReplyBody(e.target.value)}
