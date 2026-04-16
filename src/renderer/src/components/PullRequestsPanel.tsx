@@ -37,25 +37,25 @@ export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPul
     }) ?? []
 
   return (
-    <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
+    <div className="border-border bg-surface flex h-screen w-60 shrink-0 flex-col border-r">
       <div className="px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">Pull Requests</p>
+        <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Pull Requests</p>
       </div>
 
       {/* Search */}
       <div className="px-3 pb-2">
-        <label className="flex items-center gap-1.5 rounded border border-border bg-background px-2 py-1">
-          <Search size={12} className="shrink-0 text-foreground-subtle" />
+        <label className="border-border bg-background flex items-center gap-1.5 rounded border px-2 py-1">
+          <Search size={12} className="text-foreground-subtle shrink-0" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search..."
-            className="w-full bg-transparent text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none"
+            className="text-foreground placeholder:text-foreground-subtle w-full bg-transparent text-xs focus:outline-none"
           />
           {searchQuery ? (
             <button
               onClick={() => setSearchQuery('')}
-              className="shrink-0 text-foreground-subtle hover:text-foreground"
+              className="text-foreground-subtle hover:text-foreground shrink-0"
             >
               <X size={10} />
             </button>
@@ -68,7 +68,7 @@ export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPul
         <button
           onClick={() => setStateFilter('open')}
           className={cn(
-            'flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider',
+            'flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase',
             stateFilter === 'open' ? 'text-foreground' : 'text-foreground-subtle hover:text-foreground-muted'
           )}
         >
@@ -79,7 +79,7 @@ export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPul
         <button
           onClick={() => setStateFilter('closed')}
           className={cn(
-            'flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider',
+            'flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase',
             stateFilter === 'closed' ? 'text-foreground' : 'text-foreground-subtle hover:text-foreground-muted'
           )}
         >
@@ -92,15 +92,15 @@ export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPul
       {/* PR list */}
       <div className="flex-1 overflow-y-auto">
         {isLoadingGitInfo ? (
-          <p className="px-4 py-4 text-xs text-foreground-subtle">Loading...</p>
+          <p className="text-foreground-subtle px-4 py-4 text-xs">Loading...</p>
         ) : !gitInfo ? (
-          <p className="px-4 py-4 text-xs text-foreground-subtle">No GitHub repo detected</p>
+          <p className="text-foreground-subtle px-4 py-4 text-xs">No GitHub repo detected</p>
         ) : isLoading ? (
-          <p className="px-4 py-4 text-xs text-foreground-subtle">Loading pull requests...</p>
+          <p className="text-foreground-subtle px-4 py-4 text-xs">Loading pull requests...</p>
         ) : error ? (
-          <p className="px-4 py-4 text-xs text-foreground-subtle">{error.message}</p>
+          <p className="text-foreground-subtle px-4 py-4 text-xs">{error.message}</p>
         ) : filtered.length === 0 ? (
-          <p className="px-4 py-4 text-xs text-foreground-subtle">
+          <p className="text-foreground-subtle px-4 py-4 text-xs">
             {searchQuery ? 'No matches' : `No ${stateFilter} pull requests`}
           </p>
         ) : (
@@ -108,12 +108,12 @@ export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPul
             <button
               key={pr.number}
               onClick={() => onOpenPullRequest(pr.number)}
-              className="flex w-full items-center gap-2 px-4 py-[5px] text-left transition-colors hover:bg-surface-hover"
+              className="hover:bg-surface-hover flex w-full items-center gap-2 px-4 py-[5px] text-left transition-colors"
             >
               <PrStateIcon pr={pr} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs text-foreground">{pr.title}</p>
-                <p className="text-[10px] text-foreground-subtle">
+                <p className="text-foreground truncate text-xs">{pr.title}</p>
+                <p className="text-foreground-subtle text-[10px]">
                   #{pr.number} by {pr.user.login}
                 </p>
               </div>
@@ -127,13 +127,13 @@ export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPul
 
 function PrStateIcon({ pr }: { pr: PullRequest }) {
   if (pr.merged_at) {
-    return <GitMerge size={14} className="shrink-0 text-purple" />
+    return <GitMerge size={14} className="text-purple shrink-0" />
   }
   if (pr.state === 'closed') {
-    return <GitPullRequestClosed size={14} className="shrink-0 text-danger" />
+    return <GitPullRequestClosed size={14} className="text-danger shrink-0" />
   }
   if (pr.draft) {
-    return <GitPullRequestDraft size={14} className="shrink-0 text-foreground-muted" />
+    return <GitPullRequestDraft size={14} className="text-foreground-muted shrink-0" />
   }
-  return <GitPullRequest size={14} className="shrink-0 text-success" />
+  return <GitPullRequest size={14} className="text-success shrink-0" />
 }

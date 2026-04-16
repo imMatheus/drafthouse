@@ -1,13 +1,5 @@
 import { type ReactNode, useState } from 'react'
-import {
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  Home,
-  Terminal,
-  X
-} from 'lucide-react'
+import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Home, Terminal, X } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
@@ -49,7 +41,7 @@ export default function WorkspaceTabBar({
   }
 
   return (
-    <div className="border-b border-border bg-background">
+    <div className="border-border bg-background border-b">
       <div className="flex min-h-10 items-stretch overflow-x-auto px-2 pt-1.5">
         {tabs.map((tab) => {
           const { icon, label } = getWorkspaceTabPresentation(tab)
@@ -81,9 +73,9 @@ export default function WorkspaceTabBar({
                 setDropTargetId(null)
               }}
               className={cn(
-                'group cursor-pointer mr-1.5 flex min-w-0 max-w-60 shrink-0 items-stretch rounded-t-lg border border-b-0 transition-colors',
-                isActive ? 'border-border bg-surface' : 'border-transparent bg-background hover:bg-surface-hover/60',
-                isDropTarget && 'border-l-2 border-l-accent'
+                'group mr-1.5 flex max-w-60 min-w-0 shrink-0 cursor-pointer items-stretch rounded-t-lg border border-b-0 transition-colors',
+                isActive ? 'border-border bg-surface' : 'bg-background hover:bg-surface-hover/60 border-transparent',
+                isDropTarget && 'border-l-accent border-l-2'
               )}
             >
               <button
@@ -100,7 +92,7 @@ export default function WorkspaceTabBar({
 
               <button
                 onClick={() => onCloseTab(tab.id)}
-                className="flex px-2 items-center justify-center rounded-md transition-colors text-foreground-subtle hover:text-foreground"
+                className="text-foreground-subtle hover:text-foreground flex items-center justify-center rounded-md px-2 transition-colors"
                 title={`Close ${label}`}
               >
                 <X size={14} />
@@ -117,31 +109,31 @@ function PrStateBadge({ prState }: { prState: string | undefined }): React.JSX.E
   switch (prState) {
     case 'merged':
       return (
-        <span className="inline-flex size-5 items-center justify-center rounded-full bg-purple/15">
+        <span className="bg-purple/15 inline-flex size-5 items-center justify-center rounded-full">
           <GitMerge size={12} strokeWidth={2} className="text-purple" />
         </span>
       )
     case 'closed':
       return (
-        <span className="inline-flex size-5 items-center justify-center rounded-full bg-danger/15">
+        <span className="bg-danger/15 inline-flex size-5 items-center justify-center rounded-full">
           <GitPullRequestClosed size={12} strokeWidth={2} className="text-danger" />
         </span>
       )
     case 'draft':
       return (
-        <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground-muted/15">
+        <span className="bg-foreground-muted/15 inline-flex size-5 items-center justify-center rounded-full">
           <GitPullRequestDraft size={12} strokeWidth={2} className="text-foreground-muted" />
         </span>
       )
     case 'open':
       return (
-        <span className="inline-flex size-5 items-center justify-center rounded-full bg-success/15">
+        <span className="bg-success/15 inline-flex size-5 items-center justify-center rounded-full">
           <GitPullRequest size={12} strokeWidth={2} className="text-success" />
         </span>
       )
     default:
       return (
-        <span className="inline-flex size-5 items-center justify-center rounded-full bg-foreground-subtle/15">
+        <span className="bg-foreground-subtle/15 inline-flex size-5 items-center justify-center rounded-full">
           <GitPullRequest size={12} strokeWidth={2} className="text-foreground-subtle" />
         </span>
       )

@@ -515,7 +515,7 @@ export default function MonacoDiffWithComments({
           }}
           loading={
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-foreground-muted">Loading file...</p>
+              <p className="text-foreground-muted text-sm">Loading file...</p>
             </div>
           }
         />
@@ -539,7 +539,7 @@ export default function MonacoDiffWithComments({
         onMount={handleMount}
         loading={
           <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-foreground-muted">Loading diff...</p>
+            <p className="text-foreground-muted text-sm">Loading diff...</p>
           </div>
         }
       />

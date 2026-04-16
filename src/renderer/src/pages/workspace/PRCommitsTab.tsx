@@ -68,12 +68,12 @@ export default function PRCommitsTab({
   return (
     <div className="flex flex-col gap-4">
       {error ? (
-        <div className="rounded-xl border border-border bg-surface px-4 py-3">
-          <p className="text-sm text-foreground-muted">{error.message}</p>
+        <div className="border-border bg-surface rounded-xl border px-4 py-3">
+          <p className="text-foreground-muted text-sm">{error.message}</p>
         </div>
       ) : null}
 
-      {isLoading ? <p className="text-sm text-foreground-muted">Loading commits...</p> : null}
+      {isLoading ? <p className="text-foreground-muted text-sm">Loading commits...</p> : null}
 
       {items.length > 0 ? (
         <div className="flex flex-col gap-6">
@@ -84,8 +84,8 @@ export default function PRCommitsTab({
       ) : null}
 
       {!isLoading && !error && items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-surface px-6 py-8 text-center">
-          <p className="text-sm text-foreground-muted">No commits were returned for this page.</p>
+        <div className="border-border bg-surface rounded-xl border border-dashed px-6 py-8 text-center">
+          <p className="text-foreground-muted text-sm">No commits were returned for this page.</p>
         </div>
       ) : null}
 
@@ -100,10 +100,10 @@ export default function PRCommitsTab({
         </div>
       ) : null}
 
-      <div className="flex mt-10 mx-auto max-w-2xl w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+      <div className="border-border bg-surface mx-auto mt-10 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Commits</h2>
-          <p className="mt-1 text-sm text-foreground-muted">
+          <h2 className="text-foreground text-sm font-semibold">Commits</h2>
+          <p className="text-foreground-muted mt-1 text-sm">
             Showing {rangeStart}-{rangeEnd} of {totalCommits} commit{totalCommits !== 1 ? 's' : ''}
             {isFetching && !isLoading ? ' \u2022 Updating\u2026' : ''}
           </p>
@@ -123,21 +123,21 @@ function CommitDayGroup({ group }: { group: CommitDayGroupData }) {
   return (
     <section className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3">
       <div className="relative flex justify-center">
-        <div className="absolute top-7 bottom-0 w-px bg-border" />
-        <div className="relative z-10 mt-1 flex size-7 items-center justify-center rounded-full border border-border bg-background text-foreground-muted">
+        <div className="bg-border absolute top-7 bottom-0 w-px" />
+        <div className="border-border bg-background text-foreground-muted relative z-10 mt-1 flex size-7 items-center justify-center rounded-full border">
           <GitCommit size={14} />
         </div>
       </div>
 
       <div className="min-w-0">
         <div className="mb-3 flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-foreground">Commits on {group.label}</h3>
-          <span className="text-xs text-foreground-subtle">
+          <h3 className="text-foreground text-sm font-semibold">Commits on {group.label}</h3>
+          <span className="text-foreground-subtle text-xs">
             {group.items.length} commit{group.items.length !== 1 ? 's' : ''}
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="border-border bg-surface overflow-hidden rounded-xl border">
           {group.items.map((commit, index) => (
             <CommitRow key={commit.sha} commit={commit} isLast={index === group.items.length - 1} />
           ))}
@@ -167,7 +167,7 @@ function PRCommitsPagination({
         <ChevronLeft size={14} />
         Previous
       </button>
-      <span className="min-w-20 text-center text-xs text-foreground-muted">
+      <span className="text-foreground-muted min-w-20 text-center text-xs">
         Page {page} of {totalPages}
       </span>
       <button type="button" onClick={onNext} disabled={page >= totalPages} className={buttonClass}>
@@ -199,22 +199,22 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
   }
 
   return (
-    <div className={cn('px-5 py-4', !isLast && 'border-b border-border')}>
+    <div className={cn('px-5 py-4', !isLast && 'border-border border-b')}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-[15px] font-semibold text-foreground">{subject}</p>
+            <p className="text-foreground truncate text-[15px] font-semibold">{subject}</p>
             {isMergeCommit ? (
-              <span className="rounded-full bg-purple/10 px-2 py-0.5 text-[11px] font-medium text-purple">Merge</span>
+              <span className="bg-purple/10 text-purple rounded-full px-2 py-0.5 text-[11px] font-medium">Merge</span>
             ) : null}
           </div>
 
-          {bodyPreview ? <p className="mt-1 truncate text-sm text-foreground-muted">{bodyPreview}</p> : null}
+          {bodyPreview ? <p className="text-foreground-muted mt-1 truncate text-sm">{bodyPreview}</p> : null}
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-foreground-muted">
+          <div className="text-foreground-muted mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
             <CommitActorStack actors={actors} />
             <span>
-              <span className="font-medium text-foreground">{formatCommitActorNames(actors)}</span> committed{' '}
+              <span className="text-foreground font-medium">{formatCommitActorNames(actors)}</span> committed{' '}
               {authoredLabel}
             </span>
             {commitDate != null ? (
@@ -224,11 +224,11 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <span className="rounded-md px-2 py-1 font-mono text-sm text-foreground-muted">{commit.sha.slice(0, 7)}</span>
+          <span className="text-foreground-muted rounded-md px-2 py-1 font-mono text-sm">{commit.sha.slice(0, 7)}</span>
           <button
             type="button"
             onClick={handleCopySha}
-            className="inline-flex size-9 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+            className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
             title={isCopied ? 'Copied' : 'Copy SHA'}
             aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
           >
@@ -238,7 +238,7 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
             href={commit.html_url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex size-9 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+            className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
             title="Open commit on GitHub"
             aria-label="Open commit on GitHub"
           >
@@ -259,7 +259,7 @@ function CommitActorStack({ actors }: { actors: Array<{ name: string; avatarUrl:
         <div
           key={`${actor.name}-${index}`}
           className={cn(
-            'flex size-6 items-center justify-center overflow-hidden rounded-full border border-surface bg-interactive',
+            'border-surface bg-interactive flex size-6 items-center justify-center overflow-hidden rounded-full border',
             index > 0 && '-ml-2'
           )}
         >

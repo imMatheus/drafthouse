@@ -108,10 +108,10 @@ export default function CommandPalette({
         value={search}
         onValueChange={setSearch}
         placeholder="Search files, pull requests, sessions..."
-        className="w-full border-b border-border bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+        className="border-border text-foreground placeholder:text-foreground-subtle w-full border-b bg-transparent px-4 py-3 text-sm focus:outline-none"
       />
 
-      <div className="flex items-center gap-1 border-b border-border px-3 py-2">
+      <div className="border-border flex items-center gap-1 border-b px-3 py-2">
         <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="All" />
         <FilterChip active={filter === 'files'} onClick={() => setFilter('files')} icon={FileText} label="Files" />
         <FilterChip
@@ -124,7 +124,7 @@ export default function CommandPalette({
       </div>
 
       <Command.List className="max-h-[340px] overflow-y-auto p-2">
-        <Command.Empty className="py-6 text-center text-xs text-foreground-subtle">No results found.</Command.Empty>
+        <Command.Empty className="text-foreground-subtle py-6 text-center text-xs">No results found.</Command.Empty>
 
         {showFiles && matchedFiles.length > 0 ? (
           <Command.Group heading="Files" className={GROUP_HEADING_CLASSES}>
@@ -140,7 +140,7 @@ export default function CommandPalette({
               >
                 <FileIcon name={getPathBasename(relativePath)} size={14} />
                 <span className="text-foreground">{getPathBasename(relativePath)}</span>
-                <span className="truncate text-foreground-subtle">{getPathDirname(relativePath)}</span>
+                <span className="text-foreground-subtle truncate">{getPathDirname(relativePath)}</span>
               </Command.Item>
             ))}
           </Command.Group>
@@ -159,8 +159,8 @@ export default function CommandPalette({
                 className={ITEM_CLASSES}
               >
                 <PrStateIcon state={pr.state} draft={pr.draft} merged={pr.merged_at != null} />
-                <span className="min-w-0 flex-1 truncate text-foreground">{pr.title}</span>
-                <span className="shrink-0 text-foreground-subtle">#{pr.number}</span>
+                <span className="text-foreground min-w-0 flex-1 truncate">{pr.title}</span>
+                <span className="text-foreground-subtle shrink-0">#{pr.number}</span>
               </Command.Item>
             ))}
           </Command.Group>
@@ -178,8 +178,8 @@ export default function CommandPalette({
                 }}
                 className={ITEM_CLASSES}
               >
-                <Terminal size={14} className="shrink-0 text-foreground-subtle" />
-                <span className="min-w-0 flex-1 truncate text-foreground">{session.prompt}</span>
+                <Terminal size={14} className="text-foreground-subtle shrink-0" />
+                <span className="text-foreground min-w-0 flex-1 truncate">{session.prompt}</span>
                 <AgentStatusBadge status={session.status} />
               </Command.Item>
             ))}
@@ -219,21 +219,21 @@ function FilterChip({
 }
 
 function PrStateIcon({ state, draft, merged }: { state: string; draft: boolean; merged: boolean }) {
-  if (merged) return <GitMerge size={14} className="shrink-0 text-purple" />
-  if (state === 'closed') return <GitPullRequestClosed size={14} className="shrink-0 text-danger" />
-  if (draft) return <GitPullRequestDraft size={14} className="shrink-0 text-foreground-muted" />
-  return <GitPullRequest size={14} className="shrink-0 text-success" />
+  if (merged) return <GitMerge size={14} className="text-purple shrink-0" />
+  if (state === 'closed') return <GitPullRequestClosed size={14} className="text-danger shrink-0" />
+  if (draft) return <GitPullRequestDraft size={14} className="text-foreground-muted shrink-0" />
+  return <GitPullRequest size={14} className="text-success shrink-0" />
 }
 
 function AgentStatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'running':
-      return <span className="size-2 shrink-0 animate-pulse rounded-full bg-accent" />
+      return <span className="bg-accent size-2 shrink-0 animate-pulse rounded-full" />
     case 'completed':
-      return <span className="size-2 shrink-0 rounded-full bg-success" />
+      return <span className="bg-success size-2 shrink-0 rounded-full" />
     case 'error':
     case 'cancelled':
-      return <span className="size-2 shrink-0 rounded-full bg-danger" />
+      return <span className="bg-danger size-2 shrink-0 rounded-full" />
     default:
       return null
   }

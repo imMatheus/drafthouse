@@ -117,27 +117,27 @@ export default function AgentEditDiffBlock({ filePath, oldString, newString }: A
   }, [oldString, newString, filePath, theme])
 
   return (
-    <div className="my-2 overflow-hidden rounded-md border border-border bg-surface">
+    <div className="border-border bg-surface my-2 overflow-hidden rounded-md border">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <span className="size-2 rounded-full bg-success" />
-        <span className="text-xs font-medium text-foreground">
+      <div className="border-border flex items-center gap-2 border-b px-3 py-2">
+        <span className="bg-success size-2 rounded-full" />
+        <span className="text-foreground text-xs font-medium">
           Edit(<span className="text-foreground-muted">{fileName}</span>)
         </span>
       </div>
 
       {/* Stats */}
-      <div className="border-b border-border px-3 py-1.5 text-[11px] text-foreground-subtle">
+      <div className="border-border text-foreground-subtle border-b px-3 py-1.5 text-[11px]">
         {addedCount > 0 && (
           <span>
-            Added <strong className="font-medium text-foreground-muted">{addedCount}</strong> line
+            Added <strong className="text-foreground-muted font-medium">{addedCount}</strong> line
             {addedCount !== 1 ? 's' : ''}
           </span>
         )}
         {addedCount > 0 && removedCount > 0 && <span>, </span>}
         {removedCount > 0 && (
           <span>
-            removed <strong className="font-medium text-foreground-muted">{removedCount}</strong> line
+            removed <strong className="text-foreground-muted font-medium">{removedCount}</strong> line
             {removedCount !== 1 ? 's' : ''}
           </span>
         )}
@@ -157,17 +157,17 @@ export default function AgentEditDiffBlock({ filePath, oldString, newString }: A
                 )}
               >
                 {/* Line number */}
-                <td className="w-10 select-none px-2 py-0 text-right align-top text-foreground-subtle/50">
+                <td className="text-foreground-subtle/50 w-10 px-2 py-0 text-right align-top select-none">
                   {line.oldLineNumber ?? line.newLineNumber ?? ''}
                 </td>
 
                 {/* Prefix */}
-                <td className="w-4 select-none py-0 text-center align-top text-foreground-subtle">
+                <td className="text-foreground-subtle w-4 py-0 text-center align-top select-none">
                   {line.kind === 'addition' ? '+' : line.kind === 'deletion' ? '-' : ' '}
                 </td>
 
                 {/* Content */}
-                <td className="whitespace-pre py-0 pr-4">
+                <td className="py-0 pr-4 whitespace-pre">
                   <DiffLineContent tokens={tokenMap.get(line.id)} fallback={line.content} />
                 </td>
               </tr>

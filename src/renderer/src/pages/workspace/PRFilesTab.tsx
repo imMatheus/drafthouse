@@ -239,7 +239,7 @@ export default function PRFilesTab({
           {fileListCollapsed ? (
             <button
               onClick={() => setFileListCollapsed(false)}
-              className="flex size-6 -translate-x-1.5 items-center justify-center self-start rounded text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+              className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 -translate-x-1.5 items-center justify-center self-start rounded transition-colors"
               title="Show file list"
             >
               <ChevronRight size={14} />
@@ -252,25 +252,25 @@ export default function PRFilesTab({
             )}
           >
             <div className="flex items-center gap-2 px-2 py-2">
-              <Search size={14} className="shrink-0 text-foreground-subtle" />
+              <Search size={14} className="text-foreground-subtle shrink-0" />
               <input
                 value={filterValue}
                 onChange={(event) => setFilterValue(event.target.value)}
                 placeholder="Filter files..."
-                className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+                className="text-foreground placeholder:text-foreground-subtle w-full bg-transparent text-sm focus:outline-none"
               />
               {filterValue ? (
                 <button
                   type="button"
                   onClick={() => setFilterValue('')}
-                  className="shrink-0 text-foreground-subtle hover:text-foreground"
+                  className="text-foreground-subtle hover:text-foreground shrink-0"
                 >
                   <X size={14} />
                 </button>
               ) : null}
               <button
                 onClick={() => setFileListCollapsed(true)}
-                className="flex size-6 shrink-0 items-center justify-center rounded text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 shrink-0 items-center justify-center rounded transition-colors"
                 title="Hide file list"
               >
                 <ChevronLeft size={14} />
@@ -278,7 +278,7 @@ export default function PRFilesTab({
             </div>
             <div className="flex-1 overflow-y-auto">
               {filteredFiles.length === 0 && !isLoading ? (
-                <div className="px-3 py-4 text-xs text-foreground-muted">No files match this filter.</div>
+                <div className="text-foreground-muted px-3 py-4 text-xs">No files match this filter.</div>
               ) : (
                 <FileTree
                   tree={fileTree}
@@ -289,11 +289,11 @@ export default function PRFilesTab({
               )}
             </div>
             {draftReviewComments.length > 0 ? (
-              <div className="border-t border-border px-2 py-2">
+              <div className="border-border border-t px-2 py-2">
                 <button
                   type="button"
                   onClick={() => setIsSubmitReviewOpen(true)}
-                  className="w-full rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover"
+                  className="bg-accent text-foreground hover:bg-accent-hover w-full rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
                 >
                   Submit review ({draftReviewComments.length})
                 </button>
@@ -304,11 +304,11 @@ export default function PRFilesTab({
 
         <div className="min-w-0 flex-1">
           {filesErrorMessage ? (
-            <div className="rounded-xl border border-border bg-surface px-4 py-3">
-              <p className="text-sm text-foreground-muted">{filesErrorMessage.message}</p>
+            <div className="border-border bg-surface rounded-xl border px-4 py-3">
+              <p className="text-foreground-muted text-sm">{filesErrorMessage.message}</p>
             </div>
           ) : null}
-          {isLoading ? <p className="text-sm text-foreground-muted">Loading changed files...</p> : null}
+          {isLoading ? <p className="text-foreground-muted text-sm">Loading changed files...</p> : null}
           <div className="flex flex-col gap-5">
             {filteredFiles.map((file) => (
               <PullRequestFileDiffCard
@@ -552,36 +552,29 @@ function PullRequestFileDiffCard({
     <section
       ref={sectionRef}
       data-file-path={file.filename}
-      className="overflow-hidden rounded-xl border border-border bg-surface"
+      className="border-border bg-surface overflow-hidden rounded-xl border"
     >
-      <header
-        className={cn(
-          'flex items-center gap-2 px-3 py-1.5',
-          !isCollapsed && 'border-b border-border'
-        )}
-      >
+      <header className={cn('flex items-center gap-2 px-3 py-1.5', !isCollapsed && 'border-border border-b')}>
         <button
           type="button"
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex size-5 shrink-0 items-center justify-center rounded text-foreground-subtle transition-colors hover:bg-interactive hover:text-foreground"
+          className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
           aria-label={isCollapsed ? 'Expand file' : 'Collapse file'}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
-        <span className="min-w-0 truncate text-sm font-semibold text-foreground">{file.filename}</span>
+        <span className="text-foreground min-w-0 truncate text-sm font-semibold">{file.filename}</span>
         <button
           type="button"
           onClick={handleCopyPath}
-          className="flex size-5 shrink-0 items-center justify-center rounded text-foreground-subtle transition-colors hover:bg-interactive hover:text-foreground"
+          className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
           aria-label="Copy file path"
           title={pathCopied ? 'Copied' : 'Copy file path'}
         >
           {pathCopied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
         </button>
         {file.previous_filename ? (
-          <span className="min-w-0 shrink truncate text-xs text-foreground-muted">
-            from {file.previous_filename}
-          </span>
+          <span className="text-foreground-muted min-w-0 shrink truncate text-xs">from {file.previous_filename}</span>
         ) : null}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <DiffStat additions={file.additions} deletions={file.deletions} />
@@ -589,7 +582,7 @@ function PullRequestFileDiffCard({
             href={file.blob_url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 rounded-md border border-border bg-interactive px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+            className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
           >
             View
             <ExternalLink size={12} />
@@ -606,14 +599,16 @@ function PullRequestFileDiffCard({
               <UnifiedHunkDiff {...diffProps} />
             )
           ) : (
-            <div className="px-4 py-6 text-sm text-foreground-muted">
+            <div className="text-foreground-muted px-4 py-6 text-sm">
               GitHub did not return a renderable patch for this file.
             </div>
           )}
 
           {unanchoredThreads.length > 0 ? (
-            <div className="border-t border-border px-4 py-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Other comments</p>
+            <div className="border-border border-t px-4 py-4">
+              <p className="text-foreground-muted mb-3 text-xs font-semibold tracking-wider uppercase">
+                Other comments
+              </p>
               <div className="flex flex-col gap-3">
                 {unanchoredThreads.map((thread) => (
                   <div key={`unanchored-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
@@ -836,7 +831,7 @@ function ExpandSeparator({
         <button
           type="button"
           onClick={onExpand}
-          className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground"
+          className="text-foreground-muted hover:text-foreground flex items-center gap-1.5 text-xs"
         >
           <ChevronsUpDown size={12} />
           Show {gap.hiddenCount} hidden line{gap.hiddenCount !== 1 ? 's' : ''}
@@ -865,16 +860,16 @@ function ExpandedContextRows({
         const lineTokens = data.tokens?.[i]
         return (
           <tr key={`expanded-${gapKey}-${i}`} className="bg-background">
-            <td className="w-12 select-none border-r border-border px-3 py-0 text-right font-mono text-xs text-foreground-subtle">
+            <td className="border-border text-foreground-subtle w-12 border-r px-3 py-0 text-right font-mono text-xs select-none">
               {lineNum}
             </td>
             {colSpan >= 3 ? (
-              <td className="w-12 select-none border-r border-border px-3 py-0 text-right font-mono text-xs text-foreground-subtle">
+              <td className="border-border text-foreground-subtle w-12 border-r px-3 py-0 text-right font-mono text-xs select-none">
                 {lineNum}
               </td>
             ) : null}
-            <td className={cn('px-3 py-0 font-mono text-[13px] text-foreground', colSpan >= 3 && 'whitespace-pre')}>
-              {colSpan >= 3 ? <span className="mr-3 inline-block w-3 text-center text-foreground-muted"> </span> : null}
+            <td className={cn('text-foreground px-3 py-0 font-mono text-[13px]', colSpan >= 3 && 'whitespace-pre')}>
+              {colSpan >= 3 ? <span className="text-foreground-muted mr-3 inline-block w-3 text-center"> </span> : null}
               <DiffLineContent tokens={lineTokens} fallback={line} />
             </td>
           </tr>
@@ -957,13 +952,13 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
             <Fragment key={hunk.id}>
               {hunk.header ? (
                 <tr className="bg-interactive">
-                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                  <td className="border-border text-foreground-subtle w-12 border-r px-3 py-1.5 text-right font-mono text-xs">
                     ...
                   </td>
-                  <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
+                  <td className="border-border text-foreground-subtle w-12 border-r px-3 py-1.5 text-right font-mono text-xs">
                     ...
                   </td>
-                  <td className="px-3 py-1.5 font-mono text-[13px] text-foreground-muted">{hunk.header}</td>
+                  <td className="text-foreground-muted px-3 py-1.5 font-mono text-[13px]">{hunk.header}</td>
                 </tr>
               ) : null}
 
@@ -979,12 +974,12 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                 return (
                   <Fragment key={line.id}>
                     <tr className={cn('group', getFileDiffRowClassName(line.kind))}>
-                      <td className="relative w-12 border-r border-border px-3 py-0 text-right font-mono text-xs text-foreground-subtle">
+                      <td className="border-border text-foreground-subtle relative w-12 border-r px-3 py-0 text-right font-mono text-xs">
                         {rowKey ? (
                           <button
                             type="button"
                             onClick={() => onOpenComment(isComposerOpen ? null : rowKey)}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 ml-0.5 hidden size-5 items-center justify-center rounded bg-accent text-white group-hover:inline-flex"
+                            className="bg-accent absolute top-1/2 left-0 ml-0.5 hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover:inline-flex"
                             aria-label="Add line comment"
                           >
                             <Plus size={12} />
@@ -992,11 +987,11 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                         ) : null}
                         {line.oldLineNumber ?? ''}
                       </td>
-                      <td className="w-12 border-r border-border px-3 py-0 text-right font-mono text-xs text-foreground-subtle">
+                      <td className="border-border text-foreground-subtle w-12 border-r px-3 py-0 text-right font-mono text-xs">
                         {line.newLineNumber ?? ''}
                       </td>
-                      <td className="px-3 py-0 font-mono text-[13px] text-foreground whitespace-pre">
-                        <span className="mr-3 inline-block w-3 text-center text-foreground-muted">
+                      <td className="text-foreground px-3 py-0 font-mono text-[13px] whitespace-pre">
+                        <span className="text-foreground-muted mr-3 inline-block w-3 text-center">
                           {getFileDiffPrefix(line.kind)}
                         </span>
                         <DiffLineContent tokens={tokenMap.get(line.id)} fallback={line.content} />
@@ -1005,7 +1000,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
                     {rowThreads.map((thread) => (
                       <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                        <td colSpan={3} className="border-b border-border bg-background px-4 py-1">
+                        <td colSpan={3} className="border-border bg-background border-b px-4 py-1">
                           <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                         </td>
                       </tr>
@@ -1159,7 +1154,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
               <Fragment key={hunk.id}>
                 {hunk.header ? (
                   <tr className="bg-interactive">
-                    <td colSpan={4} className="px-3 py-1.5 font-mono text-[13px] text-foreground-muted">
+                    <td colSpan={4} className="text-foreground-muted px-3 py-1.5 font-mono text-[13px]">
                       {hunk.header}
                     </td>
                   </tr>
@@ -1191,7 +1186,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       <tr>
                         <td
                           className={cn(
-                            'group/left relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                            'group/left border-border text-foreground-subtle relative border-r px-2 py-0 text-right font-mono text-xs',
                             pair.left?.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
                           )}
                         >
@@ -1199,7 +1194,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             <button
                               type="button"
                               onClick={() => onOpenComment(isLeftComposerOpen ? null : leftKey)}
-                              className="absolute left-0 top-1/2 -translate-y-1/2 ml-0.5 hidden size-5 items-center justify-center rounded bg-accent text-white group-hover/left:inline-flex"
+                              className="bg-accent absolute top-1/2 left-0 ml-0.5 hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/left:inline-flex"
                               aria-label="Add line comment"
                             >
                               <Plus size={12} />
@@ -1209,7 +1204,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                         </td>
                         <td
                           className={cn(
-                            'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                            'border-border overflow-hidden border-r px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap',
                             pair.left?.kind === 'deletion'
                               ? 'bg-danger/10 text-foreground'
                               : pair.left
@@ -1225,7 +1220,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                         </td>
                         <td
                           className={cn(
-                            'group/right relative border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
+                            'group/right border-border text-foreground-subtle relative border-r px-2 py-0 text-right font-mono text-xs',
                             pair.right?.kind === 'addition' ? 'bg-success/10' : 'bg-background'
                           )}
                         >
@@ -1233,7 +1228,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             <button
                               type="button"
                               onClick={() => onOpenComment(isRightComposerOpen ? null : rightKey)}
-                              className="absolute left-0 top-1/2 -translate-y-1/2 ml-0.5 hidden size-5 items-center justify-center rounded bg-accent text-white group-hover/right:inline-flex"
+                              className="bg-accent absolute top-1/2 left-0 ml-0.5 hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/right:inline-flex"
                               aria-label="Add line comment"
                             >
                               <Plus size={12} />
@@ -1243,7 +1238,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                         </td>
                         <td
                           className={cn(
-                            'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
+                            'overflow-hidden px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap',
                             pair.right?.kind === 'addition'
                               ? 'bg-success/10 text-foreground'
                               : pair.right
@@ -1265,18 +1260,18 @@ function SplitHunkDiff(props: HunkDiffProps) {
                           <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
                             {isLeft ? (
                               <>
-                                <td className="border-r border-border" />
-                                <td className="border-r border-border px-3 py-2 align-top">
+                                <td className="border-border border-r" />
+                                <td className="border-border border-r px-3 py-2 align-top">
                                   <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                                 </td>
-                                <td className="border-r border-border" />
+                                <td className="border-border border-r" />
                                 <td />
                               </>
                             ) : (
                               <>
-                                <td className="border-r border-border" />
-                                <td className="border-r border-border" />
-                                <td className="border-r border-border" />
+                                <td className="border-border border-r" />
+                                <td className="border-border border-r" />
+                                <td className="border-border border-r" />
                                 <td className="px-3 py-2 align-top">
                                   <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                                 </td>
@@ -1348,7 +1343,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
                         const leftSessions = leftLine != null ? (sessionsByLineNumber.get(leftLine) ?? []) : []
                         const rightSessions =
                           rightLine != null && rightLine !== leftLine ? (sessionsByLineNumber.get(rightLine) ?? []) : []
-                        const pairSessions = leftSessions.length === 0 ? rightSessions : leftSessions.concat(rightSessions)
+                        const pairSessions =
+                          leftSessions.length === 0 ? rightSessions : leftSessions.concat(rightSessions)
                         return pairSessions.map((session) => (
                           <tr key={`agent-${session.id}`}>
                             {session.context?.side === 'RIGHT' ? (
@@ -1427,16 +1423,16 @@ function SplitExpandedContextRows({
         const lineTokens = data.tokens?.[i]
         return (
           <tr key={`expanded-${gapKey}-${i}`} className="bg-background">
-            <td className="border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle">
+            <td className="border-border text-foreground-subtle border-r px-2 py-0 text-right font-mono text-xs">
               {lineNum}
             </td>
-            <td className="overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all text-foreground">
+            <td className="border-border text-foreground overflow-hidden border-r px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap">
               <DiffLineContent tokens={lineTokens} fallback={line} />
             </td>
-            <td className="border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle">
+            <td className="border-border text-foreground-subtle border-r px-2 py-0 text-right font-mono text-xs">
               {lineNum}
             </td>
-            <td className="overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all text-foreground">
+            <td className="text-foreground overflow-hidden px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap">
               <DiffLineContent tokens={lineTokens} fallback={line} />
             </td>
           </tr>
@@ -1460,13 +1456,13 @@ function DraftCommentCard({
   onRemove: () => void
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+    <div className="border-border bg-surface rounded-xl border">
+      <div className="border-border flex items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-2">
           {auth?.user.avatar_url ? (
             <img src={auth.user.avatar_url} alt={auth.user.login} className="size-7 rounded-full" />
           ) : null}
-          <div className="text-sm text-foreground">
+          <div className="text-foreground text-sm">
             <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
             <span className="text-foreground-muted">pending review comment</span>
           </div>
@@ -1474,7 +1470,7 @@ function DraftCommentCard({
         <button
           type="button"
           onClick={onRemove}
-          className="inline-flex size-7 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+          className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-7 items-center justify-center rounded-md transition-colors"
           aria-label="Remove draft comment"
         >
           <X size={14} />
@@ -1534,8 +1530,8 @@ function InlineDiffThread({
         <div key={comment.id} className="py-2">
           <div className="flex items-center gap-2">
             <img src={comment.user.avatar_url} alt={comment.user.login} className="size-5 rounded-full" />
-            <span className="text-xs font-semibold text-foreground">{comment.user.login}</span>
-            <span className="text-xs text-foreground-subtle">{formatRelativeTime(comment.created_at)}</span>
+            <span className="text-foreground text-xs font-semibold">{comment.user.login}</span>
+            <span className="text-foreground-subtle text-xs">{formatRelativeTime(comment.created_at)}</span>
           </div>
           <div className="mt-2">
             <MarkdownBody className="">{comment.body}</MarkdownBody>
@@ -1547,7 +1543,7 @@ function InlineDiffThread({
           value={replyBody}
           onChange={(e) => setReplyBody(e.target.value)}
           placeholder="Write a reply"
-          className="w-full resize-none rounded border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+          className="border-border bg-surface text-foreground placeholder:text-foreground-subtle focus:border-accent w-full resize-none rounded border px-2.5 py-1.5 text-xs focus:outline-none"
           rows={1}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -1556,14 +1552,14 @@ function InlineDiffThread({
             }
           }}
         />
-        {errorMessage ? <p className="mt-1 text-xs text-danger">{errorMessage}</p> : null}
+        {errorMessage ? <p className="text-danger mt-1 text-xs">{errorMessage}</p> : null}
         {replyBody.trim() ? (
           <div className="mt-1.5 flex items-center justify-end">
             <button
               type="button"
               onClick={handleReply}
               disabled={isSubmitting}
-              className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:opacity-40"
+              className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40"
             >
               {isSubmitting ? 'Replying...' : 'Reply'}
             </button>
@@ -1640,8 +1636,8 @@ function InlineDiffCommentComposer({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface">
-      <div className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
+    <div className="border-border bg-surface rounded-xl border">
+      <div className="border-border text-foreground border-b px-4 py-3 text-sm font-medium">
         Comment on {path}:{line}
       </div>
       <ClaudeMentionTextarea
@@ -1653,9 +1649,9 @@ function InlineDiffCommentComposer({
         enabled={!!onAskClaude}
         onSubmit={() => void handleAddSingleComment()}
       />
-      {errorMessage ? <p className="px-4 text-sm text-danger">{errorMessage}</p> : null}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-        <p className="text-xs text-foreground-subtle">
+      {errorMessage ? <p className="text-danger px-4 text-sm">{errorMessage}</p> : null}
+      <div className="border-border flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
+        <p className="text-foreground-subtle text-xs">
           {claudeMention
             ? 'Claude will respond in the conversation tab with line context'
             : side === 'LEFT'
@@ -1666,7 +1662,7 @@ function InlineDiffCommentComposer({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md border border-border bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+            className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
           >
             Cancel
           </button>
@@ -1679,7 +1675,7 @@ function InlineDiffCommentComposer({
                 setBody('')
               }}
               disabled={!body.trim() || isSubmitting}
-              className="rounded-md border border-border bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               Add to review
             </button>
@@ -1688,7 +1684,7 @@ function InlineDiffCommentComposer({
             type="button"
             onClick={handleAddSingleComment}
             disabled={!body.trim() || isSubmitting}
-            className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Adding...' : claudeMention ? 'Ask Claude' : 'Add comment'}
           </button>
@@ -1758,19 +1754,19 @@ function SubmitReviewDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+    <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="border-border bg-surface w-full max-w-2xl rounded-2xl border shadow-2xl">
+        <div className="border-border flex items-center justify-between gap-3 border-b px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Submit review</h2>
-            <p className="mt-1 text-sm text-foreground-muted">
+            <h2 className="text-foreground text-lg font-semibold">Submit review</h2>
+            <p className="text-foreground-muted mt-1 text-sm">
               {draftReviewComments.length} pending comment{draftReviewComments.length !== 1 ? 's' : ''}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+            className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors"
             aria-label="Close review dialog"
           >
             <X size={16} />
@@ -1781,17 +1777,17 @@ function SubmitReviewDialog({
             value={body}
             onChange={(event) => setBody(event.target.value)}
             placeholder="Write a summary of your review"
-            className="min-h-36 w-full resize-y rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+            className="border-border bg-background text-foreground placeholder:text-foreground-subtle min-h-36 w-full resize-y rounded-xl border px-4 py-3 text-sm focus:outline-none"
           />
-          {errorMessage ? <p className="mt-3 text-sm text-danger">{errorMessage}</p> : null}
+          {errorMessage ? <p className="text-danger mt-3 text-sm">{errorMessage}</p> : null}
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
-          <p className="text-sm text-foreground-muted">Inline comments will be submitted with this review.</p>
+        <div className="border-border flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4">
+          <p className="text-foreground-muted text-sm">Inline comments will be submitted with this review.</p>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-border bg-interactive px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-interactive-hover"
+              className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm font-medium transition-colors"
             >
               Cancel
             </button>
@@ -1799,7 +1795,7 @@ function SubmitReviewDialog({
               type="button"
               onClick={() => void handleSubmit('COMMENT')}
               disabled={isSubmitting}
-              className="rounded-md border border-border bg-interactive px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               Comment
             </button>
@@ -1807,7 +1803,7 @@ function SubmitReviewDialog({
               type="button"
               onClick={() => void handleSubmit('APPROVE')}
               disabled={isSubmitting}
-              className="rounded-md bg-success px-4 py-2 text-sm font-medium text-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-success text-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             >
               Approve
             </button>
@@ -1815,7 +1811,7 @@ function SubmitReviewDialog({
               type="button"
               onClick={() => void handleSubmit('REQUEST_CHANGES')}
               disabled={isSubmitting}
-              className="rounded-md bg-danger px-4 py-2 text-sm font-medium text-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-danger text-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             >
               Request changes
             </button>
@@ -1930,12 +1926,12 @@ function FileTreeFolder({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center gap-1.5 py-1 text-left text-xs text-foreground hover:bg-surface-hover"
+        className="text-foreground hover:bg-surface-hover flex w-full items-center gap-1.5 py-1 text-left text-xs"
         style={{ paddingLeft: 8 + depth * 16 }}
       >
         <ChevronDown
           size={14}
-          className={cn('shrink-0 text-foreground-subtle transition-transform', !isOpen && '-rotate-90')}
+          className={cn('text-foreground-subtle shrink-0 transition-transform', !isOpen && '-rotate-90')}
         />
         <FolderIcon name={node.name} open={isOpen} />
         <span className="truncate font-medium">{node.name}</span>
@@ -1996,7 +1992,7 @@ function FileTreeFileButton({
       <FileStatusIcon status={file.status} />
       <span className="min-w-0 flex-1 truncate">{name}</span>
       {commentCount > 0 ? (
-        <span className="flex shrink-0 items-center gap-1 text-foreground-subtle">
+        <span className="text-foreground-subtle flex shrink-0 items-center gap-1">
           <MessageSquare size={12} />
           <span className="text-[11px]">{commentCount}</span>
         </span>
@@ -2008,11 +2004,10 @@ function FileTreeFileButton({
 function FileStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'added':
-      return <FilePlus size={14} className="shrink-0 text-success" />
+      return <FilePlus size={14} className="text-success shrink-0" />
     case 'removed':
-      return <FileMinus size={14} className="shrink-0 text-danger" />
+      return <FileMinus size={14} className="text-danger shrink-0" />
     default:
-      return <FileDiff size={14} className="shrink-0 text-foreground-subtle" />
+      return <FileDiff size={14} className="text-foreground-subtle shrink-0" />
   }
 }
-

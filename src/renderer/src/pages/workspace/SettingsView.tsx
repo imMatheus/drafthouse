@@ -12,22 +12,22 @@ export default function SettingsView() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-lg px-6 py-10">
-        <h1 className="text-lg font-semibold text-foreground">Settings</h1>
+        <h1 className="text-foreground text-lg font-semibold">Settings</h1>
 
         {/* Account */}
         <section className="mt-8">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">Account</h2>
-          <div className="mt-3 rounded-lg border border-border bg-surface p-4">
+          <h2 className="text-foreground-muted text-xs font-medium tracking-wide uppercase">Account</h2>
+          <div className="border-border bg-surface mt-3 rounded-lg border p-4">
             {user && (
               <div className="flex items-center gap-3">
                 <img src={user.avatar_url} alt={user.login} className="size-10 rounded-full" />
                 <div className="min-w-0 flex-1">
-                  {user.name && <p className="text-sm font-medium text-foreground">{user.name}</p>}
-                  <p className="text-xs text-foreground-muted">{user.login}</p>
+                  {user.name && <p className="text-foreground text-sm font-medium">{user.name}</p>}
+                  <p className="text-foreground-muted text-xs">{user.login}</p>
                 </div>
                 <button
                   onClick={logout}
-                  className="flex items-center gap-1.5 rounded-md bg-interactive px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-surface-hover"
+                  className="bg-interactive text-foreground hover:bg-surface-hover flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs transition-colors"
                 >
                   <LogOut size={12} />
                   Log out
@@ -39,12 +39,12 @@ export default function SettingsView() {
 
         {/* Appearance */}
         <section className="mt-8">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">Appearance</h2>
-          <div className="mt-3 rounded-lg border border-border bg-surface">
+          <h2 className="text-foreground-muted text-xs font-medium tracking-wide uppercase">Appearance</h2>
+          <div className="border-border bg-surface mt-3 rounded-lg border">
             <div className="flex items-center justify-between px-4 py-3">
               <div>
-                <p className="text-sm text-foreground">Theme</p>
-                <p className="text-xs text-foreground-subtle">Switch between dark and light mode</p>
+                <p className="text-foreground text-sm">Theme</p>
+                <p className="text-foreground-subtle text-xs">Switch between dark and light mode</p>
               </div>
               <button
                 onClick={toggleTheme}
@@ -62,12 +62,12 @@ export default function SettingsView() {
 
         {/* Editor */}
         <section className="mt-8">
-          <h2 className="text-xs font-medium uppercase tracking-wide text-foreground-muted">Editor</h2>
-          <div className="mt-3 rounded-lg border border-border bg-surface">
+          <h2 className="text-foreground-muted text-xs font-medium tracking-wide uppercase">Editor</h2>
+          <div className="border-border bg-surface mt-3 rounded-lg border">
             <div className="flex items-center justify-between px-4 py-3">
               <div>
-                <p className="text-sm text-foreground">Diff view</p>
-                <p className="text-xs text-foreground-subtle">How file diffs are displayed</p>
+                <p className="text-foreground text-sm">Diff view</p>
+                <p className="text-foreground-subtle text-xs">How file diffs are displayed</p>
               </div>
               <DiffViewToggle
                 value={settings.diffViewMode}
@@ -83,7 +83,7 @@ export default function SettingsView() {
 
 function DiffViewToggle({ value, onChange }: { value: DiffViewMode; onChange: (mode: DiffViewMode) => void }) {
   return (
-    <div className="flex rounded-md border border-border">
+    <div className="border-border flex rounded-md border">
       <button
         onClick={() => onChange('unified')}
         className={cn(
@@ -96,7 +96,7 @@ function DiffViewToggle({ value, onChange }: { value: DiffViewMode; onChange: (m
       <button
         onClick={() => onChange('split')}
         className={cn(
-          'border-l border-border px-3 py-1 text-xs transition-colors',
+          'border-border border-l px-3 py-1 text-xs transition-colors',
           value === 'split' ? 'bg-surface-hover text-foreground' : 'text-foreground-muted hover:text-foreground'
         )}
       >

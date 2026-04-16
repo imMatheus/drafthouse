@@ -101,10 +101,10 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
   }
 
   return (
-    <div className="px-6 pb-4 pt-2">
+    <div className="px-6 pt-2 pb-4">
       <div
         className={cn(
-          'mx-auto max-w-3xl rounded-xl border border-border bg-surface transition-colors',
+          'border-border bg-surface mx-auto max-w-3xl rounded-xl border transition-colors',
           isDragOver && 'border-accent bg-surface-hover'
         )}
         onDragOver={handleDragOver}
@@ -130,7 +130,7 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
               })
             }}
             disabled={isRunning}
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
+            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-50"
             title="Attach files"
           >
             <Plus size={16} />
@@ -144,13 +144,13 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
             placeholder={isDragOver ? 'Drop files here...' : 'Reply...'}
             rows={1}
             disabled={isRunning}
-            className="min-h-[24px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none disabled:opacity-50"
+            className="text-foreground placeholder:text-foreground-subtle min-h-[24px] flex-1 resize-none bg-transparent text-sm focus:outline-none disabled:opacity-50"
           />
 
           {isRunning ? (
             <button
               onClick={onStop}
-              className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-danger text-white transition-colors hover:opacity-90"
+              className="bg-danger flex size-7 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:opacity-90"
               title="Stop agent"
             >
               <Square size={14} />
@@ -159,7 +159,7 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
             <button
               onClick={() => void handleSubmit()}
               disabled={!canSubmit}
-              className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground text-background transition-colors hover:opacity-80 disabled:opacity-30"
+              className="bg-foreground text-background flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-80 disabled:opacity-30"
               title="Send"
             >
               <ArrowUp size={14} strokeWidth={2.5} />
@@ -192,11 +192,11 @@ function FilePreview({ filePath, onRemove }: { filePath: string; onRemove: () =>
 
   if (isImage) {
     return (
-      <div className="group relative size-20 overflow-hidden rounded-lg border border-border bg-interactive">
+      <div className="group border-border bg-interactive relative size-20 overflow-hidden rounded-lg border">
         {dataUrl && <img src={dataUrl} alt={fileName} className="size-full object-cover" />}
         <button
           onClick={onRemove}
-          className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground-subtle opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          className="bg-background/80 text-foreground-subtle hover:text-foreground absolute top-1 right-1 flex size-5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
         >
           <X size={12} />
         </button>
@@ -205,14 +205,14 @@ function FilePreview({ filePath, onRemove }: { filePath: string; onRemove: () =>
   }
 
   return (
-    <div className="group relative flex items-center gap-2 rounded-lg border border-border bg-interactive px-3 py-2">
-      <FileText size={14} className="shrink-0 text-foreground-subtle" />
-      <span className="max-w-[120px] truncate text-xs text-foreground-muted" title={filePath}>
+    <div className="group border-border bg-interactive relative flex items-center gap-2 rounded-lg border px-3 py-2">
+      <FileText size={14} className="text-foreground-subtle shrink-0" />
+      <span className="text-foreground-muted max-w-[120px] truncate text-xs" title={filePath}>
         {fileName}
       </span>
       <button
         onClick={onRemove}
-        className="flex size-4 shrink-0 items-center justify-center rounded-full text-foreground-subtle opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+        className="text-foreground-subtle hover:text-foreground flex size-4 shrink-0 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100"
       >
         <X size={12} />
       </button>

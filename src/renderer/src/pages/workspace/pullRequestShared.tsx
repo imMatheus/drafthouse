@@ -74,8 +74,8 @@ export function DiffStat({ additions, deletions }: { additions: number; deletion
       className="inline-flex items-center gap-2 text-xs"
       aria-label={`${additions} additions and ${deletions} deletions`}
     >
-      <span className="font-semibold text-success">+{additions}</span>
-      <span className="font-semibold text-danger">-{deletions}</span>
+      <span className="text-success font-semibold">+{additions}</span>
+      <span className="text-danger font-semibold">-{deletions}</span>
     </span>
   )
 }

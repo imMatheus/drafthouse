@@ -19,7 +19,7 @@ interface ActivityBarProps {
 
 export default function ActivityBar({ items, onSettingsClick, settingsActive }: ActivityBarProps) {
   return (
-    <div className="flex h-screen w-12 shrink-0 flex-col items-center border-r border-border bg-background py-2">
+    <div className="border-border bg-background flex h-screen w-12 shrink-0 flex-col items-center border-r py-2">
       <div className="flex w-full flex-col items-center gap-1">
         {items.map((item) => {
           const Icon = item.icon
@@ -38,7 +38,7 @@ export default function ActivityBar({ items, onSettingsClick, settingsActive }: 
             >
               <Icon size={18} strokeWidth={1.75} />
               {item.badge != null && item.badge > 0 && (
-                <span className="absolute bottom-0.5 right-0.5 flex px-1 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-white">
+                <span className="bg-accent absolute right-0.5 bottom-0.5 flex items-center justify-center rounded-full px-1 text-[7px] font-bold text-white">
                   {item.badge >= 1000 ? `${Math.floor(item.badge / 1000)}k+` : item.badge}
                 </span>
               )}

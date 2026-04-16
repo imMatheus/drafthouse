@@ -103,15 +103,15 @@ export default function InlineAgentResponseCard({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-surface">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <div className="border-border bg-surface rounded-lg border">
+      <div className="border-border flex items-center gap-2 border-b px-4 py-3">
         <img src={claudeLogoUrl} alt="Claude" className="size-6 rounded-full" />
-        <span className="text-sm font-medium text-foreground">Claude</span>
+        <span className="text-foreground text-sm font-medium">Claude</span>
         <div className="ml-auto flex items-center gap-1.5">
           {isRunning && (
             <button
               onClick={onStop}
-              className="flex size-6 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-hover hover:text-danger"
+              className="text-foreground-muted hover:bg-surface-hover hover:text-danger flex size-6 items-center justify-center rounded-md transition-colors"
               title="Stop agent"
             >
               <Square size={12} />
@@ -120,7 +120,7 @@ export default function InlineAgentResponseCard({
           {session.cliSessionId && (
             <button
               onClick={onOpenInChat}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+              className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
               title="Continue in chat tab"
             >
               <ExternalLink size={12} />
@@ -135,15 +135,15 @@ export default function InlineAgentResponseCard({
         <UserBubble text={session.prompt} />
         {/* While thinking and no response yet: show latest step */}
         {isRunning && !hasResponse && thinkingStepCount > 0 && (
-          <div className="flex items-center gap-2 py-1 text-accent">
+          <div className="text-accent flex items-center gap-2 py-1">
             <AgentSpinner />
-            <span className="truncate text-xs text-foreground-muted">{latestThinkingLabel}</span>
+            <span className="text-foreground-muted truncate text-xs">{latestThinkingLabel}</span>
           </div>
         )}
 
         {/* While thinking with no steps yet */}
         {isRunning && !hasResponse && thinkingStepCount === 0 && (
-          <div className="flex items-center gap-2 py-1 text-accent">
+          <div className="text-accent flex items-center gap-2 py-1">
             <AgentSpinner />
             <span className="text-xs">Thinking...</span>
           </div>
@@ -154,7 +154,7 @@ export default function InlineAgentResponseCard({
           <div className="mb-3">
             <button
               onClick={() => setThinkingExpanded(!thinkingExpanded)}
-              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+              className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors"
             >
               <ChevronRight
                 size={12}
@@ -166,7 +166,7 @@ export default function InlineAgentResponseCard({
             </button>
 
             {thinkingExpanded && (
-              <div className="mt-2 rounded-md border border-border bg-background px-3 py-2">
+              <div className="border-border bg-background mt-2 rounded-md border px-3 py-2">
                 {thinkingEvents.map((event, i) => (
                   <AgentMessageBlock key={i} event={event} inlineToolIds={inlineToolIds} />
                 ))}
@@ -182,27 +182,27 @@ export default function InlineAgentResponseCard({
 
         {/* Streaming indicator when response is coming in */}
         {isRunning && hasResponse && (
-          <div className="flex items-center gap-2 py-1 text-accent">
+          <div className="text-accent flex items-center gap-2 py-1">
             <AgentSpinner />
           </div>
         )}
 
         {lastResultEvent && !isRunning && (
-          <div className="mt-2 flex items-center gap-3 text-xs text-foreground-subtle">
+          <div className="text-foreground-subtle mt-2 flex items-center gap-3 text-xs">
             <span>{(lastResultEvent.duration_ms / 1000).toFixed(1)}s</span>
             <span>${lastResultEvent.total_cost_usd.toFixed(4)}</span>
           </div>
         )}
 
         {session.status === 'error' && !lastResultEvent && (
-          <div className="mt-2 rounded-md border border-danger/30 bg-danger/5 px-3 py-2">
-            <p className="text-xs text-danger">Agent encountered an error</p>
+          <div className="border-danger/30 bg-danger/5 mt-2 rounded-md border px-3 py-2">
+            <p className="text-danger text-xs">Agent encountered an error</p>
           </div>
         )}
 
         {/* Follow-up input */}
         {canContinue && (
-          <div className="mt-3 flex items-end gap-2 rounded-lg border border-border bg-background p-2">
+          <div className="border-border bg-background mt-3 flex items-end gap-2 rounded-lg border p-2">
             <textarea
               ref={followUpRef}
               value={followUp}
@@ -222,7 +222,7 @@ export default function InlineAgentResponseCard({
               }}
               placeholder="Ask a follow-up..."
               rows={1}
-              className="min-h-[24px] flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+              className="text-foreground placeholder:text-foreground-subtle min-h-[24px] flex-1 resize-none bg-transparent text-sm focus:outline-none"
             />
             <button
               onClick={() => {
@@ -231,7 +231,7 @@ export default function InlineAgentResponseCard({
                 setFollowUp('')
               }}
               disabled={!followUp.trim()}
-              className="flex size-6 shrink-0 items-center justify-center rounded-md bg-foreground text-background transition-colors hover:opacity-80 disabled:opacity-30"
+              className="bg-foreground text-background flex size-6 shrink-0 items-center justify-center rounded-md transition-colors hover:opacity-80 disabled:opacity-30"
             >
               <ArrowUp size={12} strokeWidth={2.5} />
             </button>

@@ -122,13 +122,13 @@ export default function PullRequestDetailView({
     setThreadJumpTarget(null)
   }, [number, owner, repo])
 
-  if (isLoading) return <p className="text-sm text-foreground-muted">Loading pull request...</p>
+  if (isLoading) return <p className="text-foreground-muted text-sm">Loading pull request...</p>
 
   if (error) {
     return (
-      <div className="max-w-xl rounded-lg border border-border bg-surface p-4">
-        <h2 className="text-sm font-semibold text-foreground">Pull request unavailable</h2>
-        <p className="mt-2 text-sm text-foreground-muted">{error.message}</p>
+      <div className="border-border bg-surface max-w-xl rounded-lg border p-4">
+        <h2 className="text-foreground text-sm font-semibold">Pull request unavailable</h2>
+        <p className="text-foreground-muted mt-2 text-sm">{error.message}</p>
       </div>
     )
   }
@@ -148,14 +148,14 @@ export default function PullRequestDetailView({
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-xl font-semibold text-foreground">
-          {pr.title} <span className="font-normal text-foreground-subtle">#{pr.number}</span>
+        <h1 className="text-foreground text-xl font-semibold">
+          {pr.title} <span className="text-foreground-subtle font-normal">#{pr.number}</span>
         </h1>
         <a
           href={pr.html_url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-interactive px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+          className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
         >
           View on GitHub
           <ExternalLink size={13} />
@@ -169,16 +169,16 @@ export default function PullRequestDetailView({
           <GitPullRequest size={14} />
           {statusLabel}
         </span>
-        <p className="text-xs text-foreground-muted">
-          <span className="font-medium text-foreground">{pr.user.login}</span> wants to merge {pr.commits} commit
+        <p className="text-foreground-muted text-xs">
+          <span className="text-foreground font-medium">{pr.user.login}</span> wants to merge {pr.commits} commit
           {pr.commits !== 1 ? 's' : ''} into{' '}
-          <code className="rounded bg-accent-bg px-1.5 py-0.5 text-xs text-accent">{pr.base.ref}</code> from{' '}
-          <code className="rounded bg-accent-bg px-1.5 py-0.5 text-xs text-accent">{pr.head.ref}</code>
+          <code className="bg-accent-bg text-accent rounded px-1.5 py-0.5 text-xs">{pr.base.ref}</code> from{' '}
+          <code className="bg-accent-bg text-accent rounded px-1.5 py-0.5 text-xs">{pr.head.ref}</code>
         </p>
         <DiffStat additions={pr.additions} deletions={pr.deletions} />
       </div>
 
-      <nav className="mt-4 flex gap-1 border-b border-border">
+      <nav className="border-border mt-4 flex gap-1 border-b">
         <PRDetailTabButton
           active={subview === 'conversation'}
           onClick={() => onSubviewChange('conversation')}
@@ -288,7 +288,7 @@ function PRDetailTabButton({
         'inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors',
         active
           ? 'border-foreground-muted text-foreground'
-          : 'border-transparent text-foreground-muted hover:text-foreground'
+          : 'text-foreground-muted hover:text-foreground border-transparent'
       )}
     >
       {icon}
@@ -374,12 +374,12 @@ function PRConversationTab({
       <PRDescriptionCard pr={pr} owner={owner} repo={repo} />
 
       {conversationError ? (
-        <div className="rounded-lg border border-border bg-surface px-4 py-3">
-          <p className="text-sm text-foreground-muted">{conversationError.message}</p>
+        <div className="border-border bg-surface rounded-lg border px-4 py-3">
+          <p className="text-foreground-muted text-sm">{conversationError.message}</p>
         </div>
       ) : null}
 
-      {isLoadingConversation ? <p className="text-sm text-foreground-muted">Loading conversation...</p> : null}
+      {isLoadingConversation ? <p className="text-foreground-muted text-sm">Loading conversation...</p> : null}
 
       {timelineItems.map((item) => (
         <PullRequestTimelineCard
@@ -489,14 +489,14 @@ function PullRequestTimelineCard({
     const commentId = Number(item.id.replace('issue-comment-', ''))
 
     return (
-      <div className="rounded-lg border border-border bg-surface">
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <div className="border-border bg-surface rounded-lg border">
+        <div className="border-border flex items-center gap-2 border-b px-4 py-3">
           <img src={item.user.avatar_url} alt={item.user.login} className="size-6 rounded-full" />
-          <span className="text-sm font-medium text-foreground">{item.user.login}</span>
-          <span className="text-xs text-foreground-subtle">commented {formatRelativeTime(item.createdAt)}</span>
+          <span className="text-foreground text-sm font-medium">{item.user.login}</span>
+          <span className="text-foreground-subtle text-xs">commented {formatRelativeTime(item.createdAt)}</span>
         </div>
         <MarkdownBody className="p-4">{item.body}</MarkdownBody>
-        <div className="border-t border-border px-4 py-2">
+        <div className="border-border border-t px-4 py-2">
           <ReactionBar owner={owner} repo={repo} commentId={commentId} commentType="issue-comment" />
         </div>
       </div>
@@ -506,17 +506,17 @@ function PullRequestTimelineCard({
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-3">
       <div className="flex flex-col items-center">
-        <img src={item.user.avatar_url} alt={item.user.login} className="size-8 rounded-full border border-border" />
-        <div className="mt-2 flex min-h-8 size-8 items-center justify-center rounded-full border border-border bg-surface text-foreground-muted">
+        <img src={item.user.avatar_url} alt={item.user.login} className="border-border size-8 rounded-full border" />
+        <div className="border-border bg-surface text-foreground-muted mt-2 flex size-8 min-h-8 items-center justify-center rounded-full border">
           <Eye size={14} />
         </div>
-        <div className="mt-2 min-h-8 w-px flex-1 bg-border" />
+        <div className="bg-border mt-2 min-h-8 w-px flex-1" />
       </div>
 
       <div className="min-w-0">
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-          <div className="min-w-0 flex-1 text-sm text-foreground-muted">
-            <span className="font-semibold text-foreground">{item.user.login}</span>{' '}
+        <div className="border-border bg-surface flex items-center gap-3 rounded-xl border px-4 py-3">
+          <div className="text-foreground-muted min-w-0 flex-1 text-sm">
+            <span className="text-foreground font-semibold">{item.user.login}</span>{' '}
             <span>
               {item.review ? getReviewStateText(item.review.state) : 'left a review'}{' '}
               {formatRelativeTime(item.createdAt)}
@@ -526,7 +526,7 @@ function PullRequestTimelineCard({
         </div>
 
         {item.review?.body ? (
-          <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="border-border bg-surface mt-3 overflow-hidden rounded-xl border">
             <MarkdownBody className="p-4">{item.review.body}</MarkdownBody>
           </div>
         ) : null}
@@ -667,8 +667,8 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
 
   if (isEditing) {
     return (
-      <div className="rounded-lg border border-border bg-surface">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+      <div className="border-border bg-surface rounded-lg border">
+        <div className="border-border flex items-center justify-between border-b px-3 py-2">
           <div className="flex">
             <button
               onClick={() => setEditTab('write')}
@@ -718,7 +718,7 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
               >
                 <Italic size={14} />
               </button>
-              <div className="mx-1 h-4 w-px bg-border" />
+              <div className="bg-border mx-1 h-4 w-px" />
               <button
                 type="button"
                 title="Unordered list"
@@ -735,7 +735,7 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
               >
                 <ListOrdered size={14} />
               </button>
-              <div className="mx-1 h-4 w-px bg-border" />
+              <div className="bg-border mx-1 h-4 w-px" />
               <button
                 type="button"
                 title="Code"
@@ -765,30 +765,30 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
             value={editBody}
             onChange={(e) => setEditBody(e.target.value)}
             placeholder="Add a description..."
-            className="min-h-[180px] w-full resize-y bg-transparent p-4 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+            className="text-foreground placeholder:text-foreground-subtle min-h-[180px] w-full resize-y bg-transparent p-4 text-sm focus:outline-none"
           />
         ) : (
           <div className="min-h-[180px]">
             {editBody ? (
               <MarkdownBody className="p-4">{editBody}</MarkdownBody>
             ) : (
-              <p className="p-4 text-foreground-subtle">Nothing to preview</p>
+              <p className="text-foreground-subtle p-4">Nothing to preview</p>
             )}
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+        <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
           <button
             onClick={handleCancel}
             disabled={isSaving}
-            className="rounded-md bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-hover disabled:opacity-40"
+            className="bg-interactive text-foreground hover:bg-surface-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
           >
             Cancel
           </button>
           <button
             onClick={() => void handleSave()}
             disabled={isSaving}
-            className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:opacity-40"
+            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
@@ -798,14 +798,14 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
   }
 
   return (
-    <div className="rounded-lg border border-border bg-surface">
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <div className="border-border bg-surface rounded-lg border">
+      <div className="border-border flex items-center gap-2 border-b px-4 py-3">
         <img src={pr.user.avatar_url} alt={pr.user.login} className="size-6 rounded-full" />
-        <span className="text-sm font-medium text-foreground">{pr.user.login}</span>
-        <span className="text-xs text-foreground-subtle">commented {formatRelativeTime(pr.created_at)}</span>
+        <span className="text-foreground text-sm font-medium">{pr.user.login}</span>
+        <span className="text-foreground-subtle text-xs">commented {formatRelativeTime(pr.created_at)}</span>
         <button
           onClick={handleEdit}
-          className="ml-auto rounded p-1 text-foreground-subtle transition-colors hover:bg-surface-hover hover:text-foreground"
+          className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground ml-auto rounded p-1 transition-colors"
           title="Edit description"
         >
           <Pencil size={14} />
@@ -814,7 +814,7 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
       {pr.body ? (
         <MarkdownBody className="p-4">{pr.body}</MarkdownBody>
       ) : (
-        <p className="p-4 text-sm text-foreground-subtle">No description provided.</p>
+        <p className="text-foreground-subtle p-4 text-sm">No description provided.</p>
       )}
     </div>
   )
@@ -913,11 +913,11 @@ function CommentBox({
         {auth?.user.avatar_url && (
           <img src={auth.user.avatar_url} alt={auth.user.login} className="size-8 rounded-full" />
         )}
-        <h3 className="text-sm font-semibold text-foreground">Add a comment</h3>
+        <h3 className="text-foreground text-sm font-semibold">Add a comment</h3>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+      <div className="border-border bg-surface rounded-lg border">
+        <div className="border-border flex items-center justify-between border-b px-3 py-2">
           <div className="flex">
             <button
               onClick={() => setActiveTab('write')}
@@ -969,7 +969,7 @@ function CommentBox({
               >
                 <Italic size={14} />
               </button>
-              <div className="mx-1 h-4 w-px bg-border" />
+              <div className="bg-border mx-1 h-4 w-px" />
               <button
                 type="button"
                 title="Unordered list"
@@ -986,7 +986,7 @@ function CommentBox({
               >
                 <ListOrdered size={14} />
               </button>
-              <div className="mx-1 h-4 w-px bg-border" />
+              <div className="bg-border mx-1 h-4 w-px" />
               <button
                 type="button"
                 title="Code"
@@ -1025,19 +1025,19 @@ function CommentBox({
             {body ? (
               <MarkdownBody className="p-4">{body}</MarkdownBody>
             ) : (
-              <p className="p-4 text-foreground-subtle">Nothing to preview</p>
+              <p className="text-foreground-subtle p-4">Nothing to preview</p>
             )}
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <p className="text-xs text-foreground-subtle">
+        <div className="border-border flex items-center justify-between border-t px-4 py-3">
+          <p className="text-foreground-subtle text-xs">
             {claudeMention ? 'Claude will respond inline with PR context' : 'Markdown is supported'}
           </p>
           <button
             onClick={handleSubmit}
             disabled={!body.trim() || isSubmitting}
-            className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Commenting...' : claudeMention ? 'Ask Claude' : 'Comment'}
           </button>
@@ -1160,7 +1160,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
         : null
 
   return (
-    <div className="mt-4 rounded-lg border border-border bg-surface p-4">
+    <div className="border-border bg-surface mt-4 rounded-lg border p-4">
       <div className="flex flex-wrap items-center gap-3">
         {state === 'open' ? (
           <>
@@ -1168,7 +1168,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
               <button
                 onClick={handleMerge}
                 disabled={isSubmitting || pr.mergeable === null || mergeDisabledReason !== null}
-                className="rounded-l-md bg-success px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+                className="bg-success text-foreground hover:bg-success/80 rounded-l-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <GitMerge size={14} />
@@ -1182,15 +1182,15 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
               <button
                 onClick={() => setIsMergeMethodOpen(!isMergeMethodOpen)}
                 disabled={isSubmitting}
-                className="rounded-r-md border-l border-success/30 bg-success px-2 py-2 text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+                className="border-success/30 bg-success text-foreground hover:bg-success/80 rounded-r-md border-l px-2 py-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronDown size={14} />
               </button>
               {isMergeMethodOpen ? (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setIsMergeMethodOpen(false)} />
-                  <div className="absolute left-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
-                    <div className="border-b border-border px-3 py-2 text-xs font-medium text-foreground-muted">
+                  <div className="border-border bg-surface absolute top-full left-0 z-20 mt-2 w-56 overflow-hidden rounded-lg border shadow-xl">
+                    <div className="border-border text-foreground-muted border-b px-3 py-2 text-xs font-medium">
                       Merge method
                     </div>
                     {MERGE_METHOD_OPTIONS.map((option) => (
@@ -1201,7 +1201,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
                           setMergeMethod(option.key)
                           setIsMergeMethodOpen(false)
                         }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover"
+                        className="text-foreground hover:bg-surface-hover flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
                       >
                         <span className="inline-flex size-4 items-center justify-center">
                           {mergeMethod === option.key ? <Check size={13} /> : null}
@@ -1217,7 +1217,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleClose}
               disabled={isSubmitting}
-              className="rounded-md border border-border bg-interactive px-4 py-2 text-xs font-medium text-danger transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? 'Closing...' : 'Close pull request'}
             </button>
@@ -1225,7 +1225,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleConvertToDraft}
               disabled={isSubmitting}
-              className="rounded-md px-4 py-2 text-xs font-medium text-foreground-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              className="text-foreground-muted hover:text-foreground rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               Convert to draft
             </button>
@@ -1237,7 +1237,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleMarkReady}
               disabled={isSubmitting}
-              className="rounded-md bg-success px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? 'Marking ready...' : 'Ready for review'}
             </button>
@@ -1245,7 +1245,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleClose}
               disabled={isSubmitting}
-              className="rounded-md border border-border bg-interactive px-4 py-2 text-xs font-medium text-danger transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? 'Closing...' : 'Close pull request'}
             </button>
@@ -1256,16 +1256,16 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
           <button
             onClick={handleReopen}
             disabled={isSubmitting}
-            className="rounded-md bg-success px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-success/80 disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Reopening...' : 'Reopen pull request'}
           </button>
         ) : null}
       </div>
 
-      {mergeDisabledReason ? <p className="mt-2 text-sm text-danger">{mergeDisabledReason}</p> : null}
+      {mergeDisabledReason ? <p className="text-danger mt-2 text-sm">{mergeDisabledReason}</p> : null}
 
-      {errorMessage ? <p className="mt-2 text-sm text-danger">{errorMessage}</p> : null}
+      {errorMessage ? <p className="text-danger mt-2 text-sm">{errorMessage}</p> : null}
     </div>
   )
 }
@@ -1274,45 +1274,45 @@ function PRDetailSidebar({ pr }: { pr: PullRequestDetail }) {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <p className="mb-2 text-xs font-medium text-foreground-muted">Reviewers</p>
+        <p className="text-foreground-muted mb-2 text-xs font-medium">Reviewers</p>
         {pr.requested_reviewers.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             {pr.requested_reviewers.map((reviewer) => (
               <div key={reviewer.login} className="flex items-center gap-2">
                 <img src={reviewer.avatar_url} alt={reviewer.login} className="size-5 rounded-full" />
-                <span className="text-xs text-foreground">{reviewer.login}</span>
+                <span className="text-foreground text-xs">{reviewer.login}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-foreground-subtle">None yet</p>
+          <p className="text-foreground-subtle text-xs">None yet</p>
         )}
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium text-foreground-muted">Assignees</p>
+        <p className="text-foreground-muted mb-2 text-xs font-medium">Assignees</p>
         {pr.assignees.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             {pr.assignees.map((assignee) => (
               <div key={assignee.login} className="flex items-center gap-2">
                 <img src={assignee.avatar_url} alt={assignee.login} className="size-5 rounded-full" />
-                <span className="text-xs text-foreground">{assignee.login}</span>
+                <span className="text-foreground text-xs">{assignee.login}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-foreground-subtle">No one assigned</p>
+          <p className="text-foreground-subtle text-xs">No one assigned</p>
         )}
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-medium text-foreground-muted">Labels</p>
+        <p className="text-foreground-muted mb-2 text-xs font-medium">Labels</p>
         {pr.labels.length > 0 ? (
           <div className="flex flex-wrap gap-1">
             {pr.labels.map((label) => (
               <span
                 key={label.name}
-                className="rounded-full border border-border px-2 py-0.5 text-xs text-foreground"
+                className="border-border text-foreground rounded-full border px-2 py-0.5 text-xs"
                 style={{ borderColor: `#${label.color}40`, backgroundColor: `#${label.color}15` }}
               >
                 {label.name}
@@ -1320,7 +1320,7 @@ function PRDetailSidebar({ pr }: { pr: PullRequestDetail }) {
             ))}
           </div>
         ) : (
-          <p className="text-xs text-foreground-subtle">None yet</p>
+          <p className="text-foreground-subtle text-xs">None yet</p>
         )}
       </div>
     </div>
@@ -1356,25 +1356,25 @@ function MergedBranchSwitchBanner({
   }
 
   return (
-    <div className="mt-8 rounded-lg border border-border bg-surface p-4">
+    <div className="border-border bg-surface mt-8 rounded-lg border p-4">
       <div className="flex items-start gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-interactive">
+        <div className="bg-interactive flex size-8 shrink-0 items-center justify-center rounded-full">
           <GitMerge size={16} className="text-foreground-muted" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-foreground">Pull request merged</p>
-          <p className="mt-0.5 text-xs text-foreground-muted">
-            You're still on <code className="rounded bg-accent-bg px-1 py-0.5 text-accent">{headBranch}</code>. Switch
-            to <code className="rounded bg-accent-bg px-1 py-0.5 text-accent">{baseBranch}</code> to continue working.
+          <p className="text-foreground text-sm font-medium">Pull request merged</p>
+          <p className="text-foreground-muted mt-0.5 text-xs">
+            You're still on <code className="bg-accent-bg text-accent rounded px-1 py-0.5">{headBranch}</code>. Switch
+            to <code className="bg-accent-bg text-accent rounded px-1 py-0.5">{baseBranch}</code> to continue working.
           </p>
-          {errorMessage ? <p className="mt-2 text-xs text-danger">{errorMessage}</p> : null}
+          {errorMessage ? <p className="text-danger mt-2 text-xs">{errorMessage}</p> : null}
         </div>
         <button
           type="button"
           onClick={handleSwitch}
           disabled={status === 'switching' || status === 'done'}
           className={cn(
-            'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-foreground transition-all',
+            'text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
             status === 'switching' ? 'bg-success/70' : 'bg-success hover:bg-success/80'
           )}
         >
@@ -1385,7 +1385,7 @@ function MergedBranchSwitchBanner({
             </>
           ) : status === 'switching' ? (
             <>
-              <span className="size-3 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+              <span className="border-foreground/30 border-t-foreground size-3 animate-spin rounded-full border-2" />
               <span>Switching...</span>
             </>
           ) : (

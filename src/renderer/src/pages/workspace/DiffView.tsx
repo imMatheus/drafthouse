@@ -38,7 +38,7 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-foreground-muted">Loading diff...</p>
+        <p className="text-foreground-muted text-sm">Loading diff...</p>
       </div>
     )
   }
@@ -46,15 +46,15 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border bg-surface px-4 py-2">
-        <span className="text-xs font-medium text-foreground">{filePath}</span>
-        <span className="rounded bg-interactive px-1.5 py-0.5 text-[10px] text-foreground-muted">
+      <div className="border-border bg-surface flex items-center gap-2 border-b px-4 py-2">
+        <span className="text-foreground text-xs font-medium">{filePath}</span>
+        <span className="bg-interactive text-foreground-muted rounded px-1.5 py-0.5 text-[10px]">
           {staged ? 'Staged' : 'Working Tree'}
         </span>
         {onOpenFile ? (
           <button
             onClick={() => onOpenFile(`${folderPath}/${filePath}`)}
-            className="ml-auto flex items-center gap-1 text-xs text-foreground-muted hover:text-foreground"
+            className="text-foreground-muted hover:text-foreground ml-auto flex items-center gap-1 text-xs"
           >
             <ExternalLink size={12} />
             Open File

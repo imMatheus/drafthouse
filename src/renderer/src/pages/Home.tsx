@@ -35,35 +35,35 @@ export default function Home({ onOpenFolder }: { onOpenFolder: (path: string) =>
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
       <div className="flex flex-col items-center gap-2">
-        <h1 className="text-3xl font-bold text-foreground">Welcome to Drafthouse</h1>
-        <p className="text-sm text-foreground-muted">Open a folder to get started</p>
+        <h1 className="text-foreground text-3xl font-bold">Welcome to Drafthouse</h1>
+        <p className="text-foreground-muted text-sm">Open a folder to get started</p>
       </div>
 
       <button
         onClick={handleOpen}
-        className="rounded-lg bg-accent px-5 py-2.5 font-medium text-foreground hover:bg-accent-hover"
+        className="bg-accent text-foreground hover:bg-accent-hover rounded-lg px-5 py-2.5 font-medium"
       >
         Open Folder
       </button>
 
       {recentFolderError && (
-        <div className="w-full max-w-sm rounded-lg border border-border bg-surface px-4 py-3">
-          <p className="text-sm text-foreground-muted">{recentFolderError}</p>
+        <div className="border-border bg-surface w-full max-w-sm rounded-lg border px-4 py-3">
+          <p className="text-foreground-muted text-sm">{recentFolderError}</p>
         </div>
       )}
 
       {recentFolders && recentFolders.length > 0 && (
         <div className="w-full max-w-sm">
-          <h2 className="mb-3 text-xs font-medium text-foreground-muted">Recent</h2>
+          <h2 className="text-foreground-muted mb-3 text-xs font-medium">Recent</h2>
           <ul className="flex flex-col gap-0.5">
             {recentFolders.map((folder) => (
               <li key={folder}>
                 <button
                   onClick={() => handleOpenRecent(folder)}
-                  className="flex w-full flex-col rounded-md px-3 py-2 text-left transition-colors hover:bg-surface-hover"
+                  className="hover:bg-surface-hover flex w-full flex-col rounded-md px-3 py-2 text-left transition-colors"
                 >
-                  <span className="text-sm text-foreground">{getPathBasename(folder)}</span>
-                  <span className="truncate text-xs text-foreground-subtle">{folder}</span>
+                  <span className="text-foreground text-sm">{getPathBasename(folder)}</span>
+                  <span className="text-foreground-subtle truncate text-xs">{folder}</span>
                 </button>
               </li>
             ))}

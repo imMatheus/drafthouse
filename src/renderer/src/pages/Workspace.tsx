@@ -424,7 +424,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   ]
 
   return (
-    <div className="flex flex-1 bg-background w-screen">
+    <div className="bg-background flex w-screen flex-1">
       <ActivityBar
         items={activityItems}
         onSettingsClick={handleToggleSettings}
@@ -440,7 +440,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           ) : null}
 
           {sidebar.visible && sidebar.activePanel === 'source-control' ? (
-            <SourceControlPanel folderPath={folderPath} gitInfo={gitInfo} onOpenDiff={handleOpenDiff} onOpenPullRequest={handleOpenPullRequest} />
+            <SourceControlPanel
+              folderPath={folderPath}
+              gitInfo={gitInfo}
+              onOpenDiff={handleOpenDiff}
+              onOpenPullRequest={handleOpenPullRequest}
+            />
           ) : null}
 
           {sidebar.visible && sidebar.activePanel === 'pull-requests' ? (
@@ -560,7 +565,7 @@ function renderWorkspaceTabContent({
       )
     case 'pull-request':
       if (isLoadingGitInfo) {
-        return <p className="text-sm text-foreground-muted">Checking repository metadata...</p>
+        return <p className="text-foreground-muted text-sm">Checking repository metadata...</p>
       }
 
       return gitInfo ? (

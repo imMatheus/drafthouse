@@ -71,7 +71,7 @@ function AppContent(): React.JSX.Element {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
+      <div className="bg-background flex h-screen items-center justify-center">
         <p className="text-foreground-muted">Loading...</p>
       </div>
     )
@@ -84,7 +84,7 @@ function AppContent(): React.JSX.Element {
       <Route
         path="/"
         element={
-          <div className="flex h-screen bg-background">
+          <div className="bg-background flex h-screen">
             <RepoSidebar />
             <Home onOpenFolder={openWorkspace} />
           </div>
@@ -93,7 +93,7 @@ function AppContent(): React.JSX.Element {
       <Route
         path="/workspace/*"
         element={
-          <div className="flex h-screen bg-background">
+          <div className="bg-background flex h-screen">
             <Workspace
               session={workspaceSession}
               onCloseWorkspace={closeWorkspace}

@@ -62,10 +62,10 @@ export default function ClaudeMentionTextarea({
           and don't shift text layout, so cursor alignment stays perfect. */}
       {hasClaudePrefix && (
         <div
-          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3 text-sm"
+          className="pointer-events-none absolute inset-0 overflow-hidden px-4 py-3 text-sm break-words whitespace-pre-wrap"
           aria-hidden
         >
-          <span className="rounded-sm bg-accent/15 font-medium text-accent">{value.match(/^@claude/i)?.[0]}</span>
+          <span className="bg-accent/15 text-accent rounded-sm font-medium">{value.match(/^@claude/i)?.[0]}</span>
           <span className="text-foreground">{value.slice(value.match(/^@claude/i)?.[0]?.length ?? 0)}</span>
         </div>
       )}
@@ -77,26 +77,26 @@ export default function ClaudeMentionTextarea({
         placeholder={placeholder}
         rows={rows}
         className={cn(
-          'w-full resize-y bg-transparent px-4 py-3 text-sm placeholder:text-foreground-subtle focus:outline-none',
-          hasClaudePrefix ? 'text-transparent caret-foreground' : 'text-foreground',
+          'placeholder:text-foreground-subtle w-full resize-y bg-transparent px-4 py-3 text-sm focus:outline-none',
+          hasClaudePrefix ? 'caret-foreground text-transparent' : 'text-foreground',
           className
         )}
       />
       {/* Autocomplete dropdown */}
       {showMentionMenu && (
-        <div className="absolute left-4 top-10 z-10 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <div className="border-border bg-surface absolute top-10 left-4 z-10 overflow-hidden rounded-lg border shadow-lg">
           <button
             type="button"
             onMouseDown={(e) => {
               e.preventDefault()
               acceptMention()
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-surface-hover"
+            className="hover:bg-surface-hover flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors"
           >
             <img src={claudeLogoUrl} alt="Claude" className="size-6 rounded-full" />
             <div>
-              <p className="text-sm font-medium text-foreground">claude</p>
-              <p className="text-xs text-foreground-muted">{menuLabel}</p>
+              <p className="text-foreground text-sm font-medium">claude</p>
+              <p className="text-foreground-muted text-xs">{menuLabel}</p>
             </div>
           </button>
         </div>

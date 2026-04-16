@@ -46,7 +46,7 @@ export default function AgentView({
         onNewSession={handleNewSession}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col bg-background">
+      <div className="bg-background flex min-w-0 flex-1 flex-col">
         {activeSession ? (
           <>
             <AgentConversation session={activeSession} />
@@ -59,7 +59,7 @@ export default function AgentView({
         ) : (
           <div className="flex flex-1 flex-col">
             <div className="flex flex-1 items-center justify-center">
-              <p className="text-sm text-foreground-subtle">What would you like the agent to do?</p>
+              <p className="text-foreground-subtle text-sm">What would you like the agent to do?</p>
             </div>
             <AgentPromptBar onSubmit={handleSubmit} onStop={() => {}} isRunning={false} />
           </div>

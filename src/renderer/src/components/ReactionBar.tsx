@@ -124,7 +124,7 @@ export default function ReactionBar({ owner, repo, commentId, commentType }: Rea
             e.stopPropagation()
             setShowPicker(!showPicker)
           }}
-          className="inline-flex size-6 items-center justify-center rounded-full border border-border text-foreground-subtle transition-colors hover:border-accent/40 hover:bg-surface-hover hover:text-foreground"
+          className="border-border text-foreground-subtle hover:border-accent/40 hover:bg-surface-hover hover:text-foreground inline-flex size-6 items-center justify-center rounded-full border transition-colors"
           title="Add reaction"
         >
           <SmilePlus size={12} />
@@ -132,7 +132,7 @@ export default function ReactionBar({ owner, repo, commentId, commentType }: Rea
 
         {showPicker ? (
           <div
-            className="absolute bottom-full left-0 z-20 mb-1 flex gap-0.5 rounded-lg border border-border bg-surface p-1.5 shadow-lg"
+            className="border-border bg-surface absolute bottom-full left-0 z-20 mb-1 flex gap-0.5 rounded-lg border p-1.5 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             {REACTION_EMOJIS.map((r) => {
@@ -143,7 +143,7 @@ export default function ReactionBar({ owner, repo, commentId, commentType }: Rea
                   type="button"
                   onClick={() => handleToggleReaction(r.content)}
                   className={cn(
-                    'flex size-7 items-center justify-center rounded text-sm transition-colors hover:bg-surface-hover',
+                    'hover:bg-surface-hover flex size-7 items-center justify-center rounded text-sm transition-colors',
                     group?.reacted && 'bg-accent/10'
                   )}
                   title={r.content}

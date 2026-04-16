@@ -15,12 +15,12 @@ export default function ExplorerPanel({
   onSelectFile: (path: string) => void
 }) {
   return (
-    <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
+    <div className="border-border bg-surface flex h-screen w-60 shrink-0 flex-col border-r">
       <div className="px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">Explorer</p>
+        <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Explorer</p>
       </div>
       <div className="px-4 pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+        <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">
           {getPathBasename(folderPath)}
         </p>
       </div>
@@ -54,7 +54,7 @@ function FolderTree({
 
   if (isLoading) {
     return (
-      <p className="py-1 text-xs text-foreground-subtle" style={{ paddingLeft: depth * 12 + 16 }}>
+      <p className="text-foreground-subtle py-1 text-xs" style={{ paddingLeft: depth * 12 + 16 }}>
         ...
       </p>
     )
@@ -67,7 +67,7 @@ function FolderTree({
         : 'Unable to read this folder. It may have been moved or permissions may have changed.'
 
     return (
-      <p className="py-1 pr-3 text-xs text-foreground-subtle" style={{ paddingLeft: depth * 12 + 16 }}>
+      <p className="text-foreground-subtle py-1 pr-3 text-xs" style={{ paddingLeft: depth * 12 + 16 }}>
         {message}
       </p>
     )
@@ -89,7 +89,7 @@ function FolderTree({
             key={entry.path}
             onClick={() => onSelectFile(entry.path)}
             className={cn(
-              'flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs transition-colors hover:bg-surface-hover',
+              'hover:bg-surface-hover flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs transition-colors',
               selectedFilePath === entry.path ? 'bg-surface-hover text-foreground' : 'text-foreground-muted'
             )}
             style={{ paddingLeft: depth * 12 + 16 }}
@@ -120,12 +120,12 @@ function FolderNode({
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs text-foreground hover:bg-surface-hover"
+        className="text-foreground hover:bg-surface-hover flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs"
         style={{ paddingLeft: depth * 12 + 8 }}
       >
         <ChevronRight
           size={12}
-          className={cn('shrink-0 text-foreground-subtle transition-transform', open && 'rotate-90')}
+          className={cn('text-foreground-subtle shrink-0 transition-transform', open && 'rotate-90')}
         />
         <FolderIcon name={entry.name} open={open} />
         <span className="truncate">{entry.name}</span>

@@ -38,22 +38,22 @@ export default function RepoSidebar() {
   return (
     <aside
       className={cn(
-        'flex h-screen shrink-0 flex-col border-r border-border bg-surface transition-all duration-200',
+        'border-border bg-surface flex h-screen shrink-0 flex-col border-r transition-all duration-200',
         collapsed ? 'w-12' : 'w-64'
       )}
     >
       {/* Header */}
-      <div className="flex justify-end items-center gap-1 px-3 pt-3 pb-2">
+      <div className="flex items-center justify-end gap-1 px-3 pt-3 pb-2">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="shrink-0 rounded-md p-1 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+          className="text-foreground-muted hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
         >
           <ChevronLeft size={14} className={cn('transition-transform duration-200', collapsed && 'rotate-180')} />
         </button>
       </div>
       <div className="flex items-center gap-1 px-3 pt-3 pb-2">
         {!collapsed && (
-          <div className="flex flex-1 items-center min-w-0">
+          <div className="flex min-w-0 flex-1 items-center">
             {searching ? (
               <input
                 autoFocus
@@ -69,10 +69,10 @@ export default function RepoSidebar() {
                   }
                 }}
                 placeholder="Search repositories..."
-                className="w-full bg-transparent text-xs text-foreground placeholder-foreground-subtle outline-none"
+                className="text-foreground placeholder-foreground-subtle w-full bg-transparent text-xs outline-none"
               />
             ) : (
-              <span className="text-xs text-foreground-muted">Top repositories</span>
+              <span className="text-foreground-muted text-xs">Top repositories</span>
             )}
           </div>
         )}
@@ -86,7 +86,7 @@ export default function RepoSidebar() {
                 setSearching(true)
               }
             }}
-            className="shrink-0 rounded-md p-1 text-foreground-muted hover:bg-surface-hover hover:text-foreground"
+            className="text-foreground-muted hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
           >
             {searching ? <X size={14} /> : <Search size={14} />}
           </button>
@@ -98,22 +98,22 @@ export default function RepoSidebar() {
         <>
           <nav className="flex-1 overflow-y-auto px-2">
             {isLoading ? (
-              <p className="px-2 text-xs text-foreground-subtle">Loading...</p>
+              <p className="text-foreground-subtle px-2 text-xs">Loading...</p>
             ) : !repos || repos.length === 0 ? (
-              <p className="px-2 text-xs text-foreground-subtle">
+              <p className="text-foreground-subtle px-2 text-xs">
                 {query ? 'No results found' : 'No repositories found'}
               </p>
             ) : (
               <ul className="flex flex-col">
                 {repos.map((repo) => (
                   <li key={repo.full_name}>
-                    <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-hover">
+                    <button className="hover:bg-surface-hover flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors">
                       <img
                         src={repo.owner.avatar_url}
                         alt={repo.owner.login}
                         className="h-4 w-4 shrink-0 rounded-full"
                       />
-                      <span className="truncate text-xs text-foreground-muted">{repo.full_name}</span>
+                      <span className="text-foreground-muted truncate text-xs">{repo.full_name}</span>
                     </button>
                   </li>
                 ))}
@@ -122,22 +122,22 @@ export default function RepoSidebar() {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-border p-2">
+          <div className="border-border border-t p-2">
             <div className="flex items-center gap-2">
               <img src={user?.avatar_url} alt={user?.login} className="h-6 w-6 shrink-0 rounded-full" />
               <div className="flex-1 overflow-hidden">
-                <p className="truncate text-xs font-medium text-foreground">{user?.name ?? user?.login}</p>
+                <p className="text-foreground truncate text-xs font-medium">{user?.name ?? user?.login}</p>
               </div>
               <button
                 onClick={toggleTheme}
-                className="shrink-0 rounded-md p-1 text-foreground-subtle hover:bg-surface-hover hover:text-foreground"
+                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
                 title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               >
                 {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
               </button>
               <button
                 onClick={logout}
-                className="shrink-0 rounded-md p-1 text-foreground-subtle hover:bg-surface-hover hover:text-foreground"
+                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
                 title="Logout"
               >
                 <LogOut size={14} />
@@ -149,10 +149,10 @@ export default function RepoSidebar() {
 
       {/* Collapsed footer */}
       {collapsed && (
-        <div className="mt-auto border-t border-border p-2 flex flex-col items-center gap-2">
+        <div className="border-border mt-auto flex flex-col items-center gap-2 border-t p-2">
           <button
             onClick={toggleTheme}
-            className="rounded-md p-1 text-foreground-subtle hover:bg-surface-hover hover:text-foreground"
+            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground rounded-md p-1"
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}

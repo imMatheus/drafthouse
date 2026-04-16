@@ -50,14 +50,14 @@ export default function PullRequestsView({
   })
 
   if (isLoadingGitInfo) {
-    return <p className="text-sm text-foreground-muted">Checking repository metadata...</p>
+    return <p className="text-foreground-muted text-sm">Checking repository metadata...</p>
   }
 
   if (gitInfoError) {
     return (
-      <div className="max-w-xl rounded-lg border border-border bg-surface p-4">
-        <h2 className="text-sm font-semibold text-foreground">Repository metadata unavailable</h2>
-        <p className="mt-2 text-sm text-foreground-muted">{gitInfoError.message}</p>
+      <div className="border-border bg-surface max-w-xl rounded-lg border p-4">
+        <h2 className="text-foreground text-sm font-semibold">Repository metadata unavailable</h2>
+        <p className="text-foreground-muted mt-2 text-sm">{gitInfoError.message}</p>
       </div>
     )
   }
@@ -76,19 +76,19 @@ export default function PullRequestsView({
   return (
     <div className="mx-auto max-w-4xl">
       <div className="flex items-center gap-3">
-        <label className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
-          <Search size={15} className="shrink-0 text-foreground-subtle" />
+        <label className="border-border bg-surface flex flex-1 items-center gap-2 rounded-lg border px-3 py-2">
+          <Search size={15} className="text-foreground-subtle shrink-0" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search pull requests..."
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+            className="text-foreground placeholder:text-foreground-subtle w-full bg-transparent text-sm focus:outline-none"
           />
           {searchQuery ? (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="shrink-0 text-foreground-subtle hover:text-foreground"
+              className="text-foreground-subtle hover:text-foreground shrink-0"
             >
               <X size={14} />
             </button>
@@ -96,8 +96,8 @@ export default function PullRequestsView({
         </label>
       </div>
 
-      <div className="mt-4 rounded-xl border border-border">
-        <div className="flex items-center justify-between gap-3 bg-surface px-4 py-3">
+      <div className="border-border mt-4 rounded-xl border">
+        <div className="bg-surface flex items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -129,7 +129,7 @@ export default function PullRequestsView({
             <button
               type="button"
               onClick={() => setIsSortOpen(!isSortOpen)}
-              className="inline-flex items-center gap-1.5 text-sm text-foreground-muted hover:text-foreground"
+              className="text-foreground-muted hover:text-foreground inline-flex items-center gap-1.5 text-sm"
             >
               <ArrowDownUp size={14} />
               Sort
@@ -137,8 +137,8 @@ export default function PullRequestsView({
             {isSortOpen ? (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setIsSortOpen(false)} />
-                <div className="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
-                  <div className="border-b border-border px-3 py-2 text-xs font-medium text-foreground-muted">
+                <div className="border-border bg-surface absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-lg border shadow-xl">
+                  <div className="border-border text-foreground-muted border-b px-3 py-2 text-xs font-medium">
                     Sort by
                   </div>
                   {SORT_OPTIONS.map((option) => (
@@ -149,7 +149,7 @@ export default function PullRequestsView({
                         setSortKey(option.key)
                         setIsSortOpen(false)
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover"
+                      className="text-foreground hover:bg-surface-hover flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
                     >
                       <span className="inline-flex size-4 items-center justify-center">
                         {sortKey === option.key ? <Check size={13} /> : null}
@@ -164,11 +164,11 @@ export default function PullRequestsView({
         </div>
 
         {isLoading ? (
-          <div className="px-4 py-8 text-center text-sm text-foreground-muted">Loading pull requests...</div>
+          <div className="text-foreground-muted px-4 py-8 text-center text-sm">Loading pull requests...</div>
         ) : error ? (
-          <div className="px-4 py-8 text-center text-sm text-foreground-muted">{error.message}</div>
+          <div className="text-foreground-muted px-4 py-8 text-center text-sm">{error.message}</div>
         ) : filtered.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-foreground-muted">
+          <div className="text-foreground-muted px-4 py-8 text-center text-sm">
             {searchQuery ? 'No pull requests match your search.' : `No ${stateFilter} pull requests.`}
           </div>
         ) : (
@@ -188,17 +188,17 @@ function PullRequestRow({ pr, onClick }: { pr: PullRequest; onClick: () => void 
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-start gap-3 border-t border-border px-4 py-3 text-left transition-colors hover:bg-surface-hover"
+      className="border-border hover:bg-surface-hover flex w-full items-start gap-3 border-t px-4 py-3 text-left transition-colors"
     >
       <PullRequestStateIcon pr={pr} />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold text-foreground hover:text-accent">{pr.title}</span>
+          <span className="text-foreground hover:text-accent text-sm font-semibold">{pr.title}</span>
           {pr.labels.map((label) => (
             <span
               key={label.name}
-              className="rounded-full border px-2 py-0.5 text-[11px] font-medium leading-tight"
+              className="rounded-full border px-2 py-0.5 text-[11px] leading-tight font-medium"
               style={{
                 borderColor: `#${label.color}60`,
                 backgroundColor: `#${label.color}18`,
@@ -209,12 +209,12 @@ function PullRequestRow({ pr, onClick }: { pr: PullRequest; onClick: () => void 
             </span>
           ))}
         </div>
-        <p className="mt-1 text-xs text-foreground-subtle">
+        <p className="text-foreground-subtle mt-1 text-xs">
           #{pr.number} opened {formatRelativeTime(pr.created_at)} by {pr.user.login}
           {pr.draft ? (
             <>
               {' '}
-              <span className="ml-1 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-foreground-muted">
+              <span className="border-border text-foreground-muted ml-1 rounded border px-1.5 py-0.5 text-[10px] font-medium">
                 Draft
               </span>
             </>
@@ -231,11 +231,11 @@ function PullRequestRow({ pr, onClick }: { pr: PullRequest; onClick: () => void 
                 src={reviewer.avatar_url}
                 alt={reviewer.login}
                 title={reviewer.login}
-                className="size-5 rounded-full border border-background"
+                className="border-background size-5 rounded-full border"
               />
             ))}
             {pr.requested_reviewers.length > 3 ? (
-              <span className="flex size-5 items-center justify-center rounded-full border border-background bg-interactive text-[9px] text-foreground-muted">
+              <span className="border-background bg-interactive text-foreground-muted flex size-5 items-center justify-center rounded-full border text-[9px]">
                 +{pr.requested_reviewers.length - 3}
               </span>
             ) : null}
@@ -243,7 +243,7 @@ function PullRequestRow({ pr, onClick }: { pr: PullRequest; onClick: () => void 
         ) : null}
 
         {pr.comments > 0 ? (
-          <span className="inline-flex items-center gap-1 text-xs text-foreground-muted">
+          <span className="text-foreground-muted inline-flex items-center gap-1 text-xs">
             <MessageSquare size={13} />
             {pr.comments}
           </span>
@@ -256,27 +256,27 @@ function PullRequestRow({ pr, onClick }: { pr: PullRequest; onClick: () => void 
 function PullRequestStateIcon({ pr }: { pr: PullRequest }) {
   if (pr.merged_at) {
     return (
-      <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-purple/15">
+      <span className="bg-purple/15 mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full">
         <GitMerge size={12} strokeWidth={2} className="text-purple" />
       </span>
     )
   }
   if (pr.state === 'closed') {
     return (
-      <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-danger/15">
+      <span className="bg-danger/15 mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full">
         <GitPullRequestClosed size={12} strokeWidth={2} className="text-danger" />
       </span>
     )
   }
   if (pr.draft) {
     return (
-      <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-foreground-muted/15">
+      <span className="bg-foreground-muted/15 mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full">
         <GitPullRequestDraft size={12} strokeWidth={2} className="text-foreground-muted" />
       </span>
     )
   }
   return (
-    <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-success/15">
+    <span className="bg-success/15 mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full">
       <GitPullRequest size={12} strokeWidth={2} className="text-success" />
     </span>
   )

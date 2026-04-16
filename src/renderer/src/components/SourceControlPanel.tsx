@@ -1,7 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, GitBranch, GitPullRequest, Minus, Plus, Undo2, Upload, X } from 'lucide-react'
-import type { GitBranchInfo, GitChangedFile, GitRepoInfo, GitStatusCode, GitHubBranch, PullRequest } from '../../../shared/types'
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  GitBranch,
+  GitPullRequest,
+  Minus,
+  Plus,
+  Undo2,
+  Upload,
+  X
+} from 'lucide-react'
+import type {
+  GitBranchInfo,
+  GitChangedFile,
+  GitRepoInfo,
+  GitStatusCode,
+  GitHubBranch,
+  PullRequest
+} from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
@@ -13,7 +33,12 @@ interface SourceControlPanelProps {
   onOpenPullRequest?: (number: number) => void
 }
 
-export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, onOpenPullRequest }: SourceControlPanelProps) {
+export default function SourceControlPanel({
+  folderPath,
+  gitInfo,
+  onOpenDiff,
+  onOpenPullRequest
+}: SourceControlPanelProps) {
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
@@ -49,7 +74,11 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
   // Check if a PR already exists for this branch
   const { data: existingPRs } = useQuery<PullRequest[]>({
     queryKey: ['pull-requests-for-head', gitInfo?.owner, gitInfo?.repo, branchInfo?.name],
-    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { head: `${gitInfo!.owner}:${branchInfo!.name}`, state: 'open' }),
+    queryFn: () =>
+      window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, {
+        head: `${gitInfo!.owner}:${branchInfo!.name}`,
+        state: 'open'
+      }),
     enabled: !!gitInfo && hasPushedBranch,
     retry: false
   })
@@ -183,10 +212,10 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
   }
 
   return (
-    <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
+    <div className="border-border bg-surface flex h-screen w-60 shrink-0 flex-col border-r">
       {/* Header */}
       <div className="px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">Source Control</p>
+        <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Source Control</p>
       </div>
 
       {/* Branch info */}
@@ -199,7 +228,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
       {/* Commit area */}
       <div className="flex flex-col gap-2 px-3 pb-3">
         <textarea
-          className="w-full resize-none rounded border border-border bg-background px-2 py-1.5 text-xs text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+          className="border-border bg-background text-foreground placeholder:text-foreground-subtle focus:border-accent w-full resize-none rounded border px-2 py-1.5 text-xs focus:outline-none"
           rows={3}
           placeholder="Message"
           value={commitMessage}
@@ -222,7 +251,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
                 <button
                   onClick={handlePublishBranch}
                   disabled={isPublishing}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded bg-accent px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                  className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
                 >
                   <Upload size={12} />
                   {isPublishing ? 'Publishing...' : 'Publish Branch'}
@@ -231,7 +260,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
                 <button
                   onClick={handlePush}
                   disabled={isPushing}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded bg-accent px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                  className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
                 >
                   <ArrowUp size={12} />
                   Push
@@ -241,7 +270,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
                 <button
                   onClick={handleCommit}
                   disabled={isCommitting || !commitMessage.trim()}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded bg-accent px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                  className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
                 >
                   <Check size={12} />
                   Commit
@@ -251,7 +280,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
                 <button
                   onClick={handlePull}
                   disabled={isPulling}
-                  className="rounded bg-interactive p-1.5 text-foreground transition-colors hover:bg-interactive-hover disabled:opacity-50"
+                  className="bg-interactive text-foreground hover:bg-interactive-hover rounded p-1.5 transition-colors disabled:opacity-50"
                   title="Pull"
                 >
                   <ArrowDown size={12} />
@@ -265,7 +294,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
         {canCreatePR ? (
           <button
             onClick={() => setIsCreatePROpen(true)}
-            className="flex items-center justify-center gap-1.5 rounded border border-border bg-interactive px-2 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+            className="border-border bg-interactive text-foreground hover:bg-interactive-hover flex items-center justify-center gap-1.5 rounded border px-2 py-1.5 text-xs font-medium transition-colors"
           >
             <GitPullRequest size={12} />
             Create Pull Request
@@ -275,9 +304,9 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
 
       {/* Error display */}
       {error ? (
-        <div className="mx-3 mb-2 flex items-start gap-1.5 rounded border border-danger/30 bg-danger/10 px-2 py-1.5">
-          <X size={12} className="mt-0.5 shrink-0 cursor-pointer text-danger" onClick={() => setError(null)} />
-          <p className="text-xs text-danger">{error}</p>
+        <div className="border-danger/30 bg-danger/10 mx-3 mb-2 flex items-start gap-1.5 rounded border px-2 py-1.5">
+          <X size={12} className="text-danger mt-0.5 shrink-0 cursor-pointer" onClick={() => setError(null)} />
+          <p className="text-danger text-xs">{error}</p>
         </div>
       ) : null}
 
@@ -321,7 +350,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
           />
         ) : null}
 
-        {files.length === 0 ? <p className="px-4 py-4 text-xs text-foreground-subtle">No changes detected</p> : null}
+        {files.length === 0 ? <p className="text-foreground-subtle px-4 py-4 text-xs">No changes detected</p> : null}
       </div>
 
       {/* Create PR Dialog */}
@@ -363,7 +392,7 @@ function humanizeGitHubError(message: string): string {
     return 'A pull request already exists for this branch. Check the Pull Requests panel.'
   if (message.includes('No commits between'))
     return 'There are no differences between these branches. Push some commits first or choose a different base branch.'
-  if (message.includes('head sha can\'t be blank') || message.includes('field.head.sha'))
+  if (message.includes("head sha can't be blank") || message.includes('field.head.sha'))
     return 'This branch does not exist on GitHub yet. Push it first.'
   if (message.includes('Validation Failed'))
     return 'GitHub rejected the request. Make sure the branch has been pushed and has commits ahead of the base.'
@@ -416,7 +445,8 @@ function CreatePullRequestDialog({
       return
     }
     if (base) return
-    const defaultBranch = branches.find((b) => b.name === 'main') ?? branches.find((b) => b.name === 'master') ?? branches[0]
+    const defaultBranch =
+      branches.find((b) => b.name === 'main') ?? branches.find((b) => b.name === 'master') ?? branches[0]
     if (defaultBranch) setBase(defaultBranch.name)
   }, [branches, base])
 
@@ -441,7 +471,13 @@ function CreatePullRequestDialog({
     setErrorMessage(null)
 
     try {
-      const pr = await window.api.github.pulls.create(owner, repo, { title, head, base, body: body || undefined, draft })
+      const pr = await window.api.github.pulls.create(owner, repo, {
+        title,
+        head,
+        base,
+        body: body || undefined,
+        draft
+      })
       await queryClient.invalidateQueries({ queryKey: ['pull-requests'] })
       onCreated(pr.number)
     } catch (e) {
@@ -455,18 +491,18 @@ function CreatePullRequestDialog({
   const hasWarnings = hasUnpushedCommits || hasUncommittedChanges || !headExistsOnRemote
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-2xl">
+    <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="border-border bg-surface w-full max-w-2xl rounded-2xl border shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="border-border flex items-center justify-between gap-3 border-b px-5 py-4">
           <div className="flex items-center gap-2">
             <GitPullRequest size={18} className="text-foreground-muted" />
-            <h2 className="text-lg font-semibold text-foreground">Create Pull Request</h2>
+            <h2 className="text-foreground text-lg font-semibold">Create Pull Request</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex size-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+            className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors"
             aria-label="Close"
           >
             <X size={16} />
@@ -475,19 +511,20 @@ function CreatePullRequestDialog({
 
         {/* Warnings */}
         {hasWarnings ? (
-          <div className="border-b border-border px-5 py-3 space-y-1.5">
+          <div className="border-border space-y-1.5 border-b px-5 py-3">
             {!headExistsOnRemote ? (
-              <p className="text-xs text-danger">
+              <p className="text-danger text-xs">
                 This branch has not been pushed to GitHub. Push it before creating a pull request.
               </p>
             ) : null}
             {hasUnpushedCommits && headExistsOnRemote ? (
-              <p className="text-xs text-accent">
-                You have unpushed commits. The pull request will be based on what is currently on GitHub, not your local changes. Push first to include them.
+              <p className="text-accent text-xs">
+                You have unpushed commits. The pull request will be based on what is currently on GitHub, not your local
+                changes. Push first to include them.
               </p>
             ) : null}
             {hasUncommittedChanges ? (
-              <p className="text-xs text-foreground-muted">
+              <p className="text-foreground-muted text-xs">
                 You have uncommitted changes that won't be included in this pull request.
               </p>
             ) : null}
@@ -495,28 +532,33 @@ function CreatePullRequestDialog({
         ) : null}
 
         {/* Branch info */}
-        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-          <div className="flex items-center gap-1.5 rounded-md bg-interactive px-2.5 py-1 text-xs font-medium text-foreground">
+        <div className="border-border flex items-center gap-2 border-b px-5 py-3">
+          <div className="bg-interactive text-foreground flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium">
             <GitBranch size={12} />
             {head}
           </div>
-          <span className="text-xs text-foreground-subtle">into</span>
+          <span className="text-foreground-subtle text-xs">into</span>
           {isLoadingBranches ? (
-            <span className="text-xs text-foreground-muted">Loading branches...</span>
+            <span className="text-foreground-muted text-xs">Loading branches...</span>
           ) : branchError ? (
-            <span className="text-xs text-danger">{branchError}</span>
+            <span className="text-danger text-xs">{branchError}</span>
           ) : (
             <div className="relative">
               <select
                 value={base}
                 onChange={(e) => setBase(e.target.value)}
-                className="appearance-none rounded-md border border-border bg-interactive py-1 pl-2.5 pr-7 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover focus:outline-none"
+                className="border-border bg-interactive text-foreground hover:bg-interactive-hover appearance-none rounded-md border py-1 pr-7 pl-2.5 text-xs font-medium transition-colors focus:outline-none"
               >
                 {baseBranches.map((b) => (
-                  <option key={b.name} value={b.name}>{b.name}</option>
+                  <option key={b.name} value={b.name}>
+                    {b.name}
+                  </option>
                 ))}
               </select>
-              <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle" />
+              <ChevronDown
+                size={12}
+                className="text-foreground-subtle pointer-events-none absolute top-1/2 right-2 -translate-y-1/2"
+              />
             </div>
           )}
         </div>
@@ -528,7 +570,7 @@ function CreatePullRequestDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Pull request title"
-            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+            className="border-border bg-background text-foreground placeholder:text-foreground-subtle focus:border-accent w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -541,28 +583,28 @@ function CreatePullRequestDialog({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Description (optional)"
-            className="mt-3 min-h-32 w-full resize-y rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+            className="border-border bg-background text-foreground placeholder:text-foreground-subtle focus:border-accent mt-3 min-h-32 w-full resize-y rounded-lg border px-4 py-3 text-sm focus:outline-none"
           />
 
-          <label className="mt-3 flex items-center gap-2 cursor-pointer">
+          <label className="mt-3 flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
               checked={draft}
               onChange={(e) => setDraft(e.target.checked)}
-              className="size-3.5 rounded border-border accent-accent"
+              className="border-border accent-accent size-3.5 rounded"
             />
-            <span className="text-xs text-foreground-muted">Create as draft</span>
+            <span className="text-foreground-muted text-xs">Create as draft</span>
           </label>
 
-          {errorMessage ? <p className="mt-3 text-sm text-danger">{errorMessage}</p> : null}
+          {errorMessage ? <p className="text-danger mt-3 text-sm">{errorMessage}</p> : null}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+        <div className="border-border flex items-center justify-end gap-2 border-t px-5 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border bg-interactive px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-interactive-hover"
+            className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm font-medium transition-colors"
           >
             Cancel
           </button>
@@ -570,7 +612,7 @@ function CreatePullRequestDialog({
             type="button"
             onClick={handleSubmit}
             disabled={!title.trim() || !base || isSubmitting || !headExistsOnRemote}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent hover:bg-accent-hover rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Creating...' : draft ? 'Create Draft PR' : 'Create Pull Request'}
           </button>
@@ -617,20 +659,20 @@ function FileSection({
 }) {
   return (
     <div>
-      <div className="group flex items-center justify-between px-2 py-1 hover:bg-surface-hover">
+      <div className="group hover:bg-surface-hover flex items-center justify-between px-2 py-1">
         <button onClick={onToggle} className="flex flex-1 items-center gap-1 text-left">
           <ChevronRight
             size={12}
-            className={cn('shrink-0 text-foreground-subtle transition-transform', isOpen && 'rotate-90')}
+            className={cn('text-foreground-subtle shrink-0 transition-transform', isOpen && 'rotate-90')}
           />
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">{title}</span>
-          <span className="text-[10px] text-foreground-subtle">{files.length}</span>
+          <span className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">{title}</span>
+          <span className="text-foreground-subtle text-[10px]">{files.length}</span>
         </button>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
           {onDiscardAll ? (
             <button
               onClick={onDiscardAll}
-              className="rounded p-0.5 text-foreground-subtle hover:text-foreground"
+              className="text-foreground-subtle hover:text-foreground rounded p-0.5"
               title="Discard All"
             >
               <Undo2 size={12} />
@@ -638,7 +680,7 @@ function FileSection({
           ) : null}
           <button
             onClick={onBulkAction}
-            className="rounded p-0.5 text-foreground-subtle hover:text-foreground"
+            className="text-foreground-subtle hover:text-foreground rounded p-0.5"
             title={bulkActionTitle}
           >
             {bulkActionIcon}
@@ -687,17 +729,17 @@ function FileRow({
   const dirPath = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : ''
 
   return (
-    <div className="group flex items-center gap-1 py-[3px] pl-6 pr-2 hover:bg-surface-hover">
+    <div className="group hover:bg-surface-hover flex items-center gap-1 py-[3px] pr-2 pl-6">
       <button onClick={onOpenDiff} className="flex flex-1 items-center gap-1.5 overflow-hidden text-left">
         <FileIcon name={displayName} />
-        <span className="truncate text-xs text-foreground">{displayName}</span>
-        {dirPath ? <span className="truncate text-[10px] text-foreground-subtle">{dirPath}</span> : null}
+        <span className="text-foreground truncate text-xs">{displayName}</span>
+        {dirPath ? <span className="text-foreground-subtle truncate text-[10px]">{dirPath}</span> : null}
       </button>
       <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
         {onDiscard ? (
           <button
             onClick={onDiscard}
-            className="rounded p-0.5 text-foreground-subtle hover:text-foreground"
+            className="text-foreground-subtle hover:text-foreground rounded p-0.5"
             title="Discard Changes"
           >
             <Undo2 size={12} />
@@ -705,7 +747,7 @@ function FileRow({
         ) : null}
         <button
           onClick={onAction}
-          className="rounded p-0.5 text-foreground-subtle hover:text-foreground"
+          className="text-foreground-subtle hover:text-foreground rounded p-0.5"
           title={actionTitle}
         >
           {actionIcon}
@@ -787,42 +829,42 @@ function BranchSwitcher({ folderPath, branchInfo }: { folderPath: string; branch
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-interactive"
+        className="hover:bg-interactive flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left"
       >
-        <GitBranch size={12} className="shrink-0 text-foreground-subtle" />
-        <span className="truncate text-xs text-foreground-muted">{branchInfo.name}</span>
+        <GitBranch size={12} className="text-foreground-subtle shrink-0" />
+        <span className="text-foreground-muted truncate text-xs">{branchInfo.name}</span>
         {branchInfo.ahead > 0 ? (
-          <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
+          <span className="text-foreground-subtle flex items-center gap-0.5 text-[10px]">
             {branchInfo.ahead}
             <ArrowUp size={10} />
           </span>
         ) : null}
         {branchInfo.behind > 0 ? (
-          <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
+          <span className="text-foreground-subtle flex items-center gap-0.5 text-[10px]">
             {branchInfo.behind}
             <ArrowDown size={10} />
           </span>
         ) : null}
         <ChevronDown
           size={11}
-          className={cn('ml-auto shrink-0 text-foreground-subtle transition-transform', isOpen && 'rotate-180')}
+          className={cn('text-foreground-subtle ml-auto shrink-0 transition-transform', isOpen && 'rotate-180')}
         />
       </button>
 
       {isOpen ? (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+          <div className="border-border bg-surface absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-lg border shadow-xl">
             <input
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search branches..."
-              className="w-full border-b border-border bg-transparent px-3 py-2 text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none"
+              className="border-border text-foreground placeholder:text-foreground-subtle w-full border-b bg-transparent px-3 py-2 text-xs focus:outline-none"
             />
             <div className="max-h-60 overflow-y-auto p-1">
               {filtered.length === 0 ? (
-                <p className="px-2 py-2 text-xs text-foreground-subtle">No branches found</p>
+                <p className="text-foreground-subtle px-2 py-2 text-xs">No branches found</p>
               ) : (
                 filtered.map((branch) => {
                   const isCurrent = branch === branchInfo.name
@@ -844,9 +886,9 @@ function BranchSwitcher({ folderPath, branchInfo }: { folderPath: string; branch
                       <GitBranch size={12} className="shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{branch}</span>
                       {isSwitching ? (
-                        <span className="size-3 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+                        <span className="border-foreground/30 border-t-foreground size-3 animate-spin rounded-full border-2" />
                       ) : isCurrent ? (
-                        <Check size={12} className="shrink-0 text-accent" />
+                        <Check size={12} className="text-accent shrink-0" />
                       ) : null}
                     </button>
                   )
@@ -854,7 +896,7 @@ function BranchSwitcher({ folderPath, branchInfo }: { folderPath: string; branch
               )}
             </div>
             {switchError ? (
-              <p className="border-t border-border px-3 py-2 text-[10px] text-danger">{switchError}</p>
+              <p className="border-border text-danger border-t px-3 py-2 text-[10px]">{switchError}</p>
             ) : null}
           </div>
         </>

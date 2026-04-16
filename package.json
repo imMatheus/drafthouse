@@ -6,7 +6,7 @@
   "author": "example.com",
   "main": "./out/main/index.js",
   "scripts": {
-    "format": "bun oxfmt",
+    "format": "bun oxfmt && bunx prettier --write \"src/**/*.{ts,tsx}\"",
     "lint": "eslint --cache .",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
@@ -55,6 +55,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "oxfmt": "^0.44.0",
     "prettier": "^3.7.4",
+    "prettier-plugin-tailwindcss": "^0.7.2",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "typescript": "^5.9.3",

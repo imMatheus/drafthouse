@@ -140,23 +140,23 @@ export default function AgentConversation({ session }: AgentConversationProps) {
             </div>
           )}
           {session.prompt && (
-            <div className="max-w-[80%] rounded-2xl bg-surface px-4 py-2.5">
-              <p className="text-sm text-foreground whitespace-pre-wrap">{session.prompt}</p>
+            <div className="bg-surface max-w-[80%] rounded-2xl px-4 py-2.5">
+              <p className="text-foreground text-sm whitespace-pre-wrap">{session.prompt}</p>
             </div>
           )}
         </div>
 
         {/* While thinking and no response yet: show latest step */}
         {isRunning && !hasResponse && thinkingStepCount > 0 && (
-          <div className="flex items-center gap-2 py-1 text-accent">
+          <div className="text-accent flex items-center gap-2 py-1">
             <AgentSpinner />
-            <span className="truncate text-xs text-foreground-muted">{latestThinkingLabel}</span>
+            <span className="text-foreground-muted truncate text-xs">{latestThinkingLabel}</span>
           </div>
         )}
 
         {/* While thinking with no steps yet */}
         {isRunning && !hasResponse && thinkingStepCount === 0 && (
-          <div className="flex items-center gap-2 py-1 text-accent">
+          <div className="text-accent flex items-center gap-2 py-1">
             <AgentSpinner />
             <span className="text-xs">Thinking...</span>
           </div>
@@ -167,7 +167,7 @@ export default function AgentConversation({ session }: AgentConversationProps) {
           <div className="mb-3">
             <button
               onClick={() => setThinkingExpanded(!thinkingExpanded)}
-              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+              className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors"
             >
               <ChevronRight
                 size={12}
@@ -179,7 +179,7 @@ export default function AgentConversation({ session }: AgentConversationProps) {
             </button>
 
             {thinkingExpanded && (
-              <div className="mt-2 rounded-md border border-border bg-surface px-3 py-2">
+              <div className="border-border bg-surface mt-2 rounded-md border px-3 py-2">
                 {thinkingEvents.map((event, i) => (
                   <AgentMessageBlock key={i} event={event} inlineToolIds={inlineToolIds} />
                 ))}
@@ -195,15 +195,15 @@ export default function AgentConversation({ session }: AgentConversationProps) {
 
         {/* Streaming indicator when response is coming in */}
         {isRunning && hasResponse && (
-          <div className="flex items-center gap-2 py-1 text-accent">
+          <div className="text-accent flex items-center gap-2 py-1">
             <AgentSpinner />
           </div>
         )}
 
         {/* Result summary */}
         {lastResultEvent && !isRunning && (
-          <div className="mt-4 rounded-md border border-border bg-surface px-3 py-2">
-            <div className="flex items-center gap-3 text-xs text-foreground-subtle">
+          <div className="border-border bg-surface mt-4 rounded-md border px-3 py-2">
+            <div className="text-foreground-subtle flex items-center gap-3 text-xs">
               <span>
                 {lastResultEvent.num_turns} turn{lastResultEvent.num_turns !== 1 ? 's' : ''}
               </span>
@@ -215,8 +215,8 @@ export default function AgentConversation({ session }: AgentConversationProps) {
 
         {/* Error state */}
         {session.status === 'error' && !lastResultEvent && (
-          <div className="mt-4 rounded-md border border-danger/30 bg-danger/5 px-3 py-2">
-            <p className="text-xs text-danger">Agent encountered an error</p>
+          <div className="border-danger/30 bg-danger/5 mt-4 rounded-md border px-3 py-2">
+            <p className="text-danger text-xs">Agent encountered an error</p>
           </div>
         )}
 
@@ -248,13 +248,13 @@ function FileAttachment({ filePath }: { filePath: string }) {
 
   if (isImage) {
     return (
-      <div className="overflow-hidden rounded-md border border-border">
+      <div className="border-border overflow-hidden rounded-md border">
         {dataUrl ? (
           <img src={dataUrl} alt={fileName} className="max-h-48 max-w-xs object-contain" />
         ) : (
           <div className="flex items-center gap-1.5 px-2 py-1">
-            <FileText size={12} className="shrink-0 text-foreground-subtle" />
-            <span className="text-xs text-foreground-muted">{fileName}</span>
+            <FileText size={12} className="text-foreground-subtle shrink-0" />
+            <span className="text-foreground-muted text-xs">{fileName}</span>
           </div>
         )}
       </div>
@@ -262,9 +262,9 @@ function FileAttachment({ filePath }: { filePath: string }) {
   }
 
   return (
-    <div className="flex items-center gap-1.5 rounded-md border border-border bg-interactive px-2 py-1">
-      <FileText size={12} className="shrink-0 text-foreground-subtle" />
-      <span className="max-w-[100px] truncate text-xs text-foreground-muted">{fileName}</span>
+    <div className="border-border bg-interactive flex items-center gap-1.5 rounded-md border px-2 py-1">
+      <FileText size={12} className="text-foreground-subtle shrink-0" />
+      <span className="text-foreground-muted max-w-[100px] truncate text-xs">{fileName}</span>
     </div>
   )
 }

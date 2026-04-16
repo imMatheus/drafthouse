@@ -13,8 +13,8 @@ import MarkdownBody from './MarkdownBody'
 
 export function UserBubble({ text }: { text: string }) {
   return (
-    <div className="mb-3 mt-2 flex justify-end">
-      <div className="max-w-[80%] rounded-2xl bg-interactive px-3 py-2 text-sm text-foreground whitespace-pre-wrap">
+    <div className="mt-2 mb-3 flex justify-end">
+      <div className="bg-interactive text-foreground max-w-[80%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap">
         {text}
       </div>
     </div>
@@ -76,7 +76,7 @@ function SystemMessage({ event }: { event: AgentStreamSystem }) {
   const message = event.message
   if (!message) return null
 
-  return <div className="mb-2 text-xs text-foreground-subtle italic">{message}</div>
+  return <div className="text-foreground-subtle mb-2 text-xs italic">{message}</div>
 }
 
 function ContentBlock({ block }: { block: AgentContentBlock }) {
@@ -113,8 +113,8 @@ function InlineToolBlock({ name, input }: { name: string; input: Record<string, 
   const summary = getToolUseSummary(name, input)
 
   return (
-    <div className="my-1.5 flex items-center gap-2 text-xs text-foreground-muted">
-      <span className="font-medium text-foreground-subtle">{name}</span>
+    <div className="text-foreground-muted my-1.5 flex items-center gap-2 text-xs">
+      <span className="text-foreground-subtle font-medium">{name}</span>
       {summary && <span className="truncate">{summary}</span>}
     </div>
   )
@@ -126,22 +126,22 @@ function ToolUseBlock({ name, input }: { name: string; input: Record<string, unk
   const summary = getToolUseSummary(name, input)
 
   return (
-    <div className="my-2 rounded-md border border-border bg-surface">
+    <div className="border-border bg-surface my-2 rounded-md border">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-surface-hover"
+        className="hover:bg-surface-hover flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors"
       >
         <ChevronRight
           size={12}
-          className={cn('shrink-0 text-foreground-subtle transition-transform', expanded && 'rotate-90')}
+          className={cn('text-foreground-subtle shrink-0 transition-transform', expanded && 'rotate-90')}
         />
-        <span className="font-medium text-foreground">{name}</span>
-        {summary && <span className="truncate text-foreground-subtle">{summary}</span>}
+        <span className="text-foreground font-medium">{name}</span>
+        {summary && <span className="text-foreground-subtle truncate">{summary}</span>}
       </button>
 
       {expanded && (
-        <div className="border-t border-border px-3 py-2">
-          <pre className="overflow-x-auto text-xs text-foreground-muted whitespace-pre-wrap break-all">
+        <div className="border-border border-t px-3 py-2">
+          <pre className="text-foreground-muted overflow-x-auto text-xs break-all whitespace-pre-wrap">
             {JSON.stringify(input, null, 2)}
           </pre>
         </div>
@@ -156,12 +156,12 @@ function ToolResultBlock({ content }: { content: string }) {
   const displayContent = !expanded && isLong ? content.slice(0, 300) + '...' : content
 
   return (
-    <div className="my-1 rounded-md border border-border bg-surface px-3 py-2">
-      <pre className="overflow-x-auto text-xs text-foreground-subtle whitespace-pre-wrap break-all">
+    <div className="border-border bg-surface my-1 rounded-md border px-3 py-2">
+      <pre className="text-foreground-subtle overflow-x-auto text-xs break-all whitespace-pre-wrap">
         {displayContent}
       </pre>
       {isLong && (
-        <button onClick={() => setExpanded(!expanded)} className="mt-1 text-xs text-accent hover:text-accent-hover">
+        <button onClick={() => setExpanded(!expanded)} className="text-accent hover:text-accent-hover mt-1 text-xs">
           {expanded ? 'Show less' : 'Show more'}
         </button>
       )}

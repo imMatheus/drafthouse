@@ -1,7 +1,13 @@
 import * as monaco from 'monaco-editor'
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — no type declarations for this ESM entry point
-import { typescriptDefaults, javascriptDefaults, JsxEmit, ScriptTarget, ModuleResolutionKind } from 'monaco-editor/esm/vs/language/typescript/monaco.contribution'
+import {
+  typescriptDefaults,
+  javascriptDefaults,
+  JsxEmit,
+  ScriptTarget,
+  ModuleResolutionKind
+} from 'monaco-editor/esm/vs/language/typescript/monaco.contribution'
 import { loader } from '@monaco-editor/react'
 import { getLanguageFromPath } from './shiki'
 

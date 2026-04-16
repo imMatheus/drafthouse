@@ -29,9 +29,9 @@ export default function ReviewThreadCard({
   const resolvedRepo = repo ?? replyTarget?.repo
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-interactive px-4 py-2">
-        <div className="min-w-0 text-sm font-medium text-foreground">
+    <div className="border-border bg-surface overflow-hidden rounded-xl border">
+      <div className="border-border bg-interactive flex items-center justify-between gap-3 border-b px-4 py-2">
+        <div className="text-foreground min-w-0 text-sm font-medium">
           {thread.path}
           {thread.line !== null ? <span className="text-foreground-muted">:{thread.line}</span> : null}
         </div>
@@ -39,7 +39,7 @@ export default function ReviewThreadCard({
           <button
             type="button"
             onClick={() => onViewReviewThread(thread)}
-            className="shrink-0 text-sm font-medium text-foreground-muted hover:text-foreground"
+            className="text-foreground-muted hover:text-foreground shrink-0 text-sm font-medium"
           >
             View reviewed changes
           </button>
@@ -48,13 +48,13 @@ export default function ReviewThreadCard({
 
       <ReviewDiffHunkPreview comment={topLevelComment} />
 
-      <div className="border-t border-border">
+      <div className="border-border border-t">
         <div className="flex items-start gap-3 px-4 py-4">
           <img src={topLevelComment.user.avatar_url} alt={topLevelComment.user.login} className="size-8 rounded-full" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-sm font-semibold text-foreground">{topLevelComment.user.login}</span>
-              <span className="text-sm text-foreground-muted">{formatRelativeTime(topLevelComment.created_at)}</span>
+              <span className="text-foreground text-sm font-semibold">{topLevelComment.user.login}</span>
+              <span className="text-foreground-muted text-sm">{formatRelativeTime(topLevelComment.created_at)}</span>
             </div>
             <div className="mt-3">
               <MarkdownBody>{topLevelComment.body}</MarkdownBody>
@@ -73,14 +73,14 @@ export default function ReviewThreadCard({
         </div>
 
         {replies.length > 0 ? (
-          <div className="border-t border-border">
+          <div className="border-border border-t">
             {replies.map((reply) => (
-              <div key={reply.id} className="flex items-start gap-3 border-t border-border px-4 py-4 first:border-t-0">
+              <div key={reply.id} className="border-border flex items-start gap-3 border-t px-4 py-4 first:border-t-0">
                 <img src={reply.user.avatar_url} alt={reply.user.login} className="size-7 rounded-full" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-sm font-semibold text-foreground">{reply.user.login}</span>
-                    <span className="text-sm text-foreground-muted">
+                    <span className="text-foreground text-sm font-semibold">{reply.user.login}</span>
+                    <span className="text-foreground-muted text-sm">
                       replied {formatRelativeTime(reply.created_at)}
                     </span>
                   </div>
@@ -104,7 +104,7 @@ export default function ReviewThreadCard({
         ) : null}
 
         {replyTarget ? (
-          <div className="border-t border-border px-4 py-4">
+          <div className="border-border border-t px-4 py-4">
             <InlineReviewReplyForm
               owner={replyTarget.owner}
               repo={replyTarget.repo}
@@ -129,7 +129,7 @@ function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment 
   const height = Math.min(lineCount, 8) * 24 + 8
 
   return (
-    <div className="border-b border-border" style={{ height }}>
+    <div className="border-border border-b" style={{ height }}>
       <DiffEditor
         key={settings.diffViewMode}
         original={original}
@@ -173,7 +173,7 @@ function InlineReviewReplyForm({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+        className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
       >
         <Reply size={13} />
         Reply
@@ -202,7 +202,7 @@ function InlineReviewReplyForm({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-background">
+    <div className="border-border bg-background rounded-lg border">
       <textarea
         value={body}
         onChange={(event) => setBody(event.target.value)}
@@ -213,17 +213,17 @@ function InlineReviewReplyForm({
           }
         }}
         placeholder="Reply to this thread"
-        className="min-h-24 w-full resize-y bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+        className="text-foreground placeholder:text-foreground-subtle min-h-24 w-full resize-y bg-transparent px-4 py-3 text-sm focus:outline-none"
       />
-      {errorMessage ? <p className="px-4 text-sm text-danger">{errorMessage}</p> : null}
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+      {errorMessage ? <p className="text-danger px-4 text-sm">{errorMessage}</p> : null}
+      <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
         <button
           type="button"
           onClick={() => {
             setIsOpen(false)
             setErrorMessage(null)
           }}
-          className="rounded-md border border-border bg-interactive px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+          className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
         >
           Cancel
         </button>
@@ -231,7 +231,7 @@ function InlineReviewReplyForm({
           type="button"
           onClick={handleSubmit}
           disabled={!body.trim() || isSubmitting}
-          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isSubmitting ? 'Replying...' : 'Reply'}
         </button>

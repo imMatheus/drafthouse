@@ -37,10 +37,10 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center gap-1.5 border-b border-border bg-surface px-4 py-2">
+      <div className="border-border bg-surface flex items-center gap-1.5 border-b px-4 py-2">
         {segments.map((segment, i) => (
           <Fragment key={i}>
-            {i > 0 && <ChevronRight size={12} className="shrink-0 text-foreground-subtle" />}
+            {i > 0 && <ChevronRight size={12} className="text-foreground-subtle shrink-0" />}
             <span className={cn('text-sm', i === segments.length - 1 ? 'text-foreground' : 'text-foreground-muted')}>
               {segment}
             </span>
@@ -48,15 +48,15 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden bg-background">
+      <div className="bg-background min-h-0 flex-1 overflow-hidden">
         {isLoading ? (
           <div className="px-4 py-6">
-            <p className="text-sm text-foreground-muted">Loading file...</p>
+            <p className="text-foreground-muted text-sm">Loading file...</p>
           </div>
         ) : error ? (
           <div className="px-4 py-6">
-            <p className="text-sm font-medium text-foreground">File unavailable</p>
-            <p className="mt-1 text-sm text-foreground-muted">{error.message}</p>
+            <p className="text-foreground text-sm font-medium">File unavailable</p>
+            <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>
           </div>
         ) : (
           <Editor
@@ -71,7 +71,7 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
             onMount={handleEditorMount}
             loading={
               <div className="px-4 py-6">
-                <p className="text-sm text-foreground-muted">Loading editor...</p>
+                <p className="text-foreground-muted text-sm">Loading editor...</p>
               </div>
             }
           />

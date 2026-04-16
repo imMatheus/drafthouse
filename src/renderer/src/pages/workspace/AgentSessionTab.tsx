@@ -28,7 +28,7 @@ export default function AgentSessionTab({
   }
 
   return (
-    <div className="flex h-full min-w-0 flex-col bg-background">
+    <div className="bg-background flex h-full min-w-0 flex-col">
       {session?.context ? <AgentContextBanner context={session.context} /> : null}
       {session ? (
         <>
@@ -38,7 +38,7 @@ export default function AgentSessionTab({
       ) : (
         <>
           <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-foreground-subtle">What would you like the agent to do?</p>
+            <p className="text-foreground-subtle text-sm">What would you like the agent to do?</p>
           </div>
           <AgentPromptBar onSubmit={handleSubmit} onStop={() => {}} isRunning={false} />
         </>
@@ -53,28 +53,28 @@ function AgentContextBanner({ context }: { context: AgentContext }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border bg-surface px-4 py-2">
-      <div className="flex items-center gap-1.5 text-xs text-foreground">
-        <GitPullRequest size={13} className="shrink-0 text-success" />
+    <div className="border-border bg-surface flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2">
+      <div className="text-foreground flex items-center gap-1.5 text-xs">
+        <GitPullRequest size={13} className="text-success shrink-0" />
         <span className="font-semibold">#{context.prNumber}</span>
         {context.prTitle ? <span className="text-foreground-muted">{context.prTitle}</span> : null}
       </div>
 
-      {context.repoFullName ? <span className="text-xs text-foreground-subtle">{context.repoFullName}</span> : null}
+      {context.repoFullName ? <span className="text-foreground-subtle text-xs">{context.repoFullName}</span> : null}
 
       {context.headBranch ? (
-        <div className="flex items-center gap-1 text-xs text-foreground-muted">
+        <div className="text-foreground-muted flex items-center gap-1 text-xs">
           <GitBranch size={12} className="shrink-0" />
-          <code className="rounded bg-interactive px-1 py-0.5 text-[11px]">{context.headBranch}</code>
+          <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.headBranch}</code>
           <span className="text-foreground-subtle">&rarr;</span>
-          <code className="rounded bg-interactive px-1 py-0.5 text-[11px]">{context.baseBranch}</code>
+          <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.baseBranch}</code>
         </div>
       ) : null}
 
       {context.filePath ? (
-        <div className="flex items-center gap-1 text-xs text-foreground-muted">
+        <div className="text-foreground-muted flex items-center gap-1 text-xs">
           <FileCode size={12} className="shrink-0" />
-          <code className="rounded bg-interactive px-1 py-0.5 text-[11px]">{context.filePath}</code>
+          <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.filePath}</code>
           {context.lineNumber ? <span className="text-foreground-subtle">:{context.lineNumber}</span> : null}
         </div>
       ) : null}
