@@ -38,8 +38,8 @@ export default function ActivityBar({ items, onSettingsClick, settingsActive }: 
             >
               <Icon size={18} strokeWidth={1.75} />
               {item.badge != null && item.badge > 0 && (
-                <span className="absolute bottom-0.5 right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[8px] font-bold text-white">
-                  {item.badge}
+                <span className="absolute bottom-0.5 right-0.5 flex px-0.5 items-center justify-center rounded-full bg-accent text-[7px] font-bold text-white">
+                  {item.badge >= 1000 ? `${Math.floor(item.badge / 1000)}k+` : item.badge}
                 </span>
               )}
             </button>

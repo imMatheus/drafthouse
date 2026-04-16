@@ -57,7 +57,7 @@ export default function ReviewThreadCard({
               <span className="text-sm text-foreground-muted">{formatRelativeTime(topLevelComment.created_at)}</span>
             </div>
             <div className="mt-3">
-              <MarkdownBody className="p-4">{topLevelComment.body}</MarkdownBody>
+              <MarkdownBody>{topLevelComment.body}</MarkdownBody>
             </div>
             {resolvedOwner && resolvedRepo ? (
               <div className="mt-3">
@@ -85,7 +85,7 @@ export default function ReviewThreadCard({
                     </span>
                   </div>
                   <div className="mt-3">
-                    <MarkdownBody className="p-4">{reply.body}</MarkdownBody>
+                    <MarkdownBody>{reply.body}</MarkdownBody>
                   </div>
                   {resolvedOwner && resolvedRepo ? (
                     <div className="mt-3">
