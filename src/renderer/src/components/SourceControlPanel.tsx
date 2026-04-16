@@ -1,37 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  ChevronRight,
-  FileDiff,
-  FilePlus,
-  FileQuestion,
-  FileX,
-  GitBranch,
-  Minus,
-  Plus,
-  Undo2,
-  X
-} from 'lucide-react'
-import type { GitBranchInfo, GitChangedFile, GitStatusCode } from '../../../shared/types'
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, GitBranch, GitPullRequest, Minus, Plus, Undo2, Upload, X } from 'lucide-react'
+import type { GitBranchInfo, GitChangedFile, GitRepoInfo, GitStatusCode, GitHubBranch, PullRequest } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
+import { FileIcon } from './FileIcon'
 
 interface SourceControlPanelProps {
   folderPath: string
+  gitInfo?: GitRepoInfo | null
   onOpenDiff: (path: string, staged: boolean) => void
+  onOpenPullRequest?: (number: number) => void
 }
 
-export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceControlPanelProps) {
+export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, onOpenPullRequest }: SourceControlPanelProps) {
   const [commitMessage, setCommitMessage] = useState('')
   const [isCommitting, setIsCommitting] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
   const [isPulling, setIsPulling] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stagedOpen, setStagedOpen] = useState(true)
   const [changesOpen, setChangesOpen] = useState(true)
+  const [isCreatePROpen, setIsCreatePROpen] = useState(false)
   const queryClient = useQueryClient()
 
   const { data: status } = useQuery<GitChangedFile[]>({
@@ -51,6 +42,19 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
   const files = status ?? []
   const stagedFiles = files.filter((f) => f.indexStatus !== ' ' && f.indexStatus !== '?')
   const changedFiles = files.filter((f) => f.workTreeStatus !== ' ' || f.indexStatus === '?')
+
+  const isDefaultBranch = branchInfo?.name === 'main' || branchInfo?.name === 'master'
+  const hasPushedBranch = branchInfo != null && branchInfo.upstream !== null && !isDefaultBranch
+
+  // Check if a PR already exists for this branch
+  const { data: existingPRs } = useQuery<PullRequest[]>({
+    queryKey: ['pull-requests-for-head', gitInfo?.owner, gitInfo?.repo, branchInfo?.name],
+    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { head: `${gitInfo!.owner}:${branchInfo!.name}`, state: 'open' }),
+    enabled: !!gitInfo && hasPushedBranch,
+    retry: false
+  })
+
+  const canCreatePR = gitInfo && hasPushedBranch && existingPRs != null && existingPRs.length === 0
 
   const invalidateGit = async (): Promise<void> => {
     await Promise.all([
@@ -164,6 +168,20 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
     }
   }
 
+  const handlePublishBranch = async (): Promise<void> => {
+    if (!branchInfo) return
+    setIsPublishing(true)
+    setError(null)
+    try {
+      await window.api.git.publishBranch(folderPath, branchInfo.name)
+      await invalidateGit()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to publish branch')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   return (
     <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
       {/* Header */}
@@ -207,11 +225,22 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
           }}
         />
         {(() => {
-          const showPush = files.length === 0 && branchInfo != null && branchInfo.ahead > 0
+          const noUpstream = branchInfo != null && branchInfo.upstream === null
+          const showPublish = noUpstream && files.length === 0
+          const showPush = !noUpstream && files.length === 0 && branchInfo != null && branchInfo.ahead > 0
 
           return (
             <div className="flex items-center gap-1">
-              {showPush ? (
+              {showPublish ? (
+                <button
+                  onClick={handlePublishBranch}
+                  disabled={isPublishing}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded bg-accent px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                >
+                  <Upload size={12} />
+                  {isPublishing ? 'Publishing...' : 'Publish Branch'}
+                </button>
+              ) : showPush ? (
                 <button
                   onClick={handlePush}
                   disabled={isPushing}
@@ -231,17 +260,30 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
                   Commit
                 </button>
               )}
-              <button
-                onClick={handlePull}
-                disabled={isPulling}
-                className="rounded bg-interactive p-1.5 text-foreground transition-colors hover:bg-interactive-hover disabled:opacity-50"
-                title="Pull"
-              >
-                <ArrowDown size={12} />
-              </button>
+              {!noUpstream ? (
+                <button
+                  onClick={handlePull}
+                  disabled={isPulling}
+                  className="rounded bg-interactive p-1.5 text-foreground transition-colors hover:bg-interactive-hover disabled:opacity-50"
+                  title="Pull"
+                >
+                  <ArrowDown size={12} />
+                </button>
+              ) : null}
             </div>
           )
         })()}
+
+        {/* Create PR button — only when branch is pushed and no open PR exists */}
+        {canCreatePR ? (
+          <button
+            onClick={() => setIsCreatePROpen(true)}
+            className="flex items-center justify-center gap-1.5 rounded border border-border bg-interactive px-2 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+          >
+            <GitPullRequest size={12} />
+            Create Pull Request
+          </button>
+        ) : null}
       </div>
 
       {/* Error display */}
@@ -294,9 +336,266 @@ export default function SourceControlPanel({ folderPath, onOpenDiff }: SourceCon
 
         {files.length === 0 ? <p className="px-4 py-4 text-xs text-foreground-subtle">No changes detected</p> : null}
       </div>
+
+      {/* Create PR Dialog */}
+      {canCreatePR ? (
+        <CreatePullRequestDialog
+          open={isCreatePROpen}
+          owner={gitInfo.owner}
+          repo={gitInfo.repo}
+          head={branchInfo.name}
+          hasUnpushedCommits={branchInfo.ahead > 0}
+          hasUncommittedChanges={files.length > 0}
+          onClose={() => setIsCreatePROpen(false)}
+          onCreated={(prNumber) => {
+            setIsCreatePROpen(false)
+            queryClient.invalidateQueries({ queryKey: ['pull-requests-for-head'] })
+            onOpenPullRequest?.(prNumber)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
+
+// ────────────────────────────────────────────────────────────
+// Create Pull Request Dialog
+// ────────────────────────────────────────────────────────────
+
+function formatBranchAsTitle(branch: string): string {
+  // Strip common prefixes like feature/, fix/, chore/, etc.
+  const stripped = branch.replace(/^(feature|fix|bugfix|hotfix|chore|docs|refactor|ci|test|perf|build|style)\//i, '')
+  // Replace hyphens/underscores with spaces, capitalize first letter
+  const spaced = stripped.replace(/[-_]/g, ' ')
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+function humanizeGitHubError(message: string): string {
+  // GitHub returns machine-readable messages — translate common ones to helpful text
+  if (message.includes('A pull request already exists'))
+    return 'A pull request already exists for this branch. Check the Pull Requests panel.'
+  if (message.includes('No commits between'))
+    return 'There are no differences between these branches. Push some commits first or choose a different base branch.'
+  if (message.includes('head sha can\'t be blank') || message.includes('field.head.sha'))
+    return 'This branch does not exist on GitHub yet. Push it first.'
+  if (message.includes('Validation Failed'))
+    return 'GitHub rejected the request. Make sure the branch has been pushed and has commits ahead of the base.'
+  return message
+}
+
+function CreatePullRequestDialog({
+  open,
+  owner,
+  repo,
+  head,
+  hasUnpushedCommits,
+  hasUncommittedChanges,
+  onClose,
+  onCreated
+}: {
+  open: boolean
+  owner: string
+  repo: string
+  head: string
+  hasUnpushedCommits: boolean
+  hasUncommittedChanges: boolean
+  onClose: () => void
+  onCreated: (prNumber: number) => void
+}) {
+  const [title, setTitle] = useState(() => formatBranchAsTitle(head))
+  const [body, setBody] = useState('')
+  const [base, setBase] = useState('')
+  const [draft, setDraft] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [branchError, setBranchError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+
+  const { data: branches, isLoading: isLoadingBranches } = useQuery<GitHubBranch[]>({
+    queryKey: ['github-branches', owner, repo],
+    queryFn: () => window.api.github.branches.list(owner, repo, { perPage: 100 }),
+    enabled: open,
+    retry: false
+  })
+
+  // Check if the head branch even exists on the remote
+  const headExistsOnRemote = branches ? branches.some((b) => b.name === head) : true // assume yes while loading
+
+  // Set default base branch when branches load
+  useEffect(() => {
+    if (!branches) return
+    if (branches.length === 0) {
+      setBranchError('Could not load branches. Check your permissions for this repository.')
+      return
+    }
+    if (base) return
+    const defaultBranch = branches.find((b) => b.name === 'main') ?? branches.find((b) => b.name === 'master') ?? branches[0]
+    if (defaultBranch) setBase(defaultBranch.name)
+  }, [branches, base])
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setTitle(formatBranchAsTitle(head))
+      setBody('')
+      setBase('')
+      setDraft(false)
+      setErrorMessage(null)
+      setBranchError(null)
+      setIsSubmitting(false)
+    }
+  }, [open, head])
+
+  if (!open) return null
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!title.trim() || !base || isSubmitting) return
+    setIsSubmitting(true)
+    setErrorMessage(null)
+
+    try {
+      const pr = await window.api.github.pulls.create(owner, repo, { title, head, base, body: body || undefined, draft })
+      await queryClient.invalidateQueries({ queryKey: ['pull-requests'] })
+      onCreated(pr.number)
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : 'Failed to create pull request.'
+      setErrorMessage(humanizeGitHubError(raw))
+      setIsSubmitting(false)
+    }
+  }
+
+  const baseBranches = (branches ?? []).filter((b) => b.name !== head)
+  const hasWarnings = hasUnpushedCommits || hasUncommittedChanges || !headExistsOnRemote
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 px-4">
+      <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <div className="flex items-center gap-2">
+            <GitPullRequest size={18} className="text-foreground-muted" />
+            <h2 className="text-lg font-semibold text-foreground">Create Pull Request</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex size-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-interactive hover:text-foreground"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Warnings */}
+        {hasWarnings ? (
+          <div className="border-b border-border px-5 py-3 space-y-1.5">
+            {!headExistsOnRemote ? (
+              <p className="text-xs text-danger">
+                This branch has not been pushed to GitHub. Push it before creating a pull request.
+              </p>
+            ) : null}
+            {hasUnpushedCommits && headExistsOnRemote ? (
+              <p className="text-xs text-accent">
+                You have unpushed commits. The pull request will be based on what is currently on GitHub, not your local changes. Push first to include them.
+              </p>
+            ) : null}
+            {hasUncommittedChanges ? (
+              <p className="text-xs text-foreground-muted">
+                You have uncommitted changes that won't be included in this pull request.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Branch info */}
+        <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+          <div className="flex items-center gap-1.5 rounded-md bg-interactive px-2.5 py-1 text-xs font-medium text-foreground">
+            <GitBranch size={12} />
+            {head}
+          </div>
+          <span className="text-xs text-foreground-subtle">into</span>
+          {isLoadingBranches ? (
+            <span className="text-xs text-foreground-muted">Loading branches...</span>
+          ) : branchError ? (
+            <span className="text-xs text-danger">{branchError}</span>
+          ) : (
+            <div className="relative">
+              <select
+                value={base}
+                onChange={(e) => setBase(e.target.value)}
+                className="appearance-none rounded-md border border-border bg-interactive py-1 pl-2.5 pr-7 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover focus:outline-none"
+              >
+                {baseBranches.map((b) => (
+                  <option key={b.name} value={b.name}>{b.name}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-foreground-subtle" />
+            </div>
+          )}
+        </div>
+
+        {/* Form */}
+        <div className="px-5 py-4">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Pull request title"
+            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault()
+                handleSubmit()
+              }
+            }}
+          />
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Description (optional)"
+            className="mt-3 min-h-32 w-full resize-y rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+          />
+
+          <label className="mt-3 flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft}
+              onChange={(e) => setDraft(e.target.checked)}
+              className="size-3.5 rounded border-border accent-accent"
+            />
+            <span className="text-xs text-foreground-muted">Create as draft</span>
+          </label>
+
+          {errorMessage ? <p className="mt-3 text-sm text-danger">{errorMessage}</p> : null}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-border bg-interactive px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-interactive-hover"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!title.trim() || !base || isSubmitting || !headExistsOnRemote}
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isSubmitting ? 'Creating...' : draft ? 'Create Draft PR' : 'Create Pull Request'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────
+// File Section & File Row (unchanged)
+// ────────────────────────────────────────────────────────────
 
 function FileSection({
   title,
@@ -403,11 +702,11 @@ function FileRow({
   return (
     <div className="group flex items-center gap-1 py-[3px] pl-6 pr-2 hover:bg-surface-hover">
       <button onClick={onOpenDiff} className="flex flex-1 items-center gap-1.5 overflow-hidden text-left">
-        <StatusIcon status={status} />
+        <FileIcon name={displayName} />
         <span className="truncate text-xs text-foreground">{displayName}</span>
         {dirPath ? <span className="truncate text-[10px] text-foreground-subtle">{dirPath}</span> : null}
       </button>
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
+      <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
         {onDiscard ? (
           <button
             onClick={onDiscard}
@@ -428,25 +727,6 @@ function FileRow({
       <StatusBadge status={status} />
     </div>
   )
-}
-
-function StatusIcon({ status }: { status: GitStatusCode | ' ' }) {
-  switch (status) {
-    case 'M':
-      return <FileDiff size={14} className="shrink-0 text-accent" />
-    case 'A':
-      return <FilePlus size={14} className="shrink-0 text-success" />
-    case 'D':
-      return <FileX size={14} className="shrink-0 text-danger" />
-    case 'R':
-      return <FileDiff size={14} className="shrink-0 text-purple" />
-    case '?':
-      return <FileQuestion size={14} className="shrink-0 text-success" />
-    case 'U':
-      return <FileDiff size={14} className="shrink-0 text-danger" />
-    default:
-      return <FileDiff size={14} className="shrink-0 text-foreground-subtle" />
-  }
 }
 
 function StatusBadge({ status }: { status: GitStatusCode | ' ' }) {

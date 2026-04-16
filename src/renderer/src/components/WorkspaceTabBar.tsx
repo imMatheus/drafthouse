@@ -1,6 +1,5 @@
 import { type ReactNode, useState } from 'react'
 import {
-  FileDiff,
   GitMerge,
   GitPullRequest,
   GitPullRequestClosed,
@@ -163,7 +162,7 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
       }
     case 'diff':
       return {
-        icon: <FileDiff size={14} strokeWidth={1.8} className="text-accent" />,
+        icon: <FileIcon name={getPathBasename(tab.path)} size={14} />,
         label: `${getPathBasename(tab.path)} (${tab.staged ? 'index' : 'working tree'})`
       }
     case 'agent':

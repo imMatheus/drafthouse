@@ -370,6 +370,7 @@ interface GitAPI {
   discardAll: (cwd: string) => Promise<void>
   commit: (cwd: string, message: string, amend?: boolean) => Promise<void>
   push: (cwd: string) => Promise<string>
+  publishBranch: (cwd: string, branch: string) => Promise<string>
   pull: (cwd: string) => Promise<string>
   stash: (cwd: string, message?: string) => Promise<void>
   stashPop: (cwd: string) => Promise<void>
@@ -395,6 +396,7 @@ interface AgentAPI {
 interface FsAPI {
   openFolder: () => Promise<string | null>
   readDir: (path: string) => Promise<FileEntry[]>
+  readDirRecursive: (path: string) => Promise<string[]>
   readFile: (path: string) => Promise<string>
   writeFile: (path: string, content: string) => Promise<void>
   getRecentFolders: () => Promise<string[]>

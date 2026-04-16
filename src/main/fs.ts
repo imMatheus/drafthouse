@@ -114,6 +114,67 @@ function requireAllowedFile(sender: WebContents, filePath: string): string {
   return resolvedPath
 }
 
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  'dist',
+  'out',
+  'build',
+  '.next',
+  '__pycache__',
+  '.venv',
+  'vendor',
+  'coverage',
+  '.cache',
+  '.turbo',
+  '.nuxt',
+  '.output',
+  '.svelte-kit',
+  'target',
+  '.gradle',
+  '.idea',
+  '.vscode'
+])
+
+const MAX_RECURSIVE_ENTRIES = 50_000
+
+function readDirectoryRecursive(rootPath: string): string[] {
+  const results: string[] = []
+
+  function walk(dirPath: string): void {
+    if (results.length >= MAX_RECURSIVE_ENTRIES) return
+
+    let entries: string[]
+    try {
+      entries = readdirSync(dirPath)
+    } catch {
+      return
+    }
+
+    for (const name of entries) {
+      if (results.length >= MAX_RECURSIVE_ENTRIES) return
+      if (name.startsWith('.')) continue
+
+      const fullPath = join(dirPath, name)
+      try {
+        const stat = statSync(fullPath)
+        if (stat.isDirectory()) {
+          if (!SKIP_DIRS.has(name)) {
+            walk(fullPath)
+          }
+        } else {
+          results.push(relative(rootPath, fullPath))
+        }
+      } catch {
+        // Skip entries we can't stat
+      }
+    }
+  }
+
+  walk(rootPath)
+  return results
+}
+
 function readDirectory(dirPath: string): FileEntry[] {
   try {
     const entries = readdirSync(dirPath)
@@ -162,6 +223,10 @@ export function registerFsHandlers(): void {
 
   ipcMain.handle('fs:read-dir', (event, dirPath: string) => {
     return readDirectory(requireAllowedDirectory(event.sender, dirPath))
+  })
+
+  ipcMain.handle('fs:read-dir-recursive', (event, dirPath: string) => {
+    return readDirectoryRecursive(requireAllowedDirectory(event.sender, dirPath))
   })
 
   ipcMain.handle('fs:read-file', (event, filePath: string) => {

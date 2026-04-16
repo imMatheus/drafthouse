@@ -331,6 +331,8 @@ const api = {
     commit: (cwd: string, message: string, amend?: boolean): Promise<unknown> =>
       ipcRenderer.invoke('git:commit', cwd, message, amend),
     push: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:push', cwd),
+    publishBranch: (cwd: string, branch: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:publish-branch', cwd, branch),
     pull: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:pull', cwd),
     stash: (cwd: string, message?: string): Promise<unknown> => ipcRenderer.invoke('git:stash', cwd, message),
     stashPop: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:stash-pop', cwd),
@@ -339,9 +341,9 @@ const api = {
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
     readDir: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir', path),
+    readDirRecursive: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir-recursive', path),
     readFile: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-file', path),
-    writeFile: (path: string, content: string): Promise<unknown> =>
-      ipcRenderer.invoke('fs:write-file', path, content),
+    writeFile: (path: string, content: string): Promise<unknown> => ipcRenderer.invoke('fs:write-file', path, content),
     getRecentFolders: (): Promise<unknown> => ipcRenderer.invoke('fs:get-recent-folders'),
     openRecent: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:open-recent', path),
     getGitInfo: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:get-git-info', path),
