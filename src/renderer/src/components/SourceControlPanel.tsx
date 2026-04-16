@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, GitBranch, GitPullRequest, Minus, Plus, Undo2, Upload, X } from 'lucide-react'
-import type { GitBranchInfo, GitChangedFile, GitRepoInfo, GitStatusCode, GitHubBranch } from '../../../shared/types'
+import type { GitBranchInfo, GitChangedFile, GitRepoInfo, GitStatusCode, GitHubBranch, PullRequest } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
@@ -44,7 +44,17 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
   const changedFiles = files.filter((f) => f.workTreeStatus !== ' ' || f.indexStatus === '?')
 
   const isDefaultBranch = branchInfo?.name === 'main' || branchInfo?.name === 'master'
-  const canCreatePR = gitInfo && branchInfo && !isDefaultBranch
+  const hasPushedBranch = branchInfo != null && branchInfo.upstream !== null && !isDefaultBranch
+
+  // Check if a PR already exists for this branch
+  const { data: existingPRs } = useQuery<PullRequest[]>({
+    queryKey: ['pull-requests-for-head', gitInfo?.owner, gitInfo?.repo, branchInfo?.name],
+    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { head: `${gitInfo!.owner}:${branchInfo!.name}`, state: 'open' }),
+    enabled: !!gitInfo && hasPushedBranch,
+    retry: false
+  })
+
+  const canCreatePR = gitInfo && hasPushedBranch && existingPRs != null && existingPRs.length === 0
 
   const invalidateGit = async (): Promise<void> => {
     await Promise.all([
@@ -264,8 +274,8 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
           )
         })()}
 
-        {/* Create PR button — show when branch has a remote upstream */}
-        {canCreatePR && branchInfo.upstream !== null ? (
+        {/* Create PR button — only when branch is pushed and no open PR exists */}
+        {canCreatePR ? (
           <button
             onClick={() => setIsCreatePROpen(true)}
             className="flex items-center justify-center gap-1.5 rounded border border-border bg-interactive px-2 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
@@ -339,6 +349,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
           onClose={() => setIsCreatePROpen(false)}
           onCreated={(prNumber) => {
             setIsCreatePROpen(false)
+            queryClient.invalidateQueries({ queryKey: ['pull-requests-for-head'] })
             onOpenPullRequest?.(prNumber)
           }}
         />

@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
+  Copy,
   ExternalLink,
   FileDiff,
   FileMinus,
@@ -429,6 +431,14 @@ function PullRequestFileDiffCard({
   const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set())
   const [expandedLines, setExpandedLines] = useState<Map<string, ExpandedContextLines>>(new Map())
+  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [pathCopied, setPathCopied] = useState(false)
+
+  const handleCopyPath = (): void => {
+    navigator.clipboard.writeText(file.filename).catch(() => {})
+    setPathCopied(true)
+    setTimeout(() => setPathCopied(false), 1500)
+  }
 
   useEffect(() => {
     const lang = getLanguageFromPath(file.filename)
@@ -544,58 +554,77 @@ function PullRequestFileDiffCard({
       data-file-path={file.filename}
       className="overflow-hidden rounded-xl border border-border bg-surface"
     >
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', getFileStatusClassName(file.status))}
-            >
-              {formatFileStatus(file.status)}
-            </span>
-            <span className="truncate text-sm font-semibold text-foreground">{file.filename}</span>
-          </div>
-          {file.previous_filename ? (
-            <p className="mt-1 text-xs text-foreground-muted">Renamed from {file.previous_filename}</p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-3">
+      <header
+        className={cn(
+          'flex items-center gap-2 px-3 py-1.5',
+          !isCollapsed && 'border-b border-border'
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex size-5 shrink-0 items-center justify-center rounded text-foreground-subtle transition-colors hover:bg-interactive hover:text-foreground"
+          aria-label={isCollapsed ? 'Expand file' : 'Collapse file'}
+        >
+          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
+        <span className="min-w-0 truncate text-sm font-semibold text-foreground">{file.filename}</span>
+        <button
+          type="button"
+          onClick={handleCopyPath}
+          className="flex size-5 shrink-0 items-center justify-center rounded text-foreground-subtle transition-colors hover:bg-interactive hover:text-foreground"
+          aria-label="Copy file path"
+          title={pathCopied ? 'Copied' : 'Copy file path'}
+        >
+          {pathCopied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+        </button>
+        {file.previous_filename ? (
+          <span className="min-w-0 shrink truncate text-xs text-foreground-muted">
+            from {file.previous_filename}
+          </span>
+        ) : null}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <DiffStat additions={file.additions} deletions={file.deletions} />
           <a
             href={file.blob_url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-interactive px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+            className="inline-flex items-center gap-1 rounded-md border border-border bg-interactive px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
           >
             View
-            <ExternalLink size={13} />
+            <ExternalLink size={12} />
           </a>
         </div>
       </header>
 
-      {parsedDiff.hasRenderablePatch ? (
-        settings.diffViewMode === 'split' ? (
-          <SplitHunkDiff {...diffProps} />
-        ) : (
-          <UnifiedHunkDiff {...diffProps} />
-        )
-      ) : (
-        <div className="px-4 py-6 text-sm text-foreground-muted">
-          GitHub did not return a renderable patch for this file.
-        </div>
-      )}
+      {isCollapsed ? null : (
+        <>
+          {parsedDiff.hasRenderablePatch ? (
+            settings.diffViewMode === 'split' ? (
+              <SplitHunkDiff {...diffProps} />
+            ) : (
+              <UnifiedHunkDiff {...diffProps} />
+            )
+          ) : (
+            <div className="px-4 py-6 text-sm text-foreground-muted">
+              GitHub did not return a renderable patch for this file.
+            </div>
+          )}
 
-      {unanchoredThreads.length > 0 ? (
-        <div className="border-t border-border px-4 py-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Other comments</p>
-          <div className="flex flex-col gap-3">
-            {unanchoredThreads.map((thread) => (
-              <div key={`unanchored-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
+          {unanchoredThreads.length > 0 ? (
+            <div className="border-t border-border px-4 py-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-foreground-muted">Other comments</p>
+              <div className="flex flex-col gap-3">
+                {unanchoredThreads.map((thread) => (
+                  <div key={`unanchored-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
+                    <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+            </div>
+          ) : null}
+        </>
+      )}
     </section>
   )
 }
@@ -1987,30 +2016,3 @@ function FileStatusIcon({ status }: { status: string }) {
   }
 }
 
-function getFileStatusClassName(status: string): string {
-  switch (status) {
-    case 'added':
-      return 'bg-success/10 text-success'
-    case 'removed':
-      return 'bg-danger/10 text-danger'
-    case 'renamed':
-      return 'bg-purple/10 text-purple'
-    default:
-      return 'bg-interactive text-foreground-muted'
-  }
-}
-
-function formatFileStatus(status: string): string {
-  switch (status) {
-    case 'added':
-      return 'Added'
-    case 'removed':
-      return 'Removed'
-    case 'renamed':
-      return 'Renamed'
-    case 'modified':
-      return 'Modified'
-    default:
-      return status
-  }
-}
