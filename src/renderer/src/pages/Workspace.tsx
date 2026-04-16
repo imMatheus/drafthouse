@@ -567,6 +567,7 @@ function renderWorkspaceTabContent({
         <PullRequestDetailView
           owner={gitInfo.owner}
           repo={gitInfo.repo}
+          folderPath={folderPath}
           number={activeTab.number}
           subview={activeTab.subview}
           agentSessions={agentSessions}

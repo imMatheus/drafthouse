@@ -303,6 +303,24 @@
   --color-purple: #7c3aed;
 } */
 
+@keyframes check-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-45deg);
+  }
+  60% {
+    transform: scale(1.2) rotate(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.animate-check-in {
+  animation: check-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 @theme {
   --color-background: var(--color-background);
   --color-surface: var(--color-surface);

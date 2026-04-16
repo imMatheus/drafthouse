@@ -330,6 +330,8 @@ const api = {
     discardAll: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:discard-all', cwd),
     commit: (cwd: string, message: string, amend?: boolean): Promise<unknown> =>
       ipcRenderer.invoke('git:commit', cwd, message, amend),
+    checkout: (cwd: string, branch: string): Promise<unknown> => ipcRenderer.invoke('git:checkout', cwd, branch),
+    listBranches: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:list-branches', cwd),
     push: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:push', cwd),
     publishBranch: (cwd: string, branch: string): Promise<unknown> =>
       ipcRenderer.invoke('git:publish-branch', cwd, branch),

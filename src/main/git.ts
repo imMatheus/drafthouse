@@ -168,6 +168,18 @@ async function gitCommit(cwd: string, message: string, amend: boolean): Promise<
   await git(cwd, args)
 }
 
+async function gitCheckout(cwd: string, branch: string): Promise<void> {
+  await git(cwd, ['checkout', branch])
+}
+
+async function gitListBranches(cwd: string): Promise<string[]> {
+  const output = await git(cwd, ['branch', '--format=%(refname:short)'])
+  return output
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 async function gitPush(cwd: string): Promise<string> {
   return git(cwd, ['push'])
 }
@@ -267,6 +279,16 @@ export function registerGitHandlers(): void {
   ipcMain.handle('git:commit', (event, cwd: string, message: string, amend?: boolean) => {
     requireAllowedDirectory(event.sender, cwd)
     return gitCommit(cwd, message, amend ?? false)
+  })
+
+  ipcMain.handle('git:checkout', (event, cwd: string, branch: string) => {
+    requireAllowedDirectory(event.sender, cwd)
+    return gitCheckout(cwd, branch)
+  })
+
+  ipcMain.handle('git:list-branches', (event, cwd: string) => {
+    requireAllowedDirectory(event.sender, cwd)
+    return gitListBranches(cwd)
   })
 
   ipcMain.handle('git:push', (event, cwd: string) => {

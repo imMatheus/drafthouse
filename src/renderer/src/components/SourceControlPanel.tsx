@@ -191,21 +191,8 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
 
       {/* Branch info */}
       {branchInfo ? (
-        <div className="flex items-center gap-1.5 px-4 pb-2">
-          <GitBranch size={12} className="shrink-0 text-foreground-subtle" />
-          <span className="truncate text-xs text-foreground-muted">{branchInfo.name}</span>
-          {branchInfo.ahead > 0 ? (
-            <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
-              {branchInfo.ahead}
-              <ArrowUp size={10} />
-            </span>
-          ) : null}
-          {branchInfo.behind > 0 ? (
-            <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
-              {branchInfo.behind}
-              <ArrowDown size={10} />
-            </span>
-          ) : null}
+        <div className="px-4 pb-2">
+          <BranchSwitcher folderPath={folderPath} branchInfo={branchInfo} />
         </div>
       ) : null}
 
@@ -748,5 +735,130 @@ function StatusBadge({ status }: { status: GitStatusCode | ' ' }) {
     >
       {label}
     </span>
+  )
+}
+
+function BranchSwitcher({ folderPath, branchInfo }: { folderPath: string; branchInfo: GitBranchInfo }) {
+  const queryClient = useQueryClient()
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [switchingTo, setSwitchingTo] = useState<string | null>(null)
+  const [switchError, setSwitchError] = useState<string | null>(null)
+
+  const { data: branches } = useQuery<string[]>({
+    queryKey: ['git-local-branches', folderPath],
+    queryFn: () => window.api.git.listBranches(folderPath),
+    enabled: isOpen,
+    retry: false
+  })
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen])
+
+  const handleSelect = async (branch: string): Promise<void> => {
+    if (branch === branchInfo.name || switchingTo) return
+    setSwitchingTo(branch)
+    setSwitchError(null)
+    try {
+      await window.api.git.checkout(folderPath, branch)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['git-branch-info', folderPath] }),
+        queryClient.invalidateQueries({ queryKey: ['git-status', folderPath] })
+      ])
+      setIsOpen(false)
+      setSearch('')
+    } catch (err) {
+      setSwitchError(err instanceof Error ? err.message : 'Failed to switch branch')
+    } finally {
+      setSwitchingTo(null)
+    }
+  }
+
+  const filtered = (branches ?? []).filter((b) => b.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-interactive"
+      >
+        <GitBranch size={12} className="shrink-0 text-foreground-subtle" />
+        <span className="truncate text-xs text-foreground-muted">{branchInfo.name}</span>
+        {branchInfo.ahead > 0 ? (
+          <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
+            {branchInfo.ahead}
+            <ArrowUp size={10} />
+          </span>
+        ) : null}
+        {branchInfo.behind > 0 ? (
+          <span className="flex items-center gap-0.5 text-[10px] text-foreground-subtle">
+            {branchInfo.behind}
+            <ArrowDown size={10} />
+          </span>
+        ) : null}
+        <ChevronDown
+          size={11}
+          className={cn('ml-auto shrink-0 text-foreground-subtle transition-transform', isOpen && 'rotate-180')}
+        />
+      </button>
+
+      {isOpen ? (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search branches..."
+              className="w-full border-b border-border bg-transparent px-3 py-2 text-xs text-foreground placeholder:text-foreground-subtle focus:outline-none"
+            />
+            <div className="max-h-60 overflow-y-auto p-1">
+              {filtered.length === 0 ? (
+                <p className="px-2 py-2 text-xs text-foreground-subtle">No branches found</p>
+              ) : (
+                filtered.map((branch) => {
+                  const isCurrent = branch === branchInfo.name
+                  const isSwitching = switchingTo === branch
+                  return (
+                    <button
+                      key={branch}
+                      type="button"
+                      onClick={() => handleSelect(branch)}
+                      disabled={isCurrent || switchingTo != null}
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs transition-colors',
+                        isCurrent
+                          ? 'text-foreground-subtle'
+                          : 'text-foreground-muted hover:bg-interactive hover:text-foreground',
+                        isSwitching && 'bg-interactive'
+                      )}
+                    >
+                      <GitBranch size={12} className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{branch}</span>
+                      {isSwitching ? (
+                        <span className="size-3 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+                      ) : isCurrent ? (
+                        <Check size={12} className="shrink-0 text-accent" />
+                      ) : null}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+            {switchError ? (
+              <p className="border-t border-border px-3 py-2 text-[10px] text-danger">{switchError}</p>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+    </div>
   )
 }

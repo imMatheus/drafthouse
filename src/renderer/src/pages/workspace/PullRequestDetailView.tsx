@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Eye,
   FileCode,
+  GitBranch,
   GitCommit,
   GitMerge,
   GitPullRequest,
@@ -24,6 +25,7 @@ import type {
   AgentContext,
   AgentSession,
   AuthData,
+  GitBranchInfo,
   PullRequestComment,
   PullRequestDetail,
   PullRequestFile,
@@ -52,6 +54,7 @@ import {
 interface PullRequestDetailViewProps {
   owner: string
   repo: string
+  folderPath: string
   number: number
   subview: PullRequestSubview
   agentSessions: AgentSession[]
@@ -67,6 +70,7 @@ interface PullRequestDetailViewProps {
 export default function PullRequestDetailView({
   owner,
   repo,
+  folderPath,
   number,
   subview,
   agentSessions,
@@ -91,6 +95,13 @@ export default function PullRequestDetailView({
   } = useQuery<PullRequestDetail, Error>({
     queryKey: ['pull-request', owner, repo, number],
     queryFn: () => window.api.github.pulls.get(owner, repo, number),
+    retry: false
+  })
+
+  const { data: branchInfo } = useQuery<GitBranchInfo>({
+    queryKey: ['git-branch-info', folderPath],
+    queryFn: () => window.api.git.branchInfo(folderPath),
+    refetchInterval: 5000,
     retry: false
   })
 
@@ -216,6 +227,9 @@ export default function PullRequestDetailView({
                 onStopAgent={onStopAgent}
                 onPromoteAgent={onPromoteAgent}
               />
+              {pr.merged && branchInfo?.name === pr.head.ref ? (
+                <MergedBranchSwitchBanner folderPath={folderPath} headBranch={pr.head.ref} baseBranch={pr.base.ref} />
+              ) : null}
             </div>
             <div className="hidden w-48 shrink-0 lg:block">
               <PRDetailSidebar pr={pr} />
@@ -246,6 +260,10 @@ export default function PullRequestDetailView({
           />
         ) : null}
       </div>
+
+      {pr.merged && branchInfo?.name === pr.head.ref ? (
+        <MergedBranchSwitchBanner folderPath={folderPath} headBranch={pr.head.ref} baseBranch={pr.base.ref} />
+      ) : null}
     </div>
   )
 }
@@ -1304,6 +1322,79 @@ function PRDetailSidebar({ pr }: { pr: PullRequestDetail }) {
         ) : (
           <p className="text-xs text-foreground-subtle">None yet</p>
         )}
+      </div>
+    </div>
+  )
+}
+
+function MergedBranchSwitchBanner({
+  folderPath,
+  headBranch,
+  baseBranch
+}: {
+  folderPath: string
+  headBranch: string
+  baseBranch: string
+}) {
+  const queryClient = useQueryClient()
+  const [status, setStatus] = useState<'idle' | 'switching' | 'done' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const handleSwitch = async (): Promise<void> => {
+    if (status === 'switching' || status === 'done') return
+    setStatus('switching')
+    setErrorMessage(null)
+    try {
+      await window.api.git.checkout(folderPath, baseBranch)
+      setStatus('done')
+      await queryClient.invalidateQueries({ queryKey: ['git-branch-info', folderPath] })
+      await queryClient.invalidateQueries({ queryKey: ['git-status', folderPath] })
+    } catch (err) {
+      setStatus('error')
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to switch branch')
+    }
+  }
+
+  return (
+    <div className="mt-8 rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-interactive">
+          <GitMerge size={16} className="text-foreground-muted" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">Pull request merged</p>
+          <p className="mt-0.5 text-xs text-foreground-muted">
+            You're still on <code className="rounded bg-accent-bg px-1 py-0.5 text-accent">{headBranch}</code>. Switch
+            to <code className="rounded bg-accent-bg px-1 py-0.5 text-accent">{baseBranch}</code> to continue working.
+          </p>
+          {errorMessage ? <p className="mt-2 text-xs text-danger">{errorMessage}</p> : null}
+        </div>
+        <button
+          type="button"
+          onClick={handleSwitch}
+          disabled={status === 'switching' || status === 'done'}
+          className={cn(
+            'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-foreground transition-all',
+            status === 'switching' ? 'bg-success/70' : 'bg-success hover:bg-success/80'
+          )}
+        >
+          {status === 'done' ? (
+            <>
+              <Check size={14} className="animate-check-in" />
+              <span>Switched</span>
+            </>
+          ) : status === 'switching' ? (
+            <>
+              <span className="size-3 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />
+              <span>Switching...</span>
+            </>
+          ) : (
+            <>
+              <GitBranch size={14} />
+              <span>Switch to {baseBranch}</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   )

@@ -369,6 +369,8 @@ interface GitAPI {
   discard: (cwd: string, filePaths: string[]) => Promise<void>
   discardAll: (cwd: string) => Promise<void>
   commit: (cwd: string, message: string, amend?: boolean) => Promise<void>
+  checkout: (cwd: string, branch: string) => Promise<void>
+  listBranches: (cwd: string) => Promise<string[]>
   push: (cwd: string) => Promise<string>
   publishBranch: (cwd: string, branch: string) => Promise<string>
   pull: (cwd: string) => Promise<string>
