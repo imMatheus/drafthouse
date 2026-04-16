@@ -1,6 +1,5 @@
 import { type ReactNode, useState } from 'react'
 import {
-  FileCode2,
   FileDiff,
   GitMerge,
   GitPullRequest,
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
+import { FileIcon } from './FileIcon'
 import type { WorkspaceTab } from '../lib/workspaceTabs'
 
 interface WorkspaceTabBarProps {
@@ -158,7 +158,7 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
       }
     case 'file':
       return {
-        icon: <FileCode2 size={14} strokeWidth={1.8} className="text-foreground-subtle" />,
+        icon: <FileIcon name={getPathBasename(tab.path)} size={14} />,
         label: getPathBasename(tab.path)
       }
     case 'diff':

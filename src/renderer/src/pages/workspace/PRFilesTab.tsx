@@ -9,7 +9,6 @@ import {
   FileDiff,
   FileMinus,
   FilePlus,
-  Folder,
   MessageSquare,
   Plus,
   Search,
@@ -26,6 +25,7 @@ import type {
   PullRequestReviewLineSide
 } from '../../../../shared/types'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
+import { FolderIcon } from '../../components/FileIcon'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import { cn } from '../../lib/cn'
 import { useSettings } from '../../hooks/useSettings'
@@ -1289,7 +1289,7 @@ function FileTreeFolder({ node, depth, activeFilePath, commentCountsByFile, onSe
     <div>
       <button type="button" onClick={() => setIsOpen(!isOpen)} className="flex w-full items-center gap-1.5 py-1 text-left text-xs text-foreground hover:bg-surface-hover" style={{ paddingLeft: 8 + depth * 16 }}>
         <ChevronDown size={14} className={cn('shrink-0 text-foreground-subtle transition-transform', !isOpen && '-rotate-90')} />
-        <Folder size={14} className="shrink-0 text-foreground-subtle" />
+        <FolderIcon name={node.name} open={isOpen} />
         <span className="truncate font-medium">{node.name}</span>
       </button>
       {isOpen ? (

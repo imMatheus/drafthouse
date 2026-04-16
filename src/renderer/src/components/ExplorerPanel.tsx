@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronRight, File, Folder } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
+import { FileIcon, FolderIcon } from './FileIcon'
 
 export default function ExplorerPanel({
   folderPath,
@@ -93,7 +94,7 @@ function FolderTree({
             )}
             style={{ paddingLeft: depth * 12 + 16 }}
           >
-            <File size={14} className="shrink-0 text-foreground-subtle" />
+            <FileIcon name={entry.name} />
             <span className="truncate">{entry.name}</span>
           </button>
         )
@@ -126,7 +127,7 @@ function FolderNode({
           size={12}
           className={cn('shrink-0 text-foreground-subtle transition-transform', open && 'rotate-90')}
         />
-        <Folder size={14} className="shrink-0 text-accent" />
+        <FolderIcon name={entry.name} open={open} />
         <span className="truncate">{entry.name}</span>
       </button>
       {open && (
