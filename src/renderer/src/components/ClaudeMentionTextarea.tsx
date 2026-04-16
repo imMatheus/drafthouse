@@ -12,6 +12,8 @@ interface ClaudeMentionTextareaProps {
   menuLabel?: string
   /** Whether @claude mention detection is enabled */
   enabled?: boolean
+  /** Called when Cmd/Ctrl+Enter is pressed (and the mention menu is not open) */
+  onSubmit?: () => void
 }
 
 export default function ClaudeMentionTextarea({
@@ -21,7 +23,8 @@ export default function ClaudeMentionTextarea({
   className,
   rows,
   menuLabel = 'Ask Claude',
-  enabled = true
+  enabled = true,
+  onSubmit
 }: ClaudeMentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -39,10 +42,16 @@ export default function ClaudeMentionTextarea({
     if (showMentionMenu && (e.key === 'Tab' || e.key === 'Enter')) {
       e.preventDefault()
       acceptMention()
+      return
     }
     if (showMentionMenu && e.key === 'Escape') {
       e.preventDefault()
       onChange('')
+      return
+    }
+    if (onSubmit && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      onSubmit()
     }
   }
 

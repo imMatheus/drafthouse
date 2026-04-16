@@ -450,6 +450,12 @@ function InlineReviewReplyForm({
       <textarea
         value={body}
         onChange={(event) => setBody(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault()
+            void handleSubmit()
+          }
+        }}
         placeholder="Reply to this thread"
         className="min-h-24 w-full resize-y bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
       />

@@ -1,7 +1,7 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* Cursor theme */
-:root {
+/* :root {
   --color-background: #14120b;
   --color-surface: #1b1913;
   --color-surface-hover: #26241e;
@@ -17,10 +17,10 @@
   --color-success: #22c55e;
   --color-danger: #ef4444;
   --color-purple: #a78bfa;
-}
+} */
 
 /* Claude theme */
-/* :root {
+:root {
   --color-background: rgb(12, 12, 12);
   --color-surface: rgb(18, 18, 18);
   --color-surface-hover: rgb(22, 22, 22);
@@ -34,9 +34,10 @@
   --color-accent-hover: rgb(87, 171, 255);
   --color-accent-bg: rgb(18, 26, 36);
   --color-success: rgb(102, 201, 95);
+  --color-success-bg: rgb(30, 40, 28);
   --color-danger: rgb(227, 66, 88);
   --color-purple: rgb(167, 139, 250);
-} */
+}
 
 .light {
   --color-background: #f7f7f4;
@@ -52,6 +53,7 @@
   --color-accent-hover: #d94400;
   --color-accent-bg: hsl(17, 33%, 11%);
   --color-success: #16a34a;
+  --color-success-bg: rgb(30, 40, 28);
   --color-danger: #dc2626;
   --color-purple: #7c3aed;
 }
@@ -310,6 +312,7 @@
   --color-accent-hover: var(--color-accent-hover);
   --color-accent-bg: var(--color-accent-bg);
   --color-success: var(--color-success);
+  --color-success-bg: var(--color-success-bg);
   --color-danger: var(--color-danger);
   --color-purple: var(--color-purple);
 }

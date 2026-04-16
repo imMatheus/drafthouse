@@ -738,6 +738,7 @@ function InlineDiffCommentComposer({
         className="min-h-28"
         menuLabel="Ask about this line"
         enabled={!!onAskClaude}
+        onSubmit={() => void handleAddSingleComment()}
       />
       {errorMessage ? <p className="px-4 text-sm text-danger">{errorMessage}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">

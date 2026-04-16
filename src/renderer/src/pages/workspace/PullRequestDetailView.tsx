@@ -1000,6 +1000,7 @@ function CommentBox({
             className="min-h-[140px]"
             menuLabel="Ask about this PR"
             enabled={!!onAskClaude}
+            onSubmit={() => void handleSubmit()}
           />
         ) : (
           <div className="min-h-[140px]">
