@@ -172,6 +172,10 @@ async function gitPush(cwd: string): Promise<string> {
   return git(cwd, ['push'])
 }
 
+async function gitPublishBranch(cwd: string, branch: string): Promise<string> {
+  return git(cwd, ['push', '-u', 'origin', branch])
+}
+
 async function gitPull(cwd: string): Promise<string> {
   return git(cwd, ['pull'])
 }
@@ -268,6 +272,11 @@ export function registerGitHandlers(): void {
   ipcMain.handle('git:push', (event, cwd: string) => {
     requireAllowedDirectory(event.sender, cwd)
     return gitPush(cwd)
+  })
+
+  ipcMain.handle('git:publish-branch', (event, cwd: string, branch: string) => {
+    requireAllowedDirectory(event.sender, cwd)
+    return gitPublishBranch(cwd, branch)
   })
 
   ipcMain.handle('git:pull', (event, cwd: string) => {

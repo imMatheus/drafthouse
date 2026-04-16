@@ -331,6 +331,8 @@ const api = {
     commit: (cwd: string, message: string, amend?: boolean): Promise<unknown> =>
       ipcRenderer.invoke('git:commit', cwd, message, amend),
     push: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:push', cwd),
+    publishBranch: (cwd: string, branch: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:publish-branch', cwd, branch),
     pull: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:pull', cwd),
     stash: (cwd: string, message?: string): Promise<unknown> => ipcRenderer.invoke('git:stash', cwd, message),
     stashPop: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:stash-pop', cwd),

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, GitBranch, GitPullRequest, Minus, Plus, Undo2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, GitBranch, GitPullRequest, Minus, Plus, Undo2, Upload, X } from 'lucide-react'
 import type { GitBranchInfo, GitChangedFile, GitRepoInfo, GitStatusCode, GitHubBranch } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
@@ -18,6 +18,7 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
   const [isCommitting, setIsCommitting] = useState(false)
   const [isPushing, setIsPushing] = useState(false)
   const [isPulling, setIsPulling] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stagedOpen, setStagedOpen] = useState(true)
   const [changesOpen, setChangesOpen] = useState(true)
@@ -157,6 +158,20 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
     }
   }
 
+  const handlePublishBranch = async (): Promise<void> => {
+    if (!branchInfo) return
+    setIsPublishing(true)
+    setError(null)
+    try {
+      await window.api.git.publishBranch(folderPath, branchInfo.name)
+      await invalidateGit()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to publish branch')
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   return (
     <div className="flex h-screen w-60 shrink-0 flex-col border-r border-border bg-surface">
       {/* Header */}
@@ -200,11 +215,22 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
           }}
         />
         {(() => {
-          const showPush = files.length === 0 && branchInfo != null && branchInfo.ahead > 0
+          const noUpstream = branchInfo != null && branchInfo.upstream === null
+          const showPublish = noUpstream && files.length === 0
+          const showPush = !noUpstream && files.length === 0 && branchInfo != null && branchInfo.ahead > 0
 
           return (
             <div className="flex items-center gap-1">
-              {showPush ? (
+              {showPublish ? (
+                <button
+                  onClick={handlePublishBranch}
+                  disabled={isPublishing}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded bg-accent px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                >
+                  <Upload size={12} />
+                  {isPublishing ? 'Publishing...' : 'Publish Branch'}
+                </button>
+              ) : showPush ? (
                 <button
                   onClick={handlePush}
                   disabled={isPushing}
@@ -224,33 +250,29 @@ export default function SourceControlPanel({ folderPath, gitInfo, onOpenDiff, on
                   Commit
                 </button>
               )}
-              <button
-                onClick={handlePull}
-                disabled={isPulling}
-                className="rounded bg-interactive p-1.5 text-foreground transition-colors hover:bg-interactive-hover disabled:opacity-50"
-                title="Pull"
-              >
-                <ArrowDown size={12} />
-              </button>
+              {!noUpstream ? (
+                <button
+                  onClick={handlePull}
+                  disabled={isPulling}
+                  className="rounded bg-interactive p-1.5 text-foreground transition-colors hover:bg-interactive-hover disabled:opacity-50"
+                  title="Pull"
+                >
+                  <ArrowDown size={12} />
+                </button>
+              ) : null}
             </div>
           )
         })()}
 
-        {/* Create PR button — only show on non-default branches with gitInfo */}
-        {canCreatePR ? (
-          branchInfo.upstream === null ? (
-            <p className="text-[10px] text-foreground-subtle text-center">
-              Push this branch to create a pull request
-            </p>
-          ) : (
-            <button
-              onClick={() => setIsCreatePROpen(true)}
-              className="flex items-center justify-center gap-1.5 rounded border border-border bg-interactive px-2 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
-            >
-              <GitPullRequest size={12} />
-              Create Pull Request
-            </button>
-          )
+        {/* Create PR button — show when branch has a remote upstream */}
+        {canCreatePR && branchInfo.upstream !== null ? (
+          <button
+            onClick={() => setIsCreatePROpen(true)}
+            className="flex items-center justify-center gap-1.5 rounded border border-border bg-interactive px-2 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover"
+          >
+            <GitPullRequest size={12} />
+            Create Pull Request
+          </button>
         ) : null}
       </div>
 
