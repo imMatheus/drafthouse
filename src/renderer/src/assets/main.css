@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Cursor theme */
-/* :root {
+:root {
   --color-background: #14120b;
   --color-surface: #1b1913;
   --color-surface-hover: #26241e;
@@ -11,16 +11,16 @@
   --color-border: #2b2923;
   --color-interactive: #201e18;
   --color-interactive-hover: #2b2923;
-  --color-accent: #f54e00;
-  --color-accent-hover: #ff6d2e;
-  --color-accent-bg: hsl(17, 33%, 11%);
+  --color-accent: hsl(19, 100%, 48%);
+  --color-accent-hover: hsl(19, 100%, 55%);
+  --color-accent-bg: hsl(19, 100%, 7%);
   --color-success: #22c55e;
   --color-danger: #ef4444;
   --color-purple: #a78bfa;
-} */
+}
 
 /* Claude theme */
-:root {
+/* :root {
   --color-background: rgb(12, 12, 12);
   --color-surface: rgb(18, 18, 18);
   --color-surface-hover: rgb(22, 22, 22);
@@ -30,14 +30,19 @@
   --color-border: rgb(32, 32, 32);
   --color-interactive: rgb(47, 47, 47);
   --color-interactive-hover: rgb(43, 41, 35);
-  --color-accent: rgb(67, 151, 248);
+   --color-accent: rgb(67, 151, 248);
   --color-accent-hover: rgb(87, 171, 255);
-  --color-accent-bg: rgb(18, 26, 36);
+  --color-accent-bg: rgb(18, 26, 36); 
+
+  --color-accent: hsl(19, 100%, 48%);
+  --color-accent-hover: hsl(19, 100%, 55%);
+  --color-accent-bg: hsl(19, 100%, 7%);
+
   --color-success: rgb(102, 201, 95);
   --color-success-bg: rgb(30, 40, 28);
   --color-danger: rgb(227, 66, 88);
   --color-purple: rgb(167, 139, 250);
-}
+} */
 
 .light {
   --color-background: #f7f7f4;

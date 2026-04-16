@@ -617,8 +617,8 @@ function InlineDiffThread({
             <span className="text-xs font-semibold text-foreground">{comment.user.login}</span>
             <span className="text-xs text-foreground-subtle">{formatRelativeTime(comment.created_at)}</span>
           </div>
-          <div className="mt-1 pl-7">
-            <MarkdownBody>{comment.body}</MarkdownBody>
+          <div className="mt-2">
+            <MarkdownBody className="">{comment.body}</MarkdownBody>
           </div>
         </div>
       ))}

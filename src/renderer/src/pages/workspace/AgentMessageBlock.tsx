@@ -82,7 +82,7 @@ function SystemMessage({ event }: { event: AgentStreamSystem }) {
 function ContentBlock({ block }: { block: AgentContentBlock }) {
   switch (block.type) {
     case 'text':
-      return <MarkdownBody>{block.text}</MarkdownBody>
+      return <MarkdownBody className="p-4">{block.text}</MarkdownBody>
     case 'tool_use':
       if (
         block.name === 'Edit' &&

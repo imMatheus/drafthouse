@@ -477,7 +477,7 @@ function PullRequestTimelineCard({
           <span className="text-sm font-medium text-foreground">{item.user.login}</span>
           <span className="text-xs text-foreground-subtle">commented {formatRelativeTime(item.createdAt)}</span>
         </div>
-        <MarkdownBody>{item.body}</MarkdownBody>
+        <MarkdownBody className="p-4">{item.body}</MarkdownBody>
         <div className="border-t border-border px-4 py-2">
           <ReactionBar owner={owner} repo={repo} commentId={commentId} commentType="issue-comment" />
         </div>
@@ -509,7 +509,7 @@ function PullRequestTimelineCard({
 
         {item.review?.body ? (
           <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
-            <MarkdownBody>{item.review.body}</MarkdownBody>
+            <MarkdownBody className="p-4">{item.review.body}</MarkdownBody>
           </div>
         ) : null}
 
@@ -752,7 +752,7 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
         ) : (
           <div className="min-h-[180px]">
             {editBody ? (
-              <MarkdownBody>{editBody}</MarkdownBody>
+              <MarkdownBody className="p-4">{editBody}</MarkdownBody>
             ) : (
               <p className="p-4 text-foreground-subtle">Nothing to preview</p>
             )}
@@ -794,7 +794,7 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
         </button>
       </div>
       {pr.body ? (
-        <MarkdownBody>{pr.body}</MarkdownBody>
+        <MarkdownBody className="p-4">{pr.body}</MarkdownBody>
       ) : (
         <p className="p-4 text-sm text-foreground-subtle">No description provided.</p>
       )}
@@ -1005,7 +1005,7 @@ function CommentBox({
         ) : (
           <div className="min-h-[140px]">
             {body ? (
-              <MarkdownBody>{body}</MarkdownBody>
+              <MarkdownBody className="p-4">{body}</MarkdownBody>
             ) : (
               <p className="p-4 text-foreground-subtle">Nothing to preview</p>
             )}
