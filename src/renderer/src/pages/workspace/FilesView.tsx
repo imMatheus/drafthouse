@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
+import Editor, { type OnMount } from '@monaco-editor/react'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
-import { getLanguageFromPath, tokenizeCode, type HighlightedToken } from '../../lib/shiki'
+import { getMonacoTheme, getMonacoLanguage, BASE_EDITOR_OPTIONS } from '../../lib/monaco'
 
 interface FilesViewProps {
   filePath: string
@@ -12,6 +13,8 @@ interface FilesViewProps {
 
 export default function FilesView({ filePath, folderPath }: FilesViewProps) {
   const { theme } = useTheme()
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+
   const {
     data: fileContents,
     isLoading,
@@ -22,21 +25,15 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
     retry: false
   })
 
-  const [tokens, setTokens] = useState<HighlightedToken[][] | null>(null)
-
-  useEffect(() => {
-    if (fileContents == null) {
-      setTokens(null)
-      return
-    }
-    const lang = getLanguageFromPath(filePath)
-    tokenizeCode(fileContents, lang, theme)
-      .then(setTokens)
-      .catch(() => {})
-  }, [fileContents, filePath, theme])
-
   const relativePath = getRelativePath(filePath, folderPath)
   const segments = relativePath.split('/')
+
+  const handleEditorMount: OnMount = (editor, monacoInstance) => {
+    editorRef.current = editor
+    editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, () => {
+      window.api.fs.writeFile(filePath, editor.getValue())
+    })
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -51,7 +48,7 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-background">
+      <div className="min-h-0 flex-1 overflow-hidden bg-background">
         {isLoading ? (
           <div className="px-4 py-6">
             <p className="text-sm text-foreground-muted">Loading file...</p>
@@ -62,48 +59,25 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
             <p className="mt-1 text-sm text-foreground-muted">{error.message}</p>
           </div>
         ) : (
-          <CodeView tokens={tokens} rawContent={fileContents ?? ''} />
+          <Editor
+            value={fileContents ?? ''}
+            language={getMonacoLanguage(filePath)}
+            theme={getMonacoTheme(theme)}
+            path={filePath}
+            options={{
+              ...BASE_EDITOR_OPTIONS,
+              readOnly: false
+            }}
+            onMount={handleEditorMount}
+            loading={
+              <div className="px-4 py-6">
+                <p className="text-sm text-foreground-muted">Loading editor...</p>
+              </div>
+            }
+          />
         )}
       </div>
     </div>
-  )
-}
-
-function CodeView({ tokens, rawContent }: { tokens: HighlightedToken[][] | null; rawContent: string }) {
-  const lines: HighlightedToken[][] =
-    tokens ?? rawContent.split('\n').map((line) => [{ content: line, color: undefined }])
-
-  return (
-    <table className="min-w-full border-collapse font-mono text-[13px] leading-6">
-      <tbody>
-        {lines.map((lineTokens, i) => (
-          <tr key={i} className="hover:bg-surface-hover">
-            <td className="sticky left-0 select-none bg-background px-3 py-0 text-right text-xs text-foreground-subtle">
-              {i + 1}
-            </td>
-            <td className="py-0 w-full pr-4 pl-4 whitespace-pre">
-              <TokenizedLine tokens={lineTokens} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-function TokenizedLine({ tokens }: { tokens: HighlightedToken[] }) {
-  return (
-    <>
-      {tokens.map((token, i) =>
-        token.color ? (
-          <span key={i} style={{ color: token.color }}>
-            {token.content}
-          </span>
-        ) : (
-          <span key={i}>{token.content}</span>
-        )
-      )}
-    </>
   )
 }
 

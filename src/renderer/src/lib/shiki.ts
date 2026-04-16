@@ -2,12 +2,12 @@ import { createHighlighterCore, type HighlighterCore, type ThemedToken } from '@
 import { createJavaScriptRegexEngine } from '@shikijs/engine-javascript'
 import type { BundledLanguage } from 'shiki'
 import { bundledLanguages } from 'shiki/langs'
-import vitesseDark from 'shiki/themes/vitesse-dark.mjs'
-import vitesseLight from 'shiki/themes/vitesse-light.mjs'
+import githubDark from 'shiki/themes/github-dark.mjs'
+import githubLight from 'shiki/themes/github-light.mjs'
 import type { ParsedDiffHunk } from '../pages/workspace/pullRequestDiff'
 
-const DARK_THEME = 'vitesse-dark' as const
-const LIGHT_THEME = 'vitesse-light' as const
+const DARK_THEME = 'github-dark' as const
+const LIGHT_THEME = 'github-light' as const
 
 let instance: HighlighterCore | null = null
 let loading: Promise<HighlighterCore> | null = null
@@ -22,7 +22,7 @@ async function getHighlighter(): Promise<HighlighterCore> {
   if (instance) return instance
   if (!loading) {
     loading = createHighlighterCore({
-      themes: [vitesseDark, vitesseLight],
+      themes: [githubDark, githubLight],
       langs: [],
       engine: createJavaScriptRegexEngine()
     }).then((h) => {
@@ -33,21 +33,29 @@ async function getHighlighter(): Promise<HighlighterCore> {
   return loading
 }
 
+const languageLoading = new Map<string, Promise<string>>()
+
 async function ensureLanguage(highlighter: HighlighterCore, lang: string): Promise<string> {
   if (lang === 'plaintext' || lang === 'text') return 'plaintext'
 
   const loaded = highlighter.getLoadedLanguages()
   if (loaded.includes(lang)) return lang
 
+  // If this language is already being loaded by another caller, reuse that promise
+  const inflight = languageLoading.get(lang)
+  if (inflight) return inflight
+
   const loader = bundledLanguages[lang as BundledLanguage]
   if (!loader) return 'plaintext'
 
-  try {
-    await highlighter.loadLanguage(loader)
-    return lang
-  } catch {
-    return 'plaintext'
-  }
+  const promise = highlighter
+    .loadLanguage(loader)
+    .then(() => lang)
+    .catch(() => 'plaintext')
+    .finally(() => languageLoading.delete(lang))
+
+  languageLoading.set(lang, promise)
+  return promise
 }
 
 const EXTENSION_TO_LANG: Record<string, string> = {

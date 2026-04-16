@@ -22,7 +22,9 @@ All colors in the frontend must use the token-based design system defined in `sr
 
 ## Code Rendering
 
-Use `shiki` for all syntax highlighting. The highlighter is set up in `src/renderer/src/lib/shiki.ts` using the JavaScript regex engine (`@shikijs/engine-javascript`) with vitesse-dark / vitesse-light themes. Use `tokenizeCode` for full files, `tokenizeDiffHunks` for PR diffs, and `tokenizeReviewPreviewLines` for review thread previews. Detect the language from file paths with `getLanguageFromPath`. Never render raw code in `<pre><code>` without highlighting.
+Use Monaco Editor (`@monaco-editor/react`) for interactive code viewing and diff rendering. The configuration is in `src/renderer/src/lib/monaco.ts` with custom themes (`drafthouse-dark`/`drafthouse-light`). Use `Editor` for file viewing, `DiffEditor` for diffs. For PR diffs with inline comments, use the `MonacoDiffWithComments` component which leverages Monaco's view zone API. Detect the language from file paths with `getMonacoLanguage` (or `getLanguageFromPath` from shiki.ts).
+
+Use `shiki` for non-interactive code highlighting only: `AgentEditDiffBlock.tsx` (agent edit diffs) and `MarkdownBody.tsx` (markdown code blocks). The Shiki highlighter is configured in `src/renderer/src/lib/shiki.ts`.
 
 ## Icons
 

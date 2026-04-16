@@ -23,4 +23,22 @@ export function registerReposHandlers(): void {
       'Failed to fetch repos'
     )
   })
+
+  // Get file content at a specific ref
+  // GET /repos/{owner}/{repo}/contents/{path}?ref={ref}
+  ipcMain.handle(
+    'github:repos:get-content',
+    async (_event, owner: string, repo: string, path: string, ref: string): Promise<string> => {
+      const token = requireAuth()
+      const data = await fetchGitHubJson<{ content: string; encoding: string }>(
+        token,
+        `${API}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`,
+        `Failed to fetch file content for ${path}`
+      )
+      if (data.encoding === 'base64') {
+        return Buffer.from(data.content, 'base64').toString('utf-8')
+      }
+      return data.content
+    }
+  )
 }

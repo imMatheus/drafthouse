@@ -154,3 +154,24 @@ function normalizeReviewCommentSide(value: string | null | undefined): PullReque
 export function getDiffThreadKey(path: string, side: PullRequestReviewLineSide, line: number): string {
   return `${path}::${side}::${line}`
 }
+
+export function splitDiffHunkToContents(diffHunk: string): { original: string; modified: string } {
+  const lines = diffHunk.split('\n')
+  const originalLines: string[] = []
+  const modifiedLines: string[] = []
+
+  for (const line of lines) {
+    if (line.startsWith('@@') || line.startsWith('\\')) continue
+    if (line.startsWith('-')) {
+      originalLines.push(line.slice(1))
+    } else if (line.startsWith('+')) {
+      modifiedLines.push(line.slice(1))
+    } else {
+      const content = line.startsWith(' ') ? line.slice(1) : line
+      originalLines.push(content)
+      modifiedLines.push(content)
+    }
+  }
+
+  return { original: originalLines.join('\n'), modified: modifiedLines.join('\n') }
+}

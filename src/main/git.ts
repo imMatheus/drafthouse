@@ -101,6 +101,14 @@ async function gitShowFile(cwd: string, filePath: string): Promise<string> {
   }
 }
 
+async function gitShowStagedFile(cwd: string, filePath: string): Promise<string> {
+  try {
+    return await git(cwd, ['show', `:${filePath}`])
+  } catch {
+    return ''
+  }
+}
+
 async function gitStage(cwd: string, filePaths: string[]): Promise<void> {
   await git(cwd, ['add', '--', ...filePaths])
 }
@@ -215,6 +223,11 @@ export function registerGitHandlers(): void {
   ipcMain.handle('git:show-file', (event, cwd: string, filePath: string) => {
     requireAllowedDirectory(event.sender, cwd)
     return gitShowFile(cwd, filePath)
+  })
+
+  ipcMain.handle('git:show-staged-file', (event, cwd: string, filePath: string) => {
+    requireAllowedDirectory(event.sender, cwd)
+    return gitShowStagedFile(cwd, filePath)
   })
 
   ipcMain.handle('git:stage', (event, cwd: string, filePaths: string[]) => {

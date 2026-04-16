@@ -172,6 +172,10 @@ export function registerFsHandlers(): void {
     }
   })
 
+  ipcMain.handle('fs:write-file', (event, filePath: string, content: string) => {
+    writeFileSync(requireAllowedFile(event.sender, filePath), content, 'utf-8')
+  })
+
   ipcMain.handle('fs:get-recent-folders', () => {
     return loadRecentFolders()
   })

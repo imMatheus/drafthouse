@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Reply } from 'lucide-react'
 import type { PullRequestReviewComment } from '../../../../shared/types'
-import { cn } from '../../lib/cn'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
-import { getLanguageFromPath, tokenizeReviewPreviewLines, type HighlightedToken } from '../../lib/shiki'
+import { DiffEditor } from '@monaco-editor/react'
+import { getMonacoTheme, getMonacoLanguage, BASE_DIFF_OPTIONS } from '../../lib/monaco'
 import ReactionBar from '../../components/ReactionBar'
 import MarkdownBody from './MarkdownBody'
+import { splitDiffHunkToContents } from './pullRequestDiff'
 import { formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
 
 export default function ReviewThreadCard({
@@ -120,279 +121,34 @@ export default function ReviewThreadCard({
 function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment }) {
   const { theme } = useTheme()
   const { settings } = useSettings()
-  const lines = getReviewDiffPreviewLines(comment)
-  const [tokenMap, setTokenMap] = useState<Map<number, HighlightedToken[]>>(new Map())
 
-  useEffect(() => {
-    if (lines.length === 0) return
-    const lang = getLanguageFromPath(comment.path)
-    tokenizeReviewPreviewLines(lines, lang, theme).then(setTokenMap)
-  }, [comment.diff_hunk, comment.path, theme])
+  if (!comment.diff_hunk) return null
 
-  if (lines.length === 0) {
-    return null
-  }
-
-  if (settings.diffViewMode === 'split') {
-    return <ReviewDiffHunkSplit lines={lines} tokenMap={tokenMap} />
-  }
-
-  return <ReviewDiffHunkUnified lines={lines} tokenMap={tokenMap} />
-}
-
-function TokenizedContent({ tokens, fallback }: { tokens: HighlightedToken[] | undefined; fallback: string }) {
-  if (tokens) {
-    return (
-      <>
-        {tokens.map((token, i) =>
-          token.color ? (
-            <span key={i} style={{ color: token.color }}>
-              {token.content}
-            </span>
-          ) : (
-            <span key={i}>{token.content}</span>
-          )
-        )}
-      </>
-    )
-  }
-  return <>{fallback}</>
-}
-
-function ReviewDiffHunkUnified({
-  lines,
-  tokenMap
-}: {
-  lines: ReviewDiffPreviewLine[]
-  tokenMap: Map<number, HighlightedToken[]>
-}) {
-  return (
-    <div className="border-b border-border bg-background">
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-sm">
-          <tbody>
-            {lines.map((line, index) => (
-              <tr key={`${line.kind}-${index}`} className={getReviewDiffRowClassName(line.kind)}>
-                <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                  {line.oldLine ?? ''}
-                </td>
-                <td className="w-12 border-r border-border px-3 py-1.5 text-right font-mono text-xs text-foreground-subtle">
-                  {line.newLine ?? ''}
-                </td>
-                <td className="px-3 py-1.5 font-mono text-[13px] text-foreground">
-                  <span className="mr-3 inline-block w-3 text-center text-foreground-muted">{line.prefix}</span>
-                  <TokenizedContent tokens={tokenMap.get(index)} fallback={line.content} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-function ReviewDiffHunkSplit({
-  lines,
-  tokenMap
-}: {
-  lines: ReviewDiffPreviewLine[]
-  tokenMap: Map<number, HighlightedToken[]>
-}) {
-  // Align deletions with additions into side-by-side pairs
-  type AlignedPair = {
-    left: { line: ReviewDiffPreviewLine; index: number } | null
-    right: { line: ReviewDiffPreviewLine; index: number } | null
-  }
-  const pairs: AlignedPair[] = []
-  let i = 0
-
-  while (i < lines.length) {
-    const line = lines[i]
-
-    if (line.kind === 'header' || line.kind === 'context') {
-      pairs.push({ left: { line, index: i }, right: { line, index: i } })
-      i++
-      continue
-    }
-
-    const deletions: { line: ReviewDiffPreviewLine; index: number }[] = []
-    const additions: { line: ReviewDiffPreviewLine; index: number }[] = []
-
-    while (i < lines.length && lines[i].kind === 'deletion') {
-      deletions.push({ line: lines[i], index: i })
-      i++
-    }
-    while (i < lines.length && lines[i].kind === 'addition') {
-      additions.push({ line: lines[i], index: i })
-      i++
-    }
-
-    const maxLen = Math.max(deletions.length, additions.length)
-    for (let j = 0; j < maxLen; j++) {
-      pairs.push({
-        left: j < deletions.length ? deletions[j] : null,
-        right: j < additions.length ? additions[j] : null
-      })
-    }
-  }
+  const { original, modified } = splitDiffHunkToContents(comment.diff_hunk)
+  const lineCount = Math.max(original.split('\n').length, modified.split('\n').length, 1)
+  const height = Math.min(lineCount, 8) * 24 + 8
 
   return (
-    <div className="border-b border-border bg-background">
-      <div className="overflow-x-auto">
-        <table className="min-w-full table-fixed border-collapse text-sm">
-          <colgroup>
-            <col className="w-10" />
-            <col className="w-1/2" />
-            <col className="w-10" />
-            <col className="w-1/2" />
-          </colgroup>
-          <tbody>
-            {pairs.map((pair, idx) => {
-              if (pair.left?.line.kind === 'header') {
-                return (
-                  <tr key={idx} className="bg-interactive">
-                    <td colSpan={4} className="px-3 py-1.5 font-mono text-[13px] text-foreground-muted">
-                      {pair.left.line.content}
-                    </td>
-                  </tr>
-                )
-              }
-
-              return (
-                <tr key={idx}>
-                  <td
-                    className={cn(
-                      'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
-                      pair.left?.line.kind === 'deletion' ? 'bg-danger/10' : 'bg-background'
-                    )}
-                  >
-                    {pair.left?.line.oldLine ?? ''}
-                  </td>
-                  <td
-                    className={cn(
-                      'overflow-hidden border-r border-border px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
-                      pair.left?.line.kind === 'deletion'
-                        ? 'bg-danger/10 text-foreground'
-                        : pair.left
-                          ? 'bg-background text-foreground'
-                          : 'bg-surface'
-                    )}
-                  >
-                    {pair.left ? (
-                      <TokenizedContent tokens={tokenMap.get(pair.left.index)} fallback={pair.left.line.content} />
-                    ) : (
-                      '\u00A0'
-                    )}
-                  </td>
-                  <td
-                    className={cn(
-                      'border-r border-border px-2 py-0 text-right font-mono text-xs text-foreground-subtle',
-                      pair.right?.line.kind === 'addition' ? 'bg-success/10' : 'bg-background'
-                    )}
-                  >
-                    {pair.right?.line.newLine ?? ''}
-                  </td>
-                  <td
-                    className={cn(
-                      'overflow-hidden px-3 py-0 font-mono text-[13px] whitespace-pre-wrap break-all',
-                      pair.right?.line.kind === 'addition'
-                        ? 'bg-success/10 text-foreground'
-                        : pair.right
-                          ? 'bg-background text-foreground'
-                          : 'bg-surface'
-                    )}
-                  >
-                    {pair.right ? (
-                      <TokenizedContent tokens={tokenMap.get(pair.right.index)} fallback={pair.right.line.content} />
-                    ) : (
-                      '\u00A0'
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+    <div className="border-b border-border" style={{ height }}>
+      <DiffEditor
+        key={settings.diffViewMode}
+        original={original}
+        modified={modified}
+        language={getMonacoLanguage(comment.path)}
+        theme={getMonacoTheme(theme)}
+        options={{
+          ...BASE_DIFF_OPTIONS,
+          renderSideBySide: settings.diffViewMode === 'split',
+          lineNumbers: 'off',
+          folding: false,
+          glyphMargin: false,
+          lineDecorationsWidth: 0,
+          lineNumbersMinChars: 0,
+          scrollbar: { vertical: 'hidden', horizontal: 'hidden' }
+        }}
+      />
     </div>
   )
-}
-
-type ReviewDiffPreviewLine = {
-  kind: 'header' | 'addition' | 'deletion' | 'context'
-  prefix: string
-  content: string
-  oldLine: number | null
-  newLine: number | null
-}
-
-function getReviewDiffPreviewLines(comment: PullRequestReviewComment): ReviewDiffPreviewLine[] {
-  if (!comment.diff_hunk) {
-    return []
-  }
-
-  const rawLines = comment.diff_hunk.split('\n').slice(0, 8)
-  let oldLineNumber = 0
-  let newLineNumber = 0
-
-  return rawLines.map((rawLine) => {
-    if (rawLine.startsWith('@@')) {
-      const match = rawLine.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-      oldLineNumber = match ? Number(match[1]) : 0
-      newLineNumber = match ? Number(match[2]) : 0
-
-      return {
-        kind: 'header' as const,
-        prefix: '@@',
-        content: rawLine,
-        oldLine: null,
-        newLine: null
-      }
-    }
-
-    if (rawLine.startsWith('-')) {
-      const line = {
-        kind: 'deletion' as const,
-        prefix: '-',
-        content: rawLine.slice(1),
-        oldLine: oldLineNumber,
-        newLine: null
-      }
-      oldLineNumber += 1
-      return line
-    }
-
-    if (rawLine.startsWith('+')) {
-      const line = {
-        kind: 'addition' as const,
-        prefix: '+',
-        content: rawLine.slice(1),
-        oldLine: null,
-        newLine: newLineNumber
-      }
-      newLineNumber += 1
-      return line
-    }
-
-    const line = {
-      kind: 'context' as const,
-      prefix: ' ',
-      content: rawLine.startsWith(' ') ? rawLine.slice(1) : rawLine,
-      oldLine: oldLineNumber || null,
-      newLine: newLineNumber || null
-    }
-    oldLineNumber += 1
-    newLineNumber += 1
-    return line
-  })
-}
-
-function getReviewDiffRowClassName(kind: ReviewDiffPreviewLine['kind']): string {
-  if (kind === 'header') return 'bg-interactive'
-  if (kind === 'addition') return 'bg-success/10'
-  if (kind === 'deletion') return 'bg-danger/10'
-  return 'bg-background'
 }
 
 function InlineReviewReplyForm({

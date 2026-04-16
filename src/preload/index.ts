@@ -14,7 +14,9 @@ const api = {
   },
   github: {
     repos: {
-      list: (query?: string): Promise<unknown> => ipcRenderer.invoke('github:repos:list', query)
+      list: (query?: string): Promise<unknown> => ipcRenderer.invoke('github:repos:list', query),
+      getContent: (owner: string, repo: string, path: string, ref: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:repos:get-content', owner, repo, path, ref)
     },
     branches: {
       list: (
@@ -318,6 +320,8 @@ const api = {
     diff: (cwd: string, filePath: string, staged: boolean): Promise<unknown> =>
       ipcRenderer.invoke('git:diff', cwd, filePath, staged),
     showFile: (cwd: string, filePath: string): Promise<unknown> => ipcRenderer.invoke('git:show-file', cwd, filePath),
+    showStagedFile: (cwd: string, filePath: string): Promise<unknown> =>
+      ipcRenderer.invoke('git:show-staged-file', cwd, filePath),
     stage: (cwd: string, filePaths: string[]): Promise<unknown> => ipcRenderer.invoke('git:stage', cwd, filePaths),
     unstage: (cwd: string, filePaths: string[]): Promise<unknown> => ipcRenderer.invoke('git:unstage', cwd, filePaths),
     stageAll: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:stage-all', cwd),
@@ -336,6 +340,8 @@ const api = {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
     readDir: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir', path),
     readFile: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-file', path),
+    writeFile: (path: string, content: string): Promise<unknown> =>
+      ipcRenderer.invoke('fs:write-file', path, content),
     getRecentFolders: (): Promise<unknown> => ipcRenderer.invoke('fs:get-recent-folders'),
     openRecent: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:open-recent', path),
     getGitInfo: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:get-git-info', path),

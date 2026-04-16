@@ -62,6 +62,7 @@ interface AuthAPI {
 
 interface GitHubReposAPI {
   list: (query?: string) => Promise<GitHubRepo[]>
+  getContent: (owner: string, repo: string, path: string, ref: string) => Promise<string>
 }
 
 interface GitHubBranchesAPI {
@@ -360,6 +361,7 @@ interface GitAPI {
   branchInfo: (cwd: string) => Promise<GitBranchInfo>
   diff: (cwd: string, filePath: string, staged: boolean) => Promise<string>
   showFile: (cwd: string, filePath: string) => Promise<string>
+  showStagedFile: (cwd: string, filePath: string) => Promise<string>
   stage: (cwd: string, filePaths: string[]) => Promise<void>
   unstage: (cwd: string, filePaths: string[]) => Promise<void>
   stageAll: (cwd: string) => Promise<void>
@@ -394,6 +396,7 @@ interface FsAPI {
   openFolder: () => Promise<string | null>
   readDir: (path: string) => Promise<FileEntry[]>
   readFile: (path: string) => Promise<string>
+  writeFile: (path: string, content: string) => Promise<void>
   getRecentFolders: () => Promise<string[]>
   openRecent: (path: string) => Promise<string>
   getGitInfo: (path: string) => Promise<GitRepoInfo | null>
