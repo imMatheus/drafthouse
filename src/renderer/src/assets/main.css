@@ -2,13 +2,22 @@
 
 html,
 body {
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  font-family:
+    "Inter",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-feature-settings: "cv11", "ss01", "ss03";
 }
 
 /* Cursor theme */
-:root {
+/* :root {
   --color-background: rgb(20, 18, 11);
   --color-surface: #1b1913;
   --color-surface-hover: #26241e;
@@ -24,10 +33,10 @@ body {
   --color-success: #22c55e;
   --color-danger: #ef4444;
   --color-purple: #a78bfa;
-}
+} */
 
 /* Claude theme */
-/* :root {
+:root {
   --color-background: rgb(12, 12, 12);
   --color-surface: rgb(18, 18, 18);
   --color-surface-hover: rgb(22, 22, 22);
@@ -37,9 +46,9 @@ body {
   --color-border: rgb(32, 32, 32);
   --color-interactive: rgb(47, 47, 47);
   --color-interactive-hover: rgb(43, 41, 35);
-   --color-accent: rgb(67, 151, 248);
+  --color-accent: rgb(67, 151, 248);
   --color-accent-hover: rgb(87, 171, 255);
-  --color-accent-bg: rgb(18, 26, 36); 
+  --color-accent-bg: rgb(18, 26, 36);
 
   --color-accent: hsl(19, 100%, 48%);
   --color-accent-hover: hsl(19, 100%, 55%);
@@ -49,7 +58,7 @@ body {
   --color-success-bg: rgb(30, 40, 28);
   --color-danger: rgb(227, 66, 88);
   --color-purple: rgb(167, 139, 250);
-} */
+}
 
 .light {
   --color-background: rgb(247, 247, 244);
@@ -329,8 +338,9 @@ body {
 }
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
+  --font-sans:
+    "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   --color-background: var(--color-background);
   --color-surface: var(--color-surface);

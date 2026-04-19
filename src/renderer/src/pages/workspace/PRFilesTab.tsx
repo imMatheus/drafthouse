@@ -30,6 +30,9 @@ import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../
 import { FolderIcon } from '../../components/FileIcon'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ReactionBar from '../../components/ReactionBar'
+import CommentActionsMenu from '../../components/CommentActionsMenu'
+import CommentBodyEditor from '../../components/CommentBodyEditor'
+import Tooltip from '../../components/Tooltip'
 import { cn } from '../../lib/cn'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
@@ -238,13 +241,15 @@ export default function PRFilesTab({
       <div className="flex gap-2">
         <div className="sticky top-1 hidden h-[calc(100vh-11rem)] shrink-0 lg:flex">
           {fileListCollapsed ? (
-            <button
-              onClick={() => setFileListCollapsed(false)}
-              className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 -translate-x-1.5 items-center justify-center self-start rounded transition-colors"
-              title="Show file list"
-            >
-              <ChevronRight size={14} />
-            </button>
+            <Tooltip label="Show file list" side="right">
+              <button
+                onClick={() => setFileListCollapsed(false)}
+                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 -translate-x-1.5 items-center justify-center self-start rounded transition-colors"
+                aria-label="Show file list"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </Tooltip>
           ) : null}
           <aside
             className={cn(
@@ -269,13 +274,15 @@ export default function PRFilesTab({
                   <X size={14} />
                 </button>
               ) : null}
-              <button
-                onClick={() => setFileListCollapsed(true)}
-                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 shrink-0 items-center justify-center rounded transition-colors"
-                title="Hide file list"
-              >
-                <ChevronLeft size={14} />
-              </button>
+              <Tooltip label="Hide file list" side="top">
+                <button
+                  onClick={() => setFileListCollapsed(true)}
+                  className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 shrink-0 items-center justify-center rounded transition-colors"
+                  aria-label="Hide file list"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              </Tooltip>
             </div>
             <div className="flex-1 overflow-y-auto">
               {filteredFiles.length === 0 && !isLoading ? (
@@ -565,15 +572,16 @@ function PullRequestFileDiffCard({
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
         <span className="text-foreground min-w-0 truncate text-sm font-semibold">{file.filename}</span>
-        <button
-          type="button"
-          onClick={handleCopyPath}
-          className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
-          aria-label="Copy file path"
-          title={pathCopied ? 'Copied' : 'Copy file path'}
-        >
-          {pathCopied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
-        </button>
+        <Tooltip label={pathCopied ? 'Copied' : 'Copy file path'} side="top">
+          <button
+            type="button"
+            onClick={handleCopyPath}
+            className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
+            aria-label="Copy file path"
+          >
+            {pathCopied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+          </button>
+        </Tooltip>
         {file.previous_filename ? (
           <span className="text-foreground-muted min-w-0 shrink truncate text-xs">from {file.previous_filename}</span>
         ) : null}
@@ -1538,6 +1546,7 @@ function InlineDiffThread({
   const [replyBody, setReplyBody] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const queryClient = useQueryClient()
 
   const handleReply = async (): Promise<void> => {
@@ -1563,6 +1572,10 @@ function InlineDiffThread({
     }
   }
 
+  const handleQuoteReply = (quoted: string): void => {
+    setReplyBody((prev) => (prev ? `${prev}\n${quoted}` : quoted))
+  }
+
   const allComments = [thread.topLevelComment, ...thread.replies]
 
   return (
@@ -1573,9 +1586,37 @@ function InlineDiffThread({
             <img src={comment.user.avatar_url} alt={comment.user.login} className="size-5 rounded-full" />
             <span className="text-foreground text-xs font-semibold">{comment.user.login}</span>
             <span className="text-foreground-subtle text-xs">{formatRelativeTime(comment.created_at)}</span>
+            <div className="ml-auto">
+              <CommentActionsMenu
+                owner={replyTarget.owner}
+                repo={replyTarget.repo}
+                number={replyTarget.number}
+                commentType="pull-comment"
+                commentId={comment.id}
+                nodeId={comment.node_id}
+                htmlUrl={comment.html_url}
+                body={comment.body}
+                authorLogin={comment.user.login}
+                onStartEdit={() => setEditingId(comment.id)}
+                onQuoteReply={handleQuoteReply}
+              />
+            </div>
           </div>
           <div className="mt-2">
-            <MarkdownBody className="">{comment.body}</MarkdownBody>
+            {editingId === comment.id ? (
+              <CommentBodyEditor
+                owner={replyTarget.owner}
+                repo={replyTarget.repo}
+                number={replyTarget.number}
+                commentType="pull-comment"
+                commentId={comment.id}
+                initialBody={comment.body}
+                onCancel={() => setEditingId(null)}
+                onSaved={() => setEditingId(null)}
+              />
+            ) : (
+              <MarkdownBody className="">{comment.body}</MarkdownBody>
+            )}
           </div>
           <div className="mt-2">
             <ReactionBar

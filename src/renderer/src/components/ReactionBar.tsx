@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { SmilePlus } from 'lucide-react'
 import { cn } from '../lib/cn'
+import Tooltip from './Tooltip'
 import type { AuthData, GitHubReaction, ReactionContent } from '../../../shared/types'
 
 const REACTION_EMOJIS: { content: ReactionContent; emoji: string }[] = [
@@ -118,17 +119,19 @@ export default function ReactionBar({ owner, repo, commentId, commentType }: Rea
 
       {/* Add reaction button */}
       <div className="relative">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            setShowPicker(!showPicker)
-          }}
-          className="border-border text-foreground-subtle hover:border-accent/40 hover:bg-surface-hover hover:text-foreground inline-flex size-6 items-center justify-center rounded-full border transition-colors"
-          title="Add reaction"
-        >
-          <SmilePlus size={12} />
-        </button>
+        <Tooltip label="Add reaction" side="top">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowPicker(!showPicker)
+            }}
+            className="border-border text-foreground-subtle hover:border-accent/40 hover:bg-surface-hover hover:text-foreground inline-flex size-6 items-center justify-center rounded-full border transition-colors"
+            aria-label="Add reaction"
+          >
+            <SmilePlus size={12} />
+          </button>
+        </Tooltip>
 
         {showPicker ? (
           <div

@@ -23,6 +23,7 @@ import type {
   PullRequest
 } from '../../../shared/types'
 import { cn } from '../lib/cn'
+import Tooltip from './Tooltip'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
 
@@ -267,24 +268,38 @@ export default function SourceControlPanel({
                   <span className="rounded-full bg-white/20 px-1.5 text-[10px]">{branchInfo.ahead}</span>
                 </button>
               ) : (
-                <button
-                  onClick={handleCommit}
-                  disabled={isCommitting || !commitMessage.trim()}
-                  className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                <Tooltip
+                  label={
+                    isCommitting
+                      ? 'Committing…'
+                      : !commitMessage.trim()
+                        ? 'Type a commit message above'
+                        : 'Commit staged changes'
+                  }
+                  shortcut={commitMessage.trim() && !isCommitting ? ['⌘', '↵'] : undefined}
+                  side="top"
                 >
-                  <Check size={12} />
-                  Commit
-                </button>
+                  <button
+                    onClick={handleCommit}
+                    disabled={isCommitting || !commitMessage.trim()}
+                    className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                  >
+                    <Check size={12} />
+                    Commit
+                  </button>
+                </Tooltip>
               )}
               {!noUpstream ? (
-                <button
-                  onClick={handlePull}
-                  disabled={isPulling}
-                  className="bg-interactive text-foreground hover:bg-interactive-hover rounded p-1.5 transition-colors disabled:opacity-50"
-                  title="Pull"
-                >
-                  <ArrowDown size={12} />
-                </button>
+                <Tooltip label="Pull from remote" side="top">
+                  <button
+                    onClick={handlePull}
+                    disabled={isPulling}
+                    className="bg-interactive text-foreground hover:bg-interactive-hover rounded p-1.5 transition-colors disabled:opacity-50"
+                    aria-label="Pull"
+                  >
+                    <ArrowDown size={12} />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           )
@@ -670,21 +685,25 @@ function FileSection({
         </button>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
           {onDiscardAll ? (
-            <button
-              onClick={onDiscardAll}
-              className="text-foreground-subtle hover:text-foreground rounded p-0.5"
-              title="Discard All"
-            >
-              <Undo2 size={12} />
-            </button>
+            <Tooltip label="Discard all changes" side="top">
+              <button
+                onClick={onDiscardAll}
+                className="text-foreground-subtle hover:text-foreground rounded p-0.5"
+                aria-label="Discard all"
+              >
+                <Undo2 size={12} />
+              </button>
+            </Tooltip>
           ) : null}
-          <button
-            onClick={onBulkAction}
-            className="text-foreground-subtle hover:text-foreground rounded p-0.5"
-            title={bulkActionTitle}
-          >
-            {bulkActionIcon}
-          </button>
+          <Tooltip label={bulkActionTitle} side="top">
+            <button
+              onClick={onBulkAction}
+              className="text-foreground-subtle hover:text-foreground rounded p-0.5"
+              aria-label={bulkActionTitle}
+            >
+              {bulkActionIcon}
+            </button>
+          </Tooltip>
         </div>
       </div>
       {isOpen ? (
@@ -737,21 +756,25 @@ function FileRow({
       </button>
       <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
         {onDiscard ? (
-          <button
-            onClick={onDiscard}
-            className="text-foreground-subtle hover:text-foreground rounded p-0.5"
-            title="Discard Changes"
-          >
-            <Undo2 size={12} />
-          </button>
+          <Tooltip label="Discard changes" side="top">
+            <button
+              onClick={onDiscard}
+              className="text-foreground-subtle hover:text-foreground rounded p-0.5"
+              aria-label="Discard changes"
+            >
+              <Undo2 size={12} />
+            </button>
+          </Tooltip>
         ) : null}
-        <button
-          onClick={onAction}
-          className="text-foreground-subtle hover:text-foreground rounded p-0.5"
-          title={actionTitle}
-        >
-          {actionIcon}
-        </button>
+        <Tooltip label={actionTitle} side="top">
+          <button
+            onClick={onAction}
+            className="text-foreground-subtle hover:text-foreground rounded p-0.5"
+            aria-label={actionTitle}
+          >
+            {actionIcon}
+          </button>
+        </Tooltip>
       </div>
       <StatusBadge status={status} />
     </div>

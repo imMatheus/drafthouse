@@ -2,6 +2,7 @@ import { Check, Plus, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { AgentSession } from '../../../../shared/types'
 import AgentSpinner from './AgentSpinner'
+import Tooltip from '../../components/Tooltip'
 
 interface AgentSessionListProps {
   sessions: AgentSession[]
@@ -38,13 +39,15 @@ export default function AgentSessionList({
     <div className="border-border bg-surface flex h-full w-60 shrink-0 flex-col border-r">
       <div className="border-border flex items-center justify-between border-b px-3 py-2">
         <span className="text-foreground-muted text-xs font-medium tracking-wide uppercase">Sessions</span>
-        <button
-          onClick={onNewSession}
-          className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 items-center justify-center rounded transition-colors"
-          title="New session"
-        >
-          <Plus size={14} />
-        </button>
+        <Tooltip label="New session" side="bottom">
+          <button
+            onClick={onNewSession}
+            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 items-center justify-center rounded transition-colors"
+            aria-label="New session"
+          >
+            <Plus size={14} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -57,7 +60,7 @@ export default function AgentSessionList({
               onClick={() => onSelectSession(session.id)}
               className={cn(
                 'flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors',
-                session.id === activeSessionId ? 'bg-surface-hover' : 'hover:bg-surface-hover'
+                session.id === activeSessionId ? 'bg-border' : 'hover:bg-surface-hover'
               )}
             >
               <StatusIndicator status={session.status} />

@@ -8,9 +8,15 @@ interface PullRequestsPanelProps {
   gitInfo: GitRepoInfo | null | undefined
   isLoadingGitInfo: boolean
   onOpenPullRequest: (number: number) => void
+  activePRNumber?: number | null
 }
 
-export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPullRequest }: PullRequestsPanelProps) {
+export default function PullRequestsPanel({
+  gitInfo,
+  isLoadingGitInfo,
+  onOpenPullRequest,
+  activePRNumber
+}: PullRequestsPanelProps) {
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -104,21 +110,29 @@ export default function PullRequestsPanel({ gitInfo, isLoadingGitInfo, onOpenPul
             {searchQuery ? 'No matches' : `No ${stateFilter} pull requests`}
           </p>
         ) : (
-          filtered.map((pr) => (
-            <button
-              key={pr.number}
-              onClick={() => onOpenPullRequest(pr.number)}
-              className="hover:bg-surface-hover flex w-full items-center gap-2 px-4 py-[5px] text-left transition-colors"
-            >
-              <PrStateIcon pr={pr} />
-              <div className="min-w-0 flex-1">
-                <p className="text-foreground truncate text-xs">{pr.title}</p>
-                <p className="text-foreground-subtle text-[10px]">
-                  #{pr.number} by {pr.user.login}
-                </p>
-              </div>
-            </button>
-          ))
+          filtered.map((pr) => {
+            const isActive = pr.number === activePRNumber
+            return (
+              <button
+                key={pr.number}
+                onClick={() => onOpenPullRequest(pr.number)}
+                className={cn(
+                  'flex w-full items-center gap-2 px-4 py-[5px] text-left transition-colors',
+                  isActive ? 'bg-border' : 'hover:bg-surface-hover'
+                )}
+              >
+                <PrStateIcon pr={pr} />
+                <div className="min-w-0 flex-1">
+                  <p className={cn('truncate text-xs', isActive ? 'text-foreground font-medium' : 'text-foreground')}>
+                    {pr.title}
+                  </p>
+                  <p className="text-foreground-subtle text-[10px]">
+                    #{pr.number} by {pr.user.login}
+                  </p>
+                </div>
+              </button>
+            )
+          })
         )}
       </div>
     </div>

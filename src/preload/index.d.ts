@@ -222,9 +222,14 @@ interface GitHubPullsAPI {
   markReady: (nodeId: string) => Promise<void>
 }
 
+type MinimizeClassifier = 'ABUSE' | 'OFF_TOPIC' | 'OUTDATED' | 'RESOLVED' | 'DUPLICATE' | 'SPAM'
+
 interface GitHubPullCommentsAPI {
   listIssueComments: (owner: string, repo: string, number: number) => Promise<PullRequestComment[]>
   createIssueComment: (owner: string, repo: string, number: number, body: string) => Promise<PullRequestComment>
+  updateIssueComment: (owner: string, repo: string, commentId: number, body: string) => Promise<PullRequestComment>
+  deleteIssueComment: (owner: string, repo: string, commentId: number) => Promise<void>
+  minimize: (nodeId: string, classifier: MinimizeClassifier) => Promise<void>
   listForPull: (
     owner: string,
     repo: string,

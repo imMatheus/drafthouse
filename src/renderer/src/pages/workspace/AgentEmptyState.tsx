@@ -1,6 +1,4 @@
-import asciiArtDark from '../../assets/ascii-art-dark.gif'
-import asciiArtLight from '../../assets/ascii-art-light.gif'
-import { useTheme } from '../../hooks/useTheme'
+import AsciiArt from '../../components/AsciiArt'
 
 const SUGGESTED_PROMPTS = [
   'Summarize the open pull requests and flag anything that looks risky',
@@ -14,11 +12,9 @@ interface AgentEmptyStateProps {
 }
 
 export default function AgentEmptyState({ onSelectSuggestion }: AgentEmptyStateProps) {
-  const { theme } = useTheme()
-  const asciiArt = theme === 'dark' ? asciiArtDark : asciiArtLight
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
-      <img src={asciiArt} alt="" className="h-48 w-auto opacity-90" />
+      <AsciiArt />
       <p className="text-foreground-subtle text-sm">What would you like the agent to do?</p>
       <div className="flex max-w-2xl flex-wrap justify-center gap-2">
         {SUGGESTED_PROMPTS.map((prompt) => (

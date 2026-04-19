@@ -4,6 +4,7 @@ import { ChevronLeft, Search, X, Sun, Moon, LogOut } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '../lib/cn'
 import { useTheme } from '../hooks/useTheme'
+import Tooltip from './Tooltip'
 
 export default function RepoSidebar() {
   const { user, logout } = useAuth()
@@ -128,20 +129,24 @@ export default function RepoSidebar() {
               <div className="flex-1 overflow-hidden">
                 <p className="text-foreground truncate text-xs font-medium">{user?.name ?? user?.login}</p>
               </div>
-              <button
-                onClick={toggleTheme}
-                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-              </button>
-              <button
-                onClick={logout}
-                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
-                title="Logout"
-              >
-                <LogOut size={14} />
-              </button>
+              <Tooltip label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} side="top">
+                <button
+                  onClick={toggleTheme}
+                  className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
+                  aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+                </button>
+              </Tooltip>
+              <Tooltip label="Logout" side="top">
+                <button
+                  onClick={logout}
+                  className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground shrink-0 rounded-md p-1"
+                  aria-label="Logout"
+                >
+                  <LogOut size={14} />
+                </button>
+              </Tooltip>
             </div>
           </div>
         </>
@@ -150,13 +155,15 @@ export default function RepoSidebar() {
       {/* Collapsed footer */}
       {collapsed && (
         <div className="border-border mt-auto flex flex-col items-center gap-2 border-t p-2">
-          <button
-            onClick={toggleTheme}
-            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground rounded-md p-1"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
+          <Tooltip label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} side="right">
+            <button
+              onClick={toggleTheme}
+              className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground rounded-md p-1"
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
+          </Tooltip>
           <img src={user?.avatar_url} alt={user?.login} className="h-6 w-6 rounded-full" />
         </div>
       )}

@@ -12,6 +12,7 @@ import {
   splitTextIntoMentionSegments
 } from '../../lib/prMentions'
 import PRStateIcon from '../../components/PRStateIcon'
+import Tooltip from '../../components/Tooltip'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
 
@@ -283,20 +284,22 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
         )}
 
         <div className="flex items-end gap-2 p-3">
-          <button
-            onClick={() => {
-              void window.api.fs.pickFiles().then((paths) => {
-                if (paths.length > 0) {
-                  setFiles((prev) => [...prev, ...paths.filter((f) => !prev.includes(f))])
-                }
-              })
-            }}
-            disabled={isRunning}
-            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-50"
-            title="Attach files"
-          >
-            <Plus size={16} />
-          </button>
+          <Tooltip label="Attach files" side="top">
+            <button
+              onClick={() => {
+                void window.api.fs.pickFiles().then((paths) => {
+                  if (paths.length > 0) {
+                    setFiles((prev) => [...prev, ...paths.filter((f) => !prev.includes(f))])
+                  }
+                })
+              }}
+              disabled={isRunning}
+              className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-50"
+              aria-label="Attach files"
+            >
+              <Plus size={16} />
+            </button>
+          </Tooltip>
 
           <div className="relative min-h-[24px] flex-1">
             {/* Paint-only overlay that highlights `@prN`. Uses the same font
@@ -343,22 +346,26 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
           </div>
 
           {isRunning ? (
-            <button
-              onClick={onStop}
-              className="bg-danger flex size-7 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:opacity-90"
-              title="Stop agent"
-            >
-              <Square size={14} />
-            </button>
+            <Tooltip label="Stop agent" side="top">
+              <button
+                onClick={onStop}
+                className="bg-danger flex size-7 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:opacity-90"
+                aria-label="Stop agent"
+              >
+                <Square size={14} />
+              </button>
+            </Tooltip>
           ) : (
-            <button
-              onClick={() => void handleSubmit()}
-              disabled={!canSubmit}
-              className="bg-foreground text-background flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-80 disabled:opacity-30"
-              title="Send"
-            >
-              <ArrowUp size={14} strokeWidth={2.5} />
-            </button>
+            <Tooltip label={canSubmit ? 'Send' : 'Type a message to send'} shortcut={canSubmit ? ['↵'] : undefined} side="top">
+              <button
+                onClick={() => void handleSubmit()}
+                disabled={!canSubmit}
+                className="bg-foreground text-background flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-80 disabled:opacity-30"
+                aria-label="Send"
+              >
+                <ArrowUp size={14} strokeWidth={2.5} />
+              </button>
+            </Tooltip>
           )}
         </div>
 
@@ -413,14 +420,16 @@ function PRMentionPill({
       <span className="text-foreground max-w-[260px] truncate font-medium">
         {detail ? detail.title : isError ? 'Not found' : isLoading ? 'Loading…' : '—'}
       </span>
-      <button
-        type="button"
-        onClick={onRemove}
-        className="text-foreground-subtle hover:text-foreground hover:bg-surface ml-0.5 flex size-4 shrink-0 items-center justify-center rounded transition-colors"
-        title="Remove reference"
-      >
-        <X size={11} />
-      </button>
+      <Tooltip label="Remove reference" side="top">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-foreground-subtle hover:text-foreground hover:bg-surface ml-0.5 flex size-4 shrink-0 items-center justify-center rounded transition-colors"
+          aria-label="Remove reference"
+        >
+          <X size={11} />
+        </button>
+      </Tooltip>
     </div>
   )
 }

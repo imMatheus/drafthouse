@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron'
-import { requireAuth, fetchGitHubJson, fetchGitHubVoid, API } from './client'
+import { requireAuth, fetchGitHubJson, fetchGitHubVoid, fetchGitHubGraphQL, API } from './client'
 import type { PullRequestComment, PullRequestReviewComment, CreateReviewCommentInput } from '../../shared/types'
+
+export type MinimizeClassifier = 'ABUSE' | 'OFF_TOPIC' | 'OUTDATED' | 'RESOLVED' | 'DUPLICATE' | 'SPAM'
 
 export function registerPullCommentsHandlers(): void {
   // ============================================================
@@ -32,6 +34,55 @@ export function registerPullCommentsHandlers(): void {
         `${API}/repos/${owner}/${repo}/issues/${number}/comments`,
         'Failed to post comment',
         { method: 'POST', body: JSON.stringify({ body }) }
+      )
+    }
+  )
+
+  // Update an issue comment
+  // PATCH /repos/{owner}/{repo}/issues/comments/{comment_id}
+  ipcMain.handle(
+    'github:pull-comments:update-issue-comment',
+    async (_event, owner: string, repo: string, commentId: number, body: string): Promise<PullRequestComment> => {
+      const token = requireAuth()
+      return fetchGitHubJson(
+        token,
+        `${API}/repos/${owner}/${repo}/issues/comments/${commentId}`,
+        `Failed to update comment ${commentId}`,
+        { method: 'PATCH', body: JSON.stringify({ body }) }
+      )
+    }
+  )
+
+  // Delete an issue comment
+  // DELETE /repos/{owner}/{repo}/issues/comments/{comment_id}
+  ipcMain.handle(
+    'github:pull-comments:delete-issue-comment',
+    async (_event, owner: string, repo: string, commentId: number): Promise<void> => {
+      const token = requireAuth()
+      return fetchGitHubVoid(
+        token,
+        `${API}/repos/${owner}/${repo}/issues/comments/${commentId}`,
+        `Failed to delete comment ${commentId}`,
+        { method: 'DELETE' }
+      )
+    }
+  )
+
+  // Minimize a comment (Hide) — works for both issue and review comments.
+  // GraphQL: minimizeComment(subjectId, classifier)
+  ipcMain.handle(
+    'github:pull-comments:minimize',
+    async (_event, nodeId: string, classifier: MinimizeClassifier): Promise<void> => {
+      const token = requireAuth()
+      await fetchGitHubGraphQL(
+        token,
+        `mutation($id: ID!, $classifier: ReportedContentClassifiers!) {
+          minimizeComment(input: { subjectId: $id, classifier: $classifier }) {
+            minimizedComment { isMinimized }
+          }
+        }`,
+        { id: nodeId, classifier },
+        'Failed to hide comment'
       )
     }
   )

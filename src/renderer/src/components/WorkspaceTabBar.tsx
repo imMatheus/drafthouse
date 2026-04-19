@@ -3,6 +3,7 @@ import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Ho
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
+import Tooltip from './Tooltip'
 import type { WorkspaceTab } from '../lib/workspaceTabs'
 
 interface WorkspaceTabBarProps {
@@ -90,13 +91,15 @@ export default function WorkspaceTabBar({
                 </span>
               </button>
 
-              <button
-                onClick={() => onCloseTab(tab.id)}
-                className="text-foreground-subtle hover:text-foreground flex items-center justify-center rounded-md px-2 transition-colors"
-                title={`Close ${label}`}
-              >
-                <X size={14} />
-              </button>
+              <Tooltip label={`Close ${label}`} side="bottom">
+                <button
+                  onClick={() => onCloseTab(tab.id)}
+                  className="text-foreground-subtle hover:text-foreground flex items-center justify-center rounded-md px-2 transition-colors"
+                  aria-label={`Close ${label}`}
+                >
+                  <X size={14} />
+                </button>
+              </Tooltip>
             </div>
           )
         })}

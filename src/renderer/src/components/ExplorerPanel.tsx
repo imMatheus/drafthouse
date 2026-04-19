@@ -89,8 +89,10 @@ function FolderTree({
             key={entry.path}
             onClick={() => onSelectFile(entry.path)}
             className={cn(
-              'hover:bg-surface-hover flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs transition-colors',
-              selectedFilePath === entry.path ? 'bg-surface-hover text-foreground' : 'text-foreground-muted'
+              'flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs transition-colors',
+              selectedFilePath === entry.path
+                ? 'bg-border text-foreground'
+                : 'text-foreground-muted hover:bg-surface-hover'
             )}
             style={{ paddingLeft: depth * 12 + 16 }}
           >

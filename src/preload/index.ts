@@ -188,6 +188,12 @@ const api = {
         ipcRenderer.invoke('github:pull-comments:list-issue-comments', owner, repo, number),
       createIssueComment: (owner: string, repo: string, number: number, body: string): Promise<unknown> =>
         ipcRenderer.invoke('github:pull-comments:create-issue-comment', owner, repo, number, body),
+      updateIssueComment: (owner: string, repo: string, commentId: number, body: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:update-issue-comment', owner, repo, commentId, body),
+      deleteIssueComment: (owner: string, repo: string, commentId: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:delete-issue-comment', owner, repo, commentId),
+      minimize: (nodeId: string, classifier: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:minimize', nodeId, classifier),
       listForPull: (
         owner: string,
         repo: string,

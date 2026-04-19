@@ -4,6 +4,7 @@ import { CheckCheck, ChevronLeft, ChevronRight, Copy, ExternalLink, GitCommit } 
 import { cn } from '../../lib/cn'
 import type { PaginatedPullRequestCommits, PullRequestCommit } from '../../../../shared/types'
 import PlaceholderView from './PlaceholderView'
+import Tooltip from '../../components/Tooltip'
 import { formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
 
 const COMMITS_PER_PAGE = 100
@@ -225,25 +226,27 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
 
         <div className="flex shrink-0 items-center gap-1">
           <span className="text-foreground-muted rounded-md px-2 py-1 font-mono text-sm">{commit.sha.slice(0, 7)}</span>
-          <button
-            type="button"
-            onClick={handleCopySha}
-            className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
-            title={isCopied ? 'Copied' : 'Copy SHA'}
-            aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
-          >
-            {isCopied ? <CheckCheck size={16} /> : <Copy size={16} />}
-          </button>
-          <a
-            href={commit.html_url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
-            title="Open commit on GitHub"
-            aria-label="Open commit on GitHub"
-          >
-            <ExternalLink size={16} />
-          </a>
+          <Tooltip label={isCopied ? 'Copied' : 'Copy SHA'} side="top">
+            <button
+              type="button"
+              onClick={handleCopySha}
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
+              aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
+            >
+              {isCopied ? <CheckCheck size={16} /> : <Copy size={16} />}
+            </button>
+          </Tooltip>
+          <Tooltip label="Open commit on GitHub" side="top">
+            <a
+              href={commit.html_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
+              aria-label="Open commit on GitHub"
+            >
+              <ExternalLink size={16} />
+            </a>
+          </Tooltip>
         </div>
       </div>
     </div>

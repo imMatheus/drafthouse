@@ -5,6 +5,7 @@ import { cn } from '../lib/cn'
 import claudeLogoUrl from '../assets/claude.png'
 import AgentMessageBlock, { UserBubble } from '../pages/workspace/AgentMessageBlock'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
+import Tooltip from './Tooltip'
 
 function getThinkingStepLabel(name: string, input: Record<string, unknown>): string {
   switch (name) {
@@ -109,23 +110,26 @@ export default function InlineAgentResponseCard({
         <span className="text-foreground text-sm font-medium">Claude</span>
         <div className="ml-auto flex items-center gap-1.5">
           {isRunning && (
-            <button
-              onClick={onStop}
-              className="text-foreground-muted hover:bg-surface-hover hover:text-danger flex size-6 items-center justify-center rounded-md transition-colors"
-              title="Stop agent"
-            >
-              <Square size={12} />
-            </button>
+            <Tooltip label="Stop agent" side="bottom">
+              <button
+                onClick={onStop}
+                className="text-foreground-muted hover:bg-surface-hover hover:text-danger flex size-6 items-center justify-center rounded-md transition-colors"
+                aria-label="Stop agent"
+              >
+                <Square size={12} />
+              </button>
+            </Tooltip>
           )}
           {session.cliSessionId && (
-            <button
-              onClick={onOpenInChat}
-              className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
-              title="Continue in chat tab"
-            >
-              <ExternalLink size={12} />
-              <span>Open in chat</span>
-            </button>
+            <Tooltip label="Continue this session in a chat tab" side="bottom">
+              <button
+                onClick={onOpenInChat}
+                className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors"
+              >
+                <ExternalLink size={12} />
+                <span>Open in chat</span>
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>

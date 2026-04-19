@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AgentContext, AgentSession, GitRepoInfo, PullRequestDetail } from '../../../../shared/types'
 import { buildMentionedPRContextBlock, buildPullRequestMentionsAgentContext } from '../../lib/prMentions'
 import AgentConversation from './AgentConversation'
@@ -24,6 +24,12 @@ export default function AgentSessionTab({
   const promptBarRef = useRef<AgentPromptBarHandle>(null)
   const isRunning = session?.status === 'running'
   const canContinue = session !== null && session.status !== 'running' && session.cliSessionId !== null
+
+  // Autofocus the prompt bar when this tab mounts or the active session changes,
+  // so switching to / opening an agent tab drops the caret into the input.
+  useEffect(() => {
+    promptBarRef.current?.focus()
+  }, [session?.id])
 
   const handleSubmit = async (
     prompt: string,

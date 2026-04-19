@@ -30,9 +30,7 @@ import FilesView from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
 import PullRequestDetailView from './workspace/PullRequestDetailView'
 import WelcomeView from './workspace/WelcomeView'
-import asciiArtDark from '../assets/ascii-art-dark.gif'
-import asciiArtLight from '../assets/ascii-art-light.gif'
-import { useTheme } from '../hooks/useTheme'
+import AsciiArt from '../components/AsciiArt'
 
 interface WorkspaceProps {
   session: WorkspaceSession | null
@@ -278,6 +276,22 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
         e.preventDefault()
         setCommandPaletteOpen((prev) => !prev)
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === '1') {
+        e.preventDefault()
+        handleToggleSidebar('explorer')
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '2') {
+        e.preventDefault()
+        handleToggleSidebar('source-control')
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '3') {
+        e.preventDefault()
+        handleToggleSidebar('pull-requests')
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === '4') {
+        e.preventDefault()
+        handleToggleSidebar('agent')
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -506,7 +520,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       label: 'Explorer',
       icon: Files,
       active: sidebar.visible && sidebar.activePanel === 'explorer',
-      onClick: () => handleToggleSidebar('explorer')
+      onClick: () => handleToggleSidebar('explorer'),
+      shortcut: ['⌘', '1']
     },
     {
       id: 'source-control',
@@ -514,14 +529,16 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       icon: GitBranch,
       active: sidebar.visible && sidebar.activePanel === 'source-control',
       badge: changedFileCount > 0 ? changedFileCount : undefined,
-      onClick: () => handleToggleSidebar('source-control')
+      onClick: () => handleToggleSidebar('source-control'),
+      shortcut: ['⌘', '2']
     },
     {
       id: 'pull-requests',
       label: 'Pull Requests',
       icon: GitGraph,
       active: sidebar.visible && sidebar.activePanel === 'pull-requests',
-      onClick: () => handleToggleSidebar('pull-requests')
+      onClick: () => handleToggleSidebar('pull-requests'),
+      shortcut: ['⌘', '3']
     },
     {
       id: 'agent',
@@ -529,7 +546,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       icon: Terminal,
       active: sidebar.visible && sidebar.activePanel === 'agent',
       badge: runningAgentCount > 0 ? runningAgentCount : undefined,
-      onClick: handleAgentActivityClick
+      onClick: handleAgentActivityClick,
+      shortcut: ['⌘', '4']
     }
   ]
 
@@ -575,6 +593,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                 gitInfo={gitInfo}
                 isLoadingGitInfo={isLoadingGitInfo}
                 onOpenPullRequest={handleOpenPullRequest}
+                activePRNumber={activeTab?.kind === 'pull-request' ? activeTab.number : null}
               />
             ) : null}
 
@@ -668,13 +687,11 @@ function renderWorkspaceTabContent({
   onPullRequestTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
   onPullRequestStateChange: (tabId: WorkspaceTab['id'], prState: 'open' | 'closed' | 'merged' | 'draft') => void
 }): ReactNode {
-  const { theme } = useTheme()
-  const asciiArt = theme === 'dark' ? asciiArtDark : asciiArtLight
   if (!activeTab) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6">
         <p className="text-foreground-subtle text-xs font-medium">/Drafthouse</p>
-        <img src={asciiArt} alt="ASCII Art" className="h-48 w-auto opacity-90" />
+        <AsciiArt alt="ASCII Art" />
         <EmptyStateShortcuts />
       </div>
     )
@@ -730,7 +747,11 @@ function renderWorkspaceTabContent({
 
 const EMPTY_STATE_SHORTCUTS: Array<{ label: string; keys: string[] }> = [
   { label: 'Command Palette', keys: ['⌘', 'K'] },
-  { label: 'Toggle Sidebar', keys: ['⌘', 'B'] }
+  { label: 'Toggle Sidebar', keys: ['⌘', 'B'] },
+  { label: 'Explorer', keys: ['⌘', '1'] },
+  { label: 'Source Control', keys: ['⌘', '2'] },
+  { label: 'Pull Requests', keys: ['⌘', '3'] },
+  { label: 'Agent', keys: ['⌘', '4'] }
 ]
 
 function EmptyStateShortcuts() {

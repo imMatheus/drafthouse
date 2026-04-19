@@ -413,6 +413,8 @@ export interface GitHubReaction {
 
 export interface PullRequestComment {
   id: number
+  node_id: string
+  html_url: string
   body: string
   created_at: string
   updated_at: string
@@ -425,6 +427,7 @@ export interface PullRequestComment {
 export interface PullRequestReviewComment {
   pull_request_review_id: number
   id: number
+  node_id: string
   body: string
   path: string
   diff_hunk: string | null

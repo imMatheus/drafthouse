@@ -40,6 +40,9 @@ import type { PullRequestSubview } from '../../lib/workspaceTabs'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ReactionBar from '../../components/ReactionBar'
+import CommentActionsMenu from '../../components/CommentActionsMenu'
+import CommentBodyEditor from '../../components/CommentBodyEditor'
+import Tooltip from '../../components/Tooltip'
 import MarkdownBody from './MarkdownBody'
 import PRCommitsTab from './PRCommitsTab'
 import PRFilesTab from './PRFilesTab'
@@ -369,6 +372,14 @@ function PRConversationTab({
   const conversationError = commentsError ?? reviewCommentsError ?? reviewsError
   const isLoadingConversation = isLoadingComments || isLoadingReviewComments || isLoadingReviews
 
+  const [commentBody, setCommentBody] = useState('')
+  const commentBoxRef = useRef<HTMLDivElement>(null)
+
+  const handleQuoteReply = (quoted: string): void => {
+    setCommentBody((prev) => (prev ? `${prev}\n${quoted}` : quoted))
+    commentBoxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <PRDescriptionCard pr={pr} owner={owner} repo={repo} />
@@ -387,7 +398,9 @@ function PRConversationTab({
           item={item}
           owner={owner}
           repo={repo}
+          prNumber={pr.number}
           onViewReviewThread={onViewReviewThread}
+          onQuoteReply={handleQuoteReply}
         />
       ))}
 
@@ -401,7 +414,16 @@ function PRConversationTab({
         />
       ))}
 
-      <CommentBox owner={owner} repo={repo} number={pr.number} onAskClaude={handleAskClaude} />
+      <div ref={commentBoxRef}>
+        <CommentBox
+          owner={owner}
+          repo={repo}
+          number={pr.number}
+          body={commentBody}
+          onBodyChange={setCommentBody}
+          onAskClaude={handleAskClaude}
+        />
+      </div>
       <PRActionBar pr={pr} owner={owner} repo={repo} />
     </div>
   )
@@ -412,8 +434,7 @@ type PullRequestTimelineItem =
       id: string
       type: 'issue-comment'
       createdAt: string
-      body: string
-      user: { login: string; avatar_url: string }
+      comment: PullRequestComment
     }
   | {
       id: string
@@ -465,8 +486,7 @@ function buildPullRequestTimelineItems(
       id: `issue-comment-${comment.id}`,
       type: 'issue-comment' as const,
       createdAt: comment.created_at,
-      body: comment.body,
-      user: comment.user
+      comment
     })),
     ...reviewItems,
     ...orphanReviewItems
@@ -477,29 +497,26 @@ function PullRequestTimelineCard({
   item,
   owner,
   repo,
-  onViewReviewThread
+  prNumber,
+  onViewReviewThread,
+  onQuoteReply
 }: {
   item: PullRequestTimelineItem
   owner: string
   repo: string
+  prNumber: number
   onViewReviewThread: (thread: PullRequestReviewThread) => void
+  onQuoteReply: (quoted: string) => void
 }) {
   if (item.type === 'issue-comment') {
-    // Extract the numeric comment ID from the timeline item ID
-    const commentId = Number(item.id.replace('issue-comment-', ''))
-
     return (
-      <div className="border-border bg-surface rounded-lg border">
-        <div className="border-border flex items-center gap-2 border-b px-4 py-3">
-          <img src={item.user.avatar_url} alt={item.user.login} className="size-6 rounded-full" />
-          <span className="text-foreground text-sm font-medium">{item.user.login}</span>
-          <span className="text-foreground-subtle text-xs">commented {formatRelativeTime(item.createdAt)}</span>
-        </div>
-        <MarkdownBody className="p-4">{item.body}</MarkdownBody>
-        <div className="border-border border-t px-4 py-2">
-          <ReactionBar owner={owner} repo={repo} commentId={commentId} commentType="issue-comment" />
-        </div>
-      </div>
+      <IssueCommentCard
+        comment={item.comment}
+        owner={owner}
+        repo={repo}
+        prNumber={prNumber}
+        onQuoteReply={onQuoteReply}
+      />
     )
   }
 
@@ -539,7 +556,9 @@ function PullRequestTimelineCard({
                 thread={thread}
                 owner={owner}
                 repo={repo}
+                prNumber={prNumber}
                 onViewReviewThread={onViewReviewThread}
+                onQuoteReply={onQuoteReply}
               />
             ))}
           </div>
@@ -562,6 +581,65 @@ function getReviewStateText(state: string): string {
     default:
       return 'reviewed this pull request'
   }
+}
+
+function IssueCommentCard({
+  comment,
+  owner,
+  repo,
+  prNumber,
+  onQuoteReply
+}: {
+  comment: PullRequestComment
+  owner: string
+  repo: string
+  prNumber: number
+  onQuoteReply: (quoted: string) => void
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  return (
+    <div className="border-border bg-surface rounded-lg border">
+      <div className="border-border flex items-center gap-2 border-b px-4 py-3">
+        <img src={comment.user.avatar_url} alt={comment.user.login} className="size-6 rounded-full" />
+        <span className="text-foreground text-sm font-medium">{comment.user.login}</span>
+        <span className="text-foreground-subtle text-xs">commented {formatRelativeTime(comment.created_at)}</span>
+        <div className="ml-auto">
+          <CommentActionsMenu
+            owner={owner}
+            repo={repo}
+            number={prNumber}
+            commentType="issue-comment"
+            commentId={comment.id}
+            nodeId={comment.node_id}
+            htmlUrl={comment.html_url}
+            body={comment.body}
+            authorLogin={comment.user.login}
+            onStartEdit={() => setIsEditing(true)}
+            onQuoteReply={onQuoteReply}
+          />
+        </div>
+      </div>
+      {isEditing ? (
+        <div className="p-4">
+          <CommentBodyEditor
+            owner={owner}
+            repo={repo}
+            number={prNumber}
+            commentType="issue-comment"
+            commentId={comment.id}
+            initialBody={comment.body}
+            onCancel={() => setIsEditing(false)}
+            onSaved={() => setIsEditing(false)}
+          />
+        </div>
+      ) : (
+        <MarkdownBody className="p-4">{comment.body}</MarkdownBody>
+      )}
+      <div className="border-border border-t px-4 py-2">
+        <ReactionBar owner={owner} repo={repo} commentId={comment.id} commentType="issue-comment" />
+      </div>
+    </div>
+  )
 }
 
 function ReviewStateBadge({ state }: { state: string }) {
@@ -694,67 +772,48 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
 
           {editTab === 'write' ? (
             <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                title="Heading"
-                className={toolbarBtnClass}
-                onClick={() => insertAtLineStart('### ')}
-              >
-                <Heading size={14} />
-              </button>
-              <button
-                type="button"
-                title="Bold"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('**', '**', 'bold text')}
-              >
-                <Bold size={14} />
-              </button>
-              <button
-                type="button"
-                title="Italic"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('_', '_', 'italic text')}
-              >
-                <Italic size={14} />
-              </button>
+              <Tooltip label="Heading" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('### ')} aria-label="Heading">
+                  <Heading size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Bold" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('**', '**', 'bold text')} aria-label="Bold">
+                  <Bold size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Italic" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('_', '_', 'italic text')} aria-label="Italic">
+                  <Italic size={14} />
+                </button>
+              </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
-              <button
-                type="button"
-                title="Unordered list"
-                className={toolbarBtnClass}
-                onClick={() => insertAtLineStart('- ')}
-              >
-                <List size={14} />
-              </button>
-              <button
-                type="button"
-                title="Ordered list"
-                className={toolbarBtnClass}
-                onClick={() => insertAtLineStart('1. ')}
-              >
-                <ListOrdered size={14} />
-              </button>
+              <Tooltip label="Unordered list" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('- ')} aria-label="Unordered list">
+                  <List size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Ordered list" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('1. ')} aria-label="Ordered list">
+                  <ListOrdered size={14} />
+                </button>
+              </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
-              <button
-                type="button"
-                title="Code"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('`', '`', 'code')}
-              >
-                <Code size={14} />
-              </button>
-              <button
-                type="button"
-                title="Link"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('[', '](url)', 'link text')}
-              >
-                <Link size={14} />
-              </button>
-              <button type="button" title="Quote" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')}>
-                <Quote size={14} />
-              </button>
+              <Tooltip label="Code" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('`', '`', 'code')} aria-label="Code">
+                  <Code size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Link" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('[', '](url)', 'link text')} aria-label="Link">
+                  <Link size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Quote" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')} aria-label="Quote">
+                  <Quote size={14} />
+                </button>
+              </Tooltip>
             </div>
           ) : null}
         </div>
@@ -803,13 +862,15 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
         <img src={pr.user.avatar_url} alt={pr.user.login} className="size-6 rounded-full" />
         <span className="text-foreground text-sm font-medium">{pr.user.login}</span>
         <span className="text-foreground-subtle text-xs">commented {formatRelativeTime(pr.created_at)}</span>
-        <button
-          onClick={handleEdit}
-          className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground ml-auto rounded p-1 transition-colors"
-          title="Edit description"
-        >
-          <Pencil size={14} />
-        </button>
+        <Tooltip label="Edit description" side="top">
+          <button
+            onClick={handleEdit}
+            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground ml-auto rounded p-1 transition-colors"
+            aria-label="Edit description"
+          >
+            <Pencil size={14} />
+          </button>
+        </Tooltip>
       </div>
       {pr.body ? (
         <MarkdownBody className="p-4">{pr.body}</MarkdownBody>
@@ -824,15 +885,19 @@ function CommentBox({
   owner,
   repo,
   number,
+  body,
+  onBodyChange,
   onAskClaude
 }: {
   owner: string
   repo: string
   number: number
+  body: string
+  onBodyChange: (body: string) => void
   onAskClaude?: (prompt: string) => Promise<void>
 }) {
-  const [body, setBody] = useState('')
   const [activeTab, setActiveTab] = useState<'write' | 'preview'>('write')
+  const setBody = onBodyChange
   const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const queryClient = useQueryClient()
@@ -945,67 +1010,48 @@ function CommentBox({
 
           {activeTab === 'write' ? (
             <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                title="Heading"
-                className={toolbarBtnClass}
-                onClick={() => insertAtLineStart('### ')}
-              >
-                <Heading size={14} />
-              </button>
-              <button
-                type="button"
-                title="Bold"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('**', '**', 'bold text')}
-              >
-                <Bold size={14} />
-              </button>
-              <button
-                type="button"
-                title="Italic"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('_', '_', 'italic text')}
-              >
-                <Italic size={14} />
-              </button>
+              <Tooltip label="Heading" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('### ')} aria-label="Heading">
+                  <Heading size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Bold" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('**', '**', 'bold text')} aria-label="Bold">
+                  <Bold size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Italic" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('_', '_', 'italic text')} aria-label="Italic">
+                  <Italic size={14} />
+                </button>
+              </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
-              <button
-                type="button"
-                title="Unordered list"
-                className={toolbarBtnClass}
-                onClick={() => insertAtLineStart('- ')}
-              >
-                <List size={14} />
-              </button>
-              <button
-                type="button"
-                title="Ordered list"
-                className={toolbarBtnClass}
-                onClick={() => insertAtLineStart('1. ')}
-              >
-                <ListOrdered size={14} />
-              </button>
+              <Tooltip label="Unordered list" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('- ')} aria-label="Unordered list">
+                  <List size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Ordered list" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('1. ')} aria-label="Ordered list">
+                  <ListOrdered size={14} />
+                </button>
+              </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
-              <button
-                type="button"
-                title="Code"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('`', '`', 'code')}
-              >
-                <Code size={14} />
-              </button>
-              <button
-                type="button"
-                title="Link"
-                className={toolbarBtnClass}
-                onClick={() => wrapSelection('[', '](url)', 'link text')}
-              >
-                <Link size={14} />
-              </button>
-              <button type="button" title="Quote" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')}>
-                <Quote size={14} />
-              </button>
+              <Tooltip label="Code" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('`', '`', 'code')} aria-label="Code">
+                  <Code size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Link" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('[', '](url)', 'link text')} aria-label="Link">
+                  <Link size={14} />
+                </button>
+              </Tooltip>
+              <Tooltip label="Quote" side="top">
+                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')} aria-label="Quote">
+                  <Quote size={14} />
+                </button>
+              </Tooltip>
             </div>
           ) : null}
         </div>

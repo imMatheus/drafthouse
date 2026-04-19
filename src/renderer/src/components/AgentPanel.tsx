@@ -2,6 +2,7 @@ import { Check, Plus, X } from 'lucide-react'
 import { cn } from '../lib/cn'
 import type { AgentSession } from '../../../shared/types'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
+import Tooltip from './Tooltip'
 
 interface AgentPanelProps {
   sessions: AgentSession[]
@@ -33,13 +34,15 @@ export default function AgentPanel({ sessions, activeSessionId, onSelectSession,
     <div className="border-border bg-surface flex min-h-0 w-60 shrink-0 flex-col border-r">
       <div className="flex items-center justify-between px-4 py-3">
         <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Agent</p>
-        <button
-          onClick={onNewSession}
-          className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-5 items-center justify-center rounded transition-colors"
-          title="New session"
-        >
-          <Plus size={14} />
-        </button>
+        <Tooltip label="New session" side="bottom">
+          <button
+            onClick={onNewSession}
+            className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-5 items-center justify-center rounded transition-colors"
+            aria-label="New session"
+          >
+            <Plus size={14} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -51,8 +54,10 @@ export default function AgentPanel({ sessions, activeSessionId, onSelectSession,
               key={session.id}
               onClick={() => onSelectSession(session.id)}
               className={cn(
-                'hover:bg-surface-hover flex w-full items-center gap-2 px-4 py-[3px] text-left transition-colors',
-                session.id === activeSessionId ? 'bg-surface-hover text-foreground' : 'text-foreground-muted'
+                'flex w-full items-center gap-2 px-4 py-[3px] text-left transition-colors',
+                session.id === activeSessionId
+                  ? 'bg-surface-hover text-foreground'
+                  : 'text-foreground-muted hover:bg-surface-hover/60'
               )}
             >
               <StatusIndicator status={session.status} />
