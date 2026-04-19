@@ -371,6 +371,15 @@ export interface PaginatedPullRequestCommits {
   perPage: number
 }
 
+export interface ResolvedCommitAuthor {
+  name: string
+  email: string | null
+  avatarUrl: string
+  login: string | null
+}
+
+export type PullRequestCommitAuthors = Record<string, ResolvedCommitAuthor[]>
+
 export interface PullRequestFile {
   sha: string | null
   filename: string

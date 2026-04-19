@@ -30,6 +30,7 @@ import type {
   PullRequestDetail,
   PullRequestCommit,
   PaginatedPullRequestCommits,
+  PullRequestCommitAuthors,
   PullRequestFile,
   PullRequestMergeMethod,
   PullRequestMergeResult,
@@ -207,6 +208,7 @@ interface GitHubPullsAPI {
     page?: number,
     perPage?: number
   ) => Promise<PaginatedPullRequestCommits>
+  listCommitAuthors: (owner: string, repo: string, number: number) => Promise<PullRequestCommitAuthors>
   listFiles: (owner: string, repo: string, number: number) => Promise<PullRequestFile[]>
   checkMerged: (owner: string, repo: string, number: number) => Promise<boolean>
   merge: (

@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   Code,
+  Copy,
   ExternalLink,
   Eye,
   FileCode,
@@ -26,7 +27,10 @@ import type {
   AgentSession,
   AuthData,
   GitBranchInfo,
+  PaginatedPullRequestCommits,
   PullRequestComment,
+  PullRequestCommit,
+  PullRequestCommitAuthors,
   PullRequestDetail,
   PullRequestFile,
   PullRequestMergeMethod,
@@ -42,6 +46,7 @@ import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
+import CommitActorStack, { getCommitActors } from '../../components/CommitActorStack'
 import Tooltip from '../../components/Tooltip'
 import MarkdownBody from './MarkdownBody'
 import PRCommitsTab from './PRCommitsTab'
@@ -85,6 +90,7 @@ export default function PullRequestDetailView({
   onStopAgent,
   onPromoteAgent
 }: PullRequestDetailViewProps) {
+  const [headBranchCopied, setHeadBranchCopied] = useState(false)
   const [draftReviewComments, setDraftReviewComments] = useState<PullRequestReviewDraftComment[]>([])
   const [threadJumpTarget, setThreadJumpTarget] = useState<{
     path: string
@@ -177,6 +183,21 @@ export default function PullRequestDetailView({
           {pr.commits !== 1 ? 's' : ''} into{' '}
           <code className="bg-accent-bg text-accent rounded px-1.5 py-0.5 text-xs">{pr.base.ref}</code> from{' '}
           <code className="bg-accent-bg text-accent rounded px-1.5 py-0.5 text-xs">{pr.head.ref}</code>
+          <Tooltip label={headBranchCopied ? 'Copied' : 'Copy branch name'} side="top">
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard.writeText(pr.head.ref).then(() => {
+                  setHeadBranchCopied(true)
+                  setTimeout(() => setHeadBranchCopied(false), 1500)
+                })
+              }}
+              className="text-foreground-subtle hover:bg-interactive hover:text-foreground ml-1 inline-flex size-5 items-center justify-center rounded transition-colors align-middle"
+              aria-label="Copy branch name"
+            >
+              {headBranchCopied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+            </button>
+          </Tooltip>
         </p>
         <DiffStat additions={pr.additions} deletions={pr.deletions} />
       </div>
@@ -367,10 +388,34 @@ function PRConversationTab({
     queryFn: () => window.api.github.reviews.list(owner, repo, pr.number),
     retry: false
   })
+  const {
+    data: commitsData,
+    isLoading: isLoadingCommits,
+    error: commitsError
+  } = useQuery<PaginatedPullRequestCommits, Error>({
+    queryKey: ['pull-request-commits', owner, repo, pr.number, 1],
+    queryFn: () => window.api.github.pulls.listCommits(owner, repo, pr.number, 1, 100),
+    retry: false,
+    enabled: pr.commits > 0
+  })
+  const { data: resolvedAuthors, error: resolvedAuthorsError } = useQuery<PullRequestCommitAuthors, Error>({
+    queryKey: ['pull-request-commit-authors', owner, repo, pr.number],
+    queryFn: () => window.api.github.pulls.listCommitAuthors(owner, repo, pr.number),
+    retry: false,
+    enabled: pr.commits > 0
+  })
+  if (resolvedAuthorsError) {
+    console.error('Failed to resolve commit authors:', resolvedAuthorsError)
+  }
 
-  const timelineItems = buildPullRequestTimelineItems(comments ?? [], reviewComments ?? [], reviews ?? [])
-  const conversationError = commentsError ?? reviewCommentsError ?? reviewsError
-  const isLoadingConversation = isLoadingComments || isLoadingReviewComments || isLoadingReviews
+  const timelineItems = buildPullRequestTimelineItems(
+    comments ?? [],
+    reviewComments ?? [],
+    reviews ?? [],
+    commitsData?.items ?? []
+  )
+  const conversationError = commentsError ?? reviewCommentsError ?? reviewsError ?? commitsError
+  const isLoadingConversation = isLoadingComments || isLoadingReviewComments || isLoadingReviews || isLoadingCommits
 
   const [commentBody, setCommentBody] = useState('')
   const commentBoxRef = useRef<HTMLDivElement>(null)
@@ -399,6 +444,7 @@ function PRConversationTab({
           owner={owner}
           repo={repo}
           prNumber={pr.number}
+          resolvedAuthors={resolvedAuthors}
           onViewReviewThread={onViewReviewThread}
           onQuoteReply={handleQuoteReply}
         />
@@ -438,6 +484,12 @@ type PullRequestTimelineItem =
     }
   | {
       id: string
+      type: 'commit'
+      createdAt: string
+      commit: PullRequestCommit
+    }
+  | {
+      id: string
       type: 'review-block'
       createdAt: string
       review: PullRequestReview | null
@@ -448,7 +500,8 @@ type PullRequestTimelineItem =
 function buildPullRequestTimelineItems(
   comments: PullRequestComment[],
   reviewComments: PullRequestReviewComment[],
-  reviews: PullRequestReview[]
+  reviews: PullRequestReview[],
+  commits: PullRequestCommit[]
 ): PullRequestTimelineItem[] {
   const threadsByReviewId = new Map<number, PullRequestReviewThread[]>()
   const threads = buildPullRequestReviewThreads(reviewComments)
@@ -481,6 +534,19 @@ function buildPullRequestTimelineItems(
       user: threads[0]!.topLevelComment.user
     }))
 
+  const commitItems: PullRequestTimelineItem[] = commits
+    .map((commit) => {
+      const date = commit.commit.author?.date ?? commit.commit.committer?.date
+      if (!date) return null
+      return {
+        id: `commit-${commit.sha}`,
+        type: 'commit' as const,
+        createdAt: date,
+        commit
+      }
+    })
+    .filter((item): item is Extract<PullRequestTimelineItem, { type: 'commit' }> => item !== null)
+
   return [
     ...comments.map((comment) => ({
       id: `issue-comment-${comment.id}`,
@@ -489,7 +555,8 @@ function buildPullRequestTimelineItems(
       comment
     })),
     ...reviewItems,
-    ...orphanReviewItems
+    ...orphanReviewItems,
+    ...commitItems
   ].sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
 }
 
@@ -498,6 +565,7 @@ function PullRequestTimelineCard({
   owner,
   repo,
   prNumber,
+  resolvedAuthors,
   onViewReviewThread,
   onQuoteReply
 }: {
@@ -505,6 +573,7 @@ function PullRequestTimelineCard({
   owner: string
   repo: string
   prNumber: number
+  resolvedAuthors: PullRequestCommitAuthors | undefined
   onViewReviewThread: (thread: PullRequestReviewThread) => void
   onQuoteReply: (quoted: string) => void
 }) {
@@ -518,6 +587,10 @@ function PullRequestTimelineCard({
         onQuoteReply={onQuoteReply}
       />
     )
+  }
+
+  if (item.type === 'commit') {
+    return <CommitTimelineRow commit={item.commit} resolvedAuthors={resolvedAuthors} />
   }
 
   return (
@@ -581,6 +654,58 @@ function getReviewStateText(state: string): string {
     default:
       return 'reviewed this pull request'
   }
+}
+
+function CommitTimelineRow({
+  commit,
+  resolvedAuthors
+}: {
+  commit: PullRequestCommit
+  resolvedAuthors: PullRequestCommitAuthors | undefined
+}) {
+  const subject = commit.commit.message.split('\n')[0]?.trim() || 'Untitled commit'
+  const actors = getCommitActors(commit, resolvedAuthors)
+  const [isCopied, setIsCopied] = useState(false)
+
+  const handleCopySha = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(commit.sha)
+      setIsCopied(true)
+      window.setTimeout(() => setIsCopied(false), 1500)
+    } catch (error) {
+      console.error('Failed to copy commit SHA:', error)
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
+      <div className="flex justify-center">
+        <div className="border-border bg-surface text-foreground-muted flex size-8 items-center justify-center rounded-full border">
+          <GitCommit size={14} />
+        </div>
+      </div>
+
+      <div className="flex min-h-8 min-w-0 items-center gap-2">
+        <CommitActorStack actors={actors} size="sm" />
+        <span className="text-foreground min-w-0 truncate text-xs font-medium" title={subject}>
+          {subject}
+        </span>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <span className="text-foreground-muted font-mono text-xs">{commit.sha.slice(0, 7)}</span>
+          <Tooltip label={isCopied ? 'Copied' : 'Copy SHA'} side="top">
+            <button
+              type="button"
+              onClick={handleCopySha}
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
+              aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
+            >
+              {isCopied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function IssueCommentCard({

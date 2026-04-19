@@ -165,6 +165,8 @@ const api = {
         ipcRenderer.invoke('github:pulls:reopen', owner, repo, number),
       listCommits: (owner: string, repo: string, number: number, page?: number, perPage?: number): Promise<unknown> =>
         ipcRenderer.invoke('github:pulls:list-commits', owner, repo, number, page, perPage),
+      listCommitAuthors: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pulls:list-commit-authors', owner, repo, number),
       listFiles: (owner: string, repo: string, number: number): Promise<unknown> =>
         ipcRenderer.invoke('github:pulls:list-files', owner, repo, number),
       checkMerged: (owner: string, repo: string, number: number): Promise<unknown> =>

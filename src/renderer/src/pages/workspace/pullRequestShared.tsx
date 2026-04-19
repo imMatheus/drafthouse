@@ -6,8 +6,19 @@ export interface PullRequestReviewThread {
   path: string
   line: number | null
   side: PullRequestReviewLineSide | null
+  /**
+   * True when the commented line no longer exists in the latest diff — GitHub
+   * clears `line`/`position` in that case and only keeps `original_*`. The
+   * thread still renders in the conversation tab with an "Outdated" badge but
+   * isn't anchored to a line in the inline diff viewer.
+   */
+  isOutdated: boolean
   topLevelComment: PullRequestReviewComment
   replies: PullRequestReviewComment[]
+}
+
+export function isOutdatedReviewComment(comment: PullRequestReviewComment): boolean {
+  return comment.line == null
 }
 
 export function buildPullRequestReviewThreads(reviewComments: PullRequestReviewComment[]): PullRequestReviewThread[] {
@@ -26,14 +37,16 @@ export function buildPullRequestReviewThreads(reviewComments: PullRequestReviewC
       return []
     }
 
-    const anchor = getReviewCommentAnchor(comment)
+    const outdated = isOutdatedReviewComment(comment)
+    const anchor = outdated ? null : getReviewCommentAnchor(comment)
 
     return [
       {
         id: comment.id,
         path: comment.path,
-        line: anchor?.line ?? comment.line ?? null,
-        side: anchor?.side ?? null,
+        line: outdated ? null : (anchor?.line ?? comment.line ?? null),
+        side: outdated ? null : (anchor?.side ?? null),
+        isOutdated: outdated,
         topLevelComment: comment,
         replies: (repliesByParent.get(comment.id) ?? []).sort(
           (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime()

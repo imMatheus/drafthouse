@@ -161,6 +161,90 @@ export function registerPullsHandlers(): void {
     }
   )
 
+  // Resolve all authors (main + co-authors) for commits on a PR via GraphQL.
+  // Returns a map of commit SHA to its authors list with avatar URLs resolved.
+  ipcMain.handle(
+    'github:pulls:list-commit-authors',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number
+    ): Promise<Record<string, Array<{ name: string; email: string | null; avatarUrl: string; login: string | null }>>> => {
+      const token = requireAuth()
+      const result: Record<string, Array<{ name: string; email: string | null; avatarUrl: string; login: string | null }>> = {}
+      let cursor: string | null = null
+
+      while (true) {
+        const data = await fetchGitHubGraphQL<{
+          repository: {
+            pullRequest: {
+              commits: {
+                nodes: Array<{
+                  commit: {
+                    oid: string
+                    authors: {
+                      nodes: Array<{
+                        name: string | null
+                        email: string | null
+                        avatarUrl: string
+                        user: { login: string } | null
+                      }>
+                    }
+                  }
+                }>
+                pageInfo: { hasNextPage: boolean; endCursor: string | null }
+              }
+            }
+          }
+        }>(
+          token,
+          `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                commits(first: 100, after: $cursor) {
+                  nodes {
+                    commit {
+                      oid
+                      authors(first: 10) {
+                        nodes {
+                          name
+                          email
+                          avatarUrl
+                          user { login }
+                        }
+                      }
+                    }
+                  }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          }`,
+          { owner, name: repo, number, cursor },
+          `Failed to resolve commit authors for PR #${number}`
+        )
+
+        const connection = data.repository.pullRequest.commits
+        for (const node of connection.nodes) {
+          result[node.commit.oid] = node.commit.authors.nodes
+            .filter((a) => a.name)
+            .map((a) => ({
+              name: a.name!,
+              email: a.email,
+              avatarUrl: a.avatarUrl,
+              login: a.user?.login ?? null
+            }))
+        }
+
+        if (!connection.pageInfo.hasNextPage || !connection.pageInfo.endCursor) break
+        cursor = connection.pageInfo.endCursor
+      }
+
+      return result
+    }
+  )
+
   // List pull request files
   // GET /repos/{owner}/{repo}/pulls/{pull_number}/files
   ipcMain.handle(

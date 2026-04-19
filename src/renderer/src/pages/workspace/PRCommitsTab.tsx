@@ -2,9 +2,14 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCheck, ChevronLeft, ChevronRight, Copy, ExternalLink, GitCommit } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import type { PaginatedPullRequestCommits, PullRequestCommit } from '../../../../shared/types'
+import type {
+  PaginatedPullRequestCommits,
+  PullRequestCommit,
+  PullRequestCommitAuthors
+} from '../../../../shared/types'
 import PlaceholderView from './PlaceholderView'
 import Tooltip from '../../components/Tooltip'
+import CommitActorStack, { formatCommitActorNames, getCommitActors } from '../../components/CommitActorStack'
 import { formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
 
 const COMMITS_PER_PAGE = 100
@@ -47,6 +52,12 @@ export default function PRCommitsTab({
     retry: false,
     enabled: totalCommits > 0
   })
+  const { data: resolvedAuthors } = useQuery<PullRequestCommitAuthors, Error>({
+    queryKey: ['pull-request-commit-authors', owner, repo, number],
+    queryFn: () => window.api.github.pulls.listCommitAuthors(owner, repo, number),
+    retry: false,
+    enabled: totalCommits > 0
+  })
 
   useEffect(() => {
     if (safePage >= totalPages) return
@@ -79,7 +90,7 @@ export default function PRCommitsTab({
       {items.length > 0 ? (
         <div className="flex flex-col gap-6">
           {commitGroups.map((group) => (
-            <CommitDayGroup key={group.dateKey} group={group} />
+            <CommitDayGroup key={group.dateKey} group={group} resolvedAuthors={resolvedAuthors} />
           ))}
         </div>
       ) : null}
@@ -120,7 +131,13 @@ export default function PRCommitsTab({
   )
 }
 
-function CommitDayGroup({ group }: { group: CommitDayGroupData }) {
+function CommitDayGroup({
+  group,
+  resolvedAuthors
+}: {
+  group: CommitDayGroupData
+  resolvedAuthors: PullRequestCommitAuthors | undefined
+}) {
   return (
     <section className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3">
       <div className="relative flex justify-center">
@@ -140,7 +157,12 @@ function CommitDayGroup({ group }: { group: CommitDayGroupData }) {
 
         <div className="border-border bg-surface overflow-hidden rounded-xl border">
           {group.items.map((commit, index) => (
-            <CommitRow key={commit.sha} commit={commit} isLast={index === group.items.length - 1} />
+            <CommitRow
+              key={commit.sha}
+              commit={commit}
+              isLast={index === group.items.length - 1}
+              resolvedAuthors={resolvedAuthors}
+            />
           ))}
         </div>
       </div>
@@ -179,11 +201,19 @@ function PRCommitsPagination({
   )
 }
 
-function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: boolean }) {
+function CommitRow({
+  commit,
+  isLast,
+  resolvedAuthors
+}: {
+  commit: PullRequestCommit
+  isLast: boolean
+  resolvedAuthors: PullRequestCommitAuthors | undefined
+}) {
   const subject = getCommitSubject(commit.commit.message)
   const body = getCommitBody(commit.commit.message)
   const bodyPreview = body.split('\n')[0] ?? ''
-  const actors = getCommitActors(commit)
+  const actors = getCommitActors(commit, resolvedAuthors)
   const commitDate = commit.commit.author?.date ?? commit.commit.committer?.date ?? null
   const authoredLabel = commitDate != null ? formatRelativeTime(commitDate) : 'Date unavailable'
   const isMergeCommit = commit.parents.length > 1
@@ -253,30 +283,6 @@ function CommitRow({ commit, isLast }: { commit: PullRequestCommit; isLast: bool
   )
 }
 
-function CommitActorStack({ actors }: { actors: Array<{ name: string; avatarUrl: string | null }> }) {
-  const visibleActors = actors.slice(0, 2)
-
-  return (
-    <div className="flex items-center">
-      {visibleActors.map((actor, index) => (
-        <div
-          key={`${actor.name}-${index}`}
-          className={cn(
-            'border-surface bg-interactive flex size-6 items-center justify-center overflow-hidden rounded-full border',
-            index > 0 && '-ml-2'
-          )}
-        >
-          {actor.avatarUrl ? (
-            <img src={actor.avatarUrl} alt={actor.name} className="size-full object-cover" />
-          ) : (
-            <GitCommit size={12} className="text-foreground-muted" />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function getCommitSubject(message: string): string {
   return message.split('\n')[0]?.trim() || 'Untitled commit'
 }
@@ -316,33 +322,3 @@ function formatCommitGroupLabel(dateStr: string): string {
   }).format(new Date(dateStr))
 }
 
-function getCommitActors(commit: PullRequestCommit): Array<{ name: string; avatarUrl: string | null }> {
-  const entries = [
-    {
-      name: commit.author?.login ?? commit.commit.author?.name ?? null,
-      avatarUrl: commit.author?.avatar_url ?? null
-    },
-    {
-      name: commit.committer?.login ?? commit.commit.committer?.name ?? null,
-      avatarUrl: commit.committer?.avatar_url ?? null
-    }
-  ].filter((entry): entry is { name: string; avatarUrl: string | null } => Boolean(entry.name))
-
-  const deduped = new Map<string, { name: string; avatarUrl: string | null }>()
-
-  for (const entry of entries) {
-    const key = entry.name.toLowerCase()
-    if (!deduped.has(key)) {
-      deduped.set(key, entry)
-    }
-  }
-
-  return Array.from(deduped.values())
-}
-
-function formatCommitActorNames(actors: Array<{ name: string }>): string {
-  if (actors.length === 0) return 'Unknown author'
-  if (actors.length === 1) return actors[0]!.name
-  if (actors.length === 2) return `${actors[0]!.name} and ${actors[1]!.name}`
-  return `${actors[0]!.name}, ${actors[1]!.name}, and ${actors.length - 2} others`
-}

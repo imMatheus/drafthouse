@@ -111,11 +111,21 @@ export default function ReviewThreadCard({
   return (
     <div className="border-border bg-surface overflow-hidden rounded-xl border">
       <div className="border-border bg-interactive flex items-center justify-between gap-3 border-b px-4 py-2">
-        <div className="text-foreground min-w-0 text-sm font-medium">
-          {thread.path}
-          {thread.line !== null ? <span className="text-foreground-muted">:{thread.line}</span> : null}
+        <div className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">
+          <span className="truncate">
+            {thread.path}
+            {thread.line !== null ? <span className="text-foreground-muted">:{thread.line}</span> : null}
+          </span>
+          {thread.isOutdated ? (
+            <span
+              title="The line this comment was anchored to no longer exists in the latest diff"
+              className="border-border bg-surface text-foreground-muted shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+            >
+              Outdated
+            </span>
+          ) : null}
         </div>
-        {onViewReviewThread ? (
+        {onViewReviewThread && !thread.isOutdated ? (
           <button
             type="button"
             onClick={() => onViewReviewThread(thread)}
