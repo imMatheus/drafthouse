@@ -36,7 +36,7 @@ body {
 } */
 
 /* Claude theme */
-:root {
+:root, .dark {
   --color-background: rgb(12, 12, 12);
   --color-surface: rgb(18, 18, 18);
   --color-surface-hover: rgb(22, 22, 22);
@@ -49,6 +49,14 @@ body {
   --color-accent: rgb(67, 151, 248);
   --color-accent-hover: rgb(87, 171, 255);
   --color-accent-bg: rgb(18, 26, 36);
+
+  /* --color-accent: hsl(270, 73%, 35%);
+  --color-accent-hover: hsl(270, 73%, 42%);
+  --color-accent-bg: hsl(270, 73%, 4%); */
+
+  /* --color-accent: hsl(0, 69%, 50%);
+  --color-accent-hover: hsl(0, 69%, 57%);
+  --color-accent-bg: hsl(0, 69%, 7%); */
 
   --color-accent: hsl(19, 100%, 48%);
   --color-accent-hover: hsl(19, 100%, 55%);

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { FolderOpen } from 'lucide-react'
 import { getPathBasename } from '../lib/path'
+import AsciiArt from '../components/AsciiArt'
 
 export default function Home({ onOpenFolder }: { onOpenFolder: (path: string) => void }) {
   const [recentFolderError, setRecentFolderError] = useState<string | null>(null)
@@ -33,43 +35,50 @@ export default function Home({ onOpenFolder }: { onOpenFolder: (path: string) =>
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
-      <div className="flex flex-col items-center gap-2">
-        <h1 className="text-foreground text-3xl font-bold">Welcome to Drafthouse</h1>
-        <p className="text-foreground-muted text-sm">Open a folder to get started</p>
+    <div className="flex min-h-full flex-1 items-center justify-center px-6 py-12">
+      <div className="flex w-full max-w-md flex-col items-center gap-8">
+        <AsciiArt className="size-32" />
+
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <h1 className="text-foreground text-2xl font-semibold tracking-tight">Welcome to Drafthouse</h1>
+          <p className="text-foreground-muted text-sm">Open a folder to get started</p>
+        </div>
+
+        <button
+          onClick={handleOpen}
+          className="border-border bg-interactive hover:bg-interactive-hover text-foreground inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
+        >
+          <FolderOpen size={14} />
+          Open Folder
+        </button>
+
+        {recentFolderError ? (
+          <div className="border-danger/30 bg-danger/5 w-full rounded-lg border px-3 py-2">
+            <p className="text-foreground-muted text-xs">{recentFolderError}</p>
+          </div>
+        ) : null}
+
+        {recentFolders && recentFolders.length > 0 ? (
+          <div className="w-full">
+            <h2 className="text-foreground-subtle mb-2 text-[11px] font-semibold tracking-wider uppercase">
+              Recent
+            </h2>
+            <ul className="-mx-2 flex flex-col">
+              {recentFolders.map((folder) => (
+                <li key={folder}>
+                  <button
+                    onClick={() => handleOpenRecent(folder)}
+                    className="hover:bg-surface-hover flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-colors"
+                  >
+                    <span className="text-foreground text-sm font-medium">{getPathBasename(folder)}</span>
+                    <span className="text-foreground-subtle truncate text-xs">{folder}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
-
-      <button
-        onClick={handleOpen}
-        className="bg-accent text-foreground hover:bg-accent-hover rounded-lg px-5 py-2.5 font-medium"
-      >
-        Open Folder
-      </button>
-
-      {recentFolderError && (
-        <div className="border-border bg-surface w-full max-w-sm rounded-lg border px-4 py-3">
-          <p className="text-foreground-muted text-sm">{recentFolderError}</p>
-        </div>
-      )}
-
-      {recentFolders && recentFolders.length > 0 && (
-        <div className="w-full max-w-sm">
-          <h2 className="text-foreground-muted mb-3 text-xs font-medium">Recent</h2>
-          <ul className="flex flex-col gap-0.5">
-            {recentFolders.map((folder) => (
-              <li key={folder}>
-                <button
-                  onClick={() => handleOpenRecent(folder)}
-                  className="hover:bg-surface-hover flex w-full flex-col rounded-md px-3 py-2 text-left transition-colors"
-                >
-                  <span className="text-foreground text-sm">{getPathBasename(folder)}</span>
-                  <span className="text-foreground-subtle truncate text-xs">{folder}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   )
 }
