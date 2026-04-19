@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, FileText } from 'lucide-react'
+import { ChevronRight, FileCode, FileText, GitBranch } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import AgentSpinner from './AgentSpinner'
-import type { AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
+import type { AgentContext, AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
 import AgentMessageBlock from './AgentMessageBlock'
+import HighlightedMentionText from '../../components/HighlightedMentionText'
+import PRStateIcon from '../../components/PRStateIcon'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
 
@@ -130,6 +132,8 @@ export default function AgentConversation({ session }: AgentConversationProps) {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-6">
+        {session.context ? <AgentContextBox context={session.context} /> : null}
+
         {/* Initial user prompt */}
         <div className="mb-6 flex flex-col items-end gap-2">
           {session.files.length > 0 && (
@@ -141,7 +145,9 @@ export default function AgentConversation({ session }: AgentConversationProps) {
           )}
           {session.prompt && (
             <div className="bg-surface max-w-[80%] rounded-2xl px-4 py-2.5">
-              <p className="text-foreground text-sm whitespace-pre-wrap">{session.prompt}</p>
+              <p className="text-foreground text-sm whitespace-pre-wrap">
+                <HighlightedMentionText text={session.prompt} />
+              </p>
             </div>
           )}
         </div>
@@ -208,7 +214,6 @@ export default function AgentConversation({ session }: AgentConversationProps) {
                 {lastResultEvent.num_turns} turn{lastResultEvent.num_turns !== 1 ? 's' : ''}
               </span>
               <span>{(lastResultEvent.duration_ms / 1000).toFixed(1)}s</span>
-              <span>${lastResultEvent.total_cost_usd.toFixed(4)}</span>
             </div>
           </div>
         )}
@@ -222,6 +227,56 @@ export default function AgentConversation({ session }: AgentConversationProps) {
 
         <div ref={bottomRef} />
       </div>
+    </div>
+  )
+}
+
+function AgentContextBox({ context }: { context: AgentContext }) {
+  if (context.source !== 'pull-request') return null
+
+  // Multi-PR mention context (from the agents view): render one row per PR.
+  if (context.prs && context.prs.length > 1) {
+    return (
+      <div className="border-border ml-auto bg-surface mb-2 flex w-max flex-col items-end gap-1.5 rounded-lg border px-3 py-2">
+        {context.prs.map((pr) => (
+          <div key={pr.number} className="text-foreground flex items-center gap-1.5 text-xs">
+            <PRStateIcon state={pr.state} size={13} />
+            <span className="font-semibold">#{pr.number}</span>
+            <span className="text-foreground-muted max-w-[200px] truncate">{pr.title}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (!context.prNumber) return null
+
+  return (
+    <div className="border-border ml-auto bg-surface mb-2 flex w-max flex-col items-end gap-x-4 gap-y-1.5 rounded-lg border px-3 py-2">
+      <div className="text-foreground flex items-center gap-1.5 text-xs">
+        <PRStateIcon state={context.prState ?? 'open'} size={13} />
+        <span className="font-semibold">#{context.prNumber}</span>
+        {context.prTitle ? (
+          <span className="text-foreground-muted max-w-[200px] truncate">{context.prTitle}</span>
+        ) : null}
+      </div>
+
+      {context.headBranch ? (
+        <div className="text-foreground-muted flex items-center gap-1 text-xs">
+          <GitBranch size={12} className="shrink-0" />
+          <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.headBranch}</code>
+          <span className="text-foreground-subtle">&rarr;</span>
+          <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.baseBranch}</code>
+        </div>
+      ) : null}
+
+      {context.filePath ? (
+        <div className="text-foreground-muted flex items-center gap-1 text-xs">
+          <FileCode size={12} className="shrink-0" />
+          <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.filePath}</code>
+          {context.lineNumber ? <span className="text-foreground-subtle">:{context.lineNumber}</span> : null}
+        </div>
+      ) : null}
     </div>
   )
 }

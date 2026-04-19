@@ -979,6 +979,14 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                     <tr className={cn('group', getFileDiffRowClassName(line.kind))}>
                       <td
                         className={cn(
+                          'text-foreground-subtle w-12 px-3 py-0 text-center font-mono text-xs',
+                          getFileDiffLineNumClassName(line.kind)
+                        )}
+                      >
+                        {line.oldLineNumber ?? ''}
+                      </td>
+                      <td
+                        className={cn(
                           'text-foreground-subtle relative w-12 px-3 py-0 text-center font-mono text-xs',
                           getFileDiffLineNumClassName(line.kind)
                         )}
@@ -987,20 +995,12 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                           <button
                             type="button"
                             onClick={() => onOpenComment(isComposerOpen ? null : rowKey)}
-                            className="bg-accent absolute top-1/2 left-0 ml-0.5 hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover:inline-flex"
+                            className="bg-accent absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover:inline-flex"
                             aria-label="Add line comment"
                           >
                             <Plus size={12} />
                           </button>
                         ) : null}
-                        {line.oldLineNumber ?? ''}
-                      </td>
-                      <td
-                        className={cn(
-                          'text-foreground-subtle w-12 px-3 py-0 text-center font-mono text-xs',
-                          getFileDiffLineNumClassName(line.kind)
-                        )}
-                      >
                         {line.newLineNumber ?? ''}
                       </td>
                       <td className="text-foreground px-3 py-0 font-mono text-[13px] whitespace-pre">
@@ -1013,10 +1013,9 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
                     {rowThreads.map((thread) => (
                       <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                        <td
-                          colSpan={3}
-                          className={cn('border-border border-b px-4 py-2', getFileDiffRowClassName(line.kind))}
-                        >
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('border-border border-b px-4 py-2', getFileDiffRowClassName(line.kind))}>
                           <InlineDiffThread thread={thread} replyTarget={replyTarget} />
                         </td>
                       </tr>
@@ -1024,7 +1023,9 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
                     {draftComments.map(({ comment, index }) => (
                       <tr key={`draft-${rowKey}-${index}`}>
-                        <td colSpan={3} className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
                           <DraftCommentCard
                             comment={comment}
                             auth={auth}
@@ -1036,7 +1037,9 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
                     {isComposerOpen && rowKey && line.commentSide && line.commentLine ? (
                       <tr>
-                        <td colSpan={3} className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
                           <InlineDiffCommentComposer
                             owner={owner}
                             repo={repo}
@@ -1058,7 +1061,9 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                     {line.commentLine
                       ? (sessionsByLineNumber.get(line.commentLine) ?? []).map((session) => (
                           <tr key={`agent-${session.id}`}>
-                            <td colSpan={3} className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
+                            <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                            <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                            <td className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
                               <InlineAgentResponseCard
                                 session={session}
                                 onStop={() => onStopAgent?.(session.id)}
@@ -1209,7 +1214,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             <button
                               type="button"
                               onClick={() => onOpenComment(isLeftComposerOpen ? null : leftKey)}
-                              className="bg-accent absolute top-1/2 left-0 ml-0.5 hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/left:inline-flex"
+                              className="bg-accent absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/left:inline-flex"
                               aria-label="Add line comment"
                             >
                               <Plus size={12} />
@@ -1243,7 +1248,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             <button
                               type="button"
                               onClick={() => onOpenComment(isRightComposerOpen ? null : rightKey)}
-                              className="bg-accent absolute top-1/2 left-0 ml-0.5 hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/right:inline-flex"
+                              className="bg-accent absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/right:inline-flex"
                               aria-label="Add line comment"
                             >
                               <Plus size={12} />
@@ -1298,20 +1303,24 @@ function SplitHunkDiff(props: HunkDiffProps) {
 
                       {leftDrafts.map(({ comment, index }) => (
                         <tr key={`draft-left-${index}`}>
-                          <td colSpan={2} className="bg-danger/10 px-3 py-3">
+                          <td className="bg-danger/20" />
+                          <td className="border-border border-r bg-danger/10 px-3 py-3 align-top">
                             <DraftCommentCard
                               comment={comment}
                               auth={auth}
                               onRemove={() => onRemoveDraftComment(index)}
                             />
                           </td>
-                          <td colSpan={2} className="bg-success/10" />
+                          <td className="bg-success/20" />
+                          <td className="bg-success/10" />
                         </tr>
                       ))}
                       {rightDrafts.map(({ comment, index }) => (
                         <tr key={`draft-right-${index}`}>
-                          <td colSpan={2} className="bg-danger/10" />
-                          <td colSpan={2} className="bg-success/10 px-3 py-3">
+                          <td className="bg-danger/20" />
+                          <td className="border-border border-r bg-danger/10" />
+                          <td className="bg-success/20" />
+                          <td className="bg-success/10 px-3 py-3 align-top">
                             <DraftCommentCard
                               comment={comment}
                               auth={auth}
@@ -1323,7 +1332,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
 
                       {isLeftComposerOpen && leftKey && pair.left?.commentSide && pair.left.commentLine ? (
                         <tr>
-                          <td colSpan={2} className="bg-danger/10 px-3 py-3">
+                          <td className="bg-danger/20" />
+                          <td className="border-border border-r bg-danger/10 px-3 py-3 align-top">
                             <InlineDiffCommentComposer
                               owner={owner}
                               repo={repo}
@@ -1339,14 +1349,17 @@ function SplitHunkDiff(props: HunkDiffProps) {
                               onAskClaude={onAskClaude}
                             />
                           </td>
-                          <td colSpan={2} className="bg-success/10" />
+                          <td className="bg-success/20" />
+                          <td className="bg-success/10" />
                         </tr>
                       ) : null}
 
                       {isRightComposerOpen && rightKey && pair.right?.commentSide && pair.right.commentLine ? (
                         <tr>
-                          <td colSpan={2} className="bg-danger/10" />
-                          <td colSpan={2} className="bg-success/10 px-3 py-3">
+                          <td className="bg-danger/20" />
+                          <td className="border-border border-r bg-danger/10" />
+                          <td className="bg-success/20" />
+                          <td className="bg-success/10 px-3 py-3 align-top">
                             <InlineDiffCommentComposer
                               owner={owner}
                               repo={repo}
@@ -1377,8 +1390,10 @@ function SplitHunkDiff(props: HunkDiffProps) {
                           <tr key={`agent-${session.id}`}>
                             {session.context?.side === 'RIGHT' ? (
                               <>
-                                <td colSpan={2} className="bg-danger/10" />
-                                <td colSpan={2} className="bg-success/10 px-3 py-3">
+                                <td className="bg-danger/20" />
+                                <td className="border-border border-r bg-danger/10" />
+                                <td className="bg-success/20" />
+                                <td className="bg-success/10 px-3 py-3 align-top">
                                   <InlineAgentResponseCard
                                     session={session}
                                     onStop={() => onStopAgent?.(session.id)}
@@ -1389,7 +1404,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
                               </>
                             ) : (
                               <>
-                                <td colSpan={2} className="bg-danger/10 px-3 py-3">
+                                <td className="bg-danger/20" />
+                                <td className="border-border border-r bg-danger/10 px-3 py-3 align-top">
                                   <InlineAgentResponseCard
                                     session={session}
                                     onStop={() => onStopAgent?.(session.id)}
@@ -1397,7 +1413,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
                                     onOpenInChat={() => onPromoteAgent?.(session.id)}
                                   />
                                 </td>
-                                <td colSpan={2} className="bg-success/10" />
+                                <td className="bg-success/20" />
+                                <td className="bg-success/10" />
                               </>
                             )}
                           </tr>

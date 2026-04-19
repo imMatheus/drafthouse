@@ -19,7 +19,7 @@ interface ActivityBarProps {
 
 export default function ActivityBar({ items, onSettingsClick, settingsActive }: ActivityBarProps) {
   return (
-    <div className="border-border bg-background flex h-screen w-12 shrink-0 flex-col items-center border-r py-2">
+    <div className="border-border bg-background flex w-12 shrink-0 flex-col items-center border-r py-2">
       <div className="flex w-full flex-col items-center gap-1">
         {items.map((item) => {
           const Icon = item.icon

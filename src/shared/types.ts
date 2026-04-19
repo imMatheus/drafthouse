@@ -519,9 +519,12 @@ export interface AgentContext {
   /** Display info for the context banner in the agent chat view */
   prNumber?: number
   prTitle?: string
+  prState?: 'open' | 'merged' | 'closed' | 'draft'
   headBranch?: string
   baseBranch?: string
   repoFullName?: string
+  /** For sessions started from multiple `@prN` mentions in the agents view */
+  prs?: { number: number; title: string; state: 'open' | 'merged' | 'closed' | 'draft' }[]
 }
 
 export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'

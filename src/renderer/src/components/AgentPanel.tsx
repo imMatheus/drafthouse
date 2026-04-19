@@ -30,7 +30,7 @@ export default function AgentPanel({ sessions, activeSessionId, onSelectSession,
   const sortedSessions = [...sessions].filter((s) => !s.context?.inline).reverse()
 
   return (
-    <div className="border-border bg-surface flex h-screen w-60 shrink-0 flex-col border-r">
+    <div className="border-border bg-surface flex min-h-0 w-60 shrink-0 flex-col border-r">
       <div className="flex items-center justify-between px-4 py-3">
         <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Agent</p>
         <button

@@ -1,6 +1,17 @@
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
-import { ArrowUp, FileText, Plus, Square, X } from 'lucide-react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
+import { useQueries, useQuery } from '@tanstack/react-query'
+import { ArrowUp, FileText, GitPullRequest, Plus, Square, X } from 'lucide-react'
+import type { GitRepoInfo, PullRequest, PullRequestDetail } from '../../../../shared/types'
 import { cn } from '../../lib/cn'
+import {
+  extractMentionedPRNumbers,
+  findActiveMention,
+  prStateLabel,
+  removePRMention,
+  searchPRs,
+  splitTextIntoMentionSegments
+} from '../../lib/prMentions'
+import PRStateIcon from '../../components/PRStateIcon'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
 
@@ -14,17 +25,71 @@ function getFileName(filePath: string): string {
 }
 
 interface AgentPromptBarProps {
-  onSubmit: (prompt: string, files?: string[]) => Promise<void>
+  onSubmit: (prompt: string, files?: string[], mentionedPRs?: PullRequestDetail[]) => Promise<void>
   onStop: () => void
   isRunning: boolean
+  gitInfo?: GitRepoInfo | null
+  text: string
+  onTextChange: (text: string) => void
 }
 
-export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPromptBarProps) {
-  const [text, setText] = useState('')
+export interface AgentPromptBarHandle {
+  focus: () => void
+}
+
+const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(function AgentPromptBar(
+  { onSubmit, onStop, isRunning, gitInfo, text, onTextChange },
+  ref
+) {
   const [files, setFiles] = useState<string[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [cursor, setCursor] = useState(0)
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      const ta = textareaRef.current
+      if (!ta) return
+      ta.focus()
+      const end = ta.value.length
+      ta.setSelectionRange(end, end)
+      setCursor(end)
+    }
+  }))
+
+  // Resize the textarea when text changes from the outside (e.g. a suggestion click).
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`
+  }, [text])
+
+  // Fetch all PRs (open/closed/merged) for the mention dropdown. Sorted by
+  // updated_at desc on the backend so the most relevant ones surface first.
+  const { data: allPRs } = useQuery<PullRequest[], Error>({
+    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, 'all'],
+    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: 'all', perPage: 100 }),
+    enabled: gitInfo != null,
+    retry: false
+  })
+
+  // Resolve full `PullRequestDetail` for every `@prN` in the draft so pills
+  // and the on-submit context have body / additions / deletions / branches.
+  // react-query dedupes + caches per number across renders.
+  const mentionedNumbers = extractMentionedPRNumbers(text)
+  const mentionQueries = useQueries({
+    queries: mentionedNumbers.map((n) => ({
+      queryKey: ['pull-request', gitInfo?.owner, gitInfo?.repo, n],
+      queryFn: () => window.api.github.pulls.get(gitInfo!.owner, gitInfo!.repo, n),
+      enabled: gitInfo != null,
+      retry: false,
+      staleTime: Infinity
+    }))
+  })
 
   // Prevent Electron's default drag-and-drop behavior (navigating to the file)
   useEffect(() => {
@@ -39,6 +104,19 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
     }
   }, [])
 
+  const activeMention = gitInfo ? findActiveMention(text, cursor) : null
+  const mentionSuggestions = activeMention && allPRs ? searchPRs(allPRs, activeMention.query, 8) : []
+  const showMentionMenu = activeMention !== null && mentionSuggestions.length > 0
+
+  useEffect(() => {
+    if (selectedMentionIndex >= mentionSuggestions.length) {
+      setSelectedMentionIndex(0)
+    }
+  }, [mentionSuggestions.length, selectedMentionIndex])
+
+  const segments = splitTextIntoMentionSegments(text)
+  const hasMentions = segments.some((s) => s.type === 'mention')
+
   const canSubmit = (text.trim().length > 0 || files.length > 0) && !isRunning && !isSubmitting
 
   const handleSubmit = async (): Promise<void> => {
@@ -46,8 +124,15 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
 
     setIsSubmitting(true)
     try {
-      await onSubmit(text.trim(), files.length > 0 ? files : undefined)
-      setText('')
+      const resolvedDetails = mentionQueries
+        .map((q) => q.data)
+        .filter((d): d is PullRequestDetail => d != null)
+      await onSubmit(
+        text.trim(),
+        files.length > 0 ? files : undefined,
+        resolvedDetails.length > 0 ? resolvedDetails : undefined
+      )
+      onTextChange('')
       setFiles([])
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
@@ -57,7 +142,53 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
     }
   }
 
+  const handleRemovePill = (prNumber: number): void => {
+    onTextChange(removePRMention(text, prNumber))
+  }
+
+  const acceptMention = (pr: PullRequest): void => {
+    if (!activeMention) return
+    const before = text.slice(0, activeMention.startIndex)
+    const after = text.slice(activeMention.endIndex)
+    const insertion = `@pr${pr.number}`
+    const needsSpace = after.length === 0 || !/^\s/.test(after)
+    const newText = before + insertion + (needsSpace ? ' ' : '') + after
+    const newCursor = before.length + insertion.length + (needsSpace ? 1 : 0)
+    onTextChange(newText)
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current
+      if (!ta) return
+      ta.focus()
+      ta.setSelectionRange(newCursor, newCursor)
+      setCursor(newCursor)
+    })
+  }
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (showMentionMenu) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedMentionIndex((i) => (i + 1) % mentionSuggestions.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedMentionIndex((i) => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        const chosen = mentionSuggestions[selectedMentionIndex] ?? mentionSuggestions[0]
+        if (chosen) acceptMention(chosen)
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setCursor(-1)
+        return
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       void handleSubmit()
@@ -100,17 +231,48 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
     textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`
   }
 
+  const syncCursor = (): void => {
+    const ta = textareaRef.current
+    if (!ta) return
+    setCursor(ta.selectionStart ?? 0)
+  }
+
+  // Keep the overlay's scroll position aligned with the textarea when the
+  // content exceeds the max height and the user scrolls.
+  const handleScroll = (): void => {
+    const ta = textareaRef.current
+    const overlay = overlayRef.current
+    if (!ta || !overlay) return
+    overlay.scrollTop = ta.scrollTop
+  }
+
   return (
     <div className="px-6 pt-2 pb-4">
       <div
         className={cn(
-          'border-border bg-surface mx-auto max-w-3xl rounded-xl border transition-colors',
+          'border-border bg-surface relative mx-auto max-w-3xl rounded-xl border transition-colors',
           isDragOver && 'border-accent bg-surface-hover'
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {/* PR mention pills */}
+        {mentionedNumbers.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-3 pt-3">
+            {mentionedNumbers.map((n, i) => (
+              <PRMentionPill
+                key={n}
+                prNumber={n}
+                detail={mentionQueries[i]?.data}
+                isLoading={mentionQueries[i]?.isLoading ?? false}
+                isError={mentionQueries[i]?.isError ?? false}
+                onRemove={() => handleRemovePill(n)}
+              />
+            ))}
+          </div>
+        )}
+
         {/* File previews */}
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">
@@ -135,17 +297,50 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
           >
             <Plus size={16} />
           </button>
-          <textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onInput={handleInput}
-            placeholder={isDragOver ? 'Drop files here...' : 'Reply...'}
-            rows={1}
-            disabled={isRunning}
-            className="text-foreground placeholder:text-foreground-subtle min-h-[24px] flex-1 resize-none bg-transparent text-sm focus:outline-none disabled:opacity-50"
-          />
+
+          <div className="relative min-h-[24px] flex-1">
+            {/* Paint-only overlay that highlights `@prN`. Uses the same font
+                size / line-height / wrap behavior as the textarea so the
+                caret stays perfectly aligned over the visible glyphs. */}
+            {hasMentions && (
+              <div
+                ref={overlayRef}
+                aria-hidden
+                className="text-foreground pointer-events-none absolute inset-0 max-h-[160px] overflow-hidden text-sm leading-5 break-words whitespace-pre-wrap"
+              >
+                {segments.map((seg, i) =>
+                  seg.type === 'mention' ? (
+                    <span key={i} className="bg-accent/15 text-accent rounded-[3px] font-medium">
+                      {seg.text}
+                    </span>
+                  ) : (
+                    <span key={i}>{seg.text}</span>
+                  )
+                )}
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={(e) => {
+                onTextChange(e.target.value)
+                setCursor(e.target.selectionStart ?? e.target.value.length)
+              }}
+              onKeyDown={handleKeyDown}
+              onKeyUp={syncCursor}
+              onClick={syncCursor}
+              onSelect={syncCursor}
+              onInput={handleInput}
+              onScroll={handleScroll}
+              placeholder={isDragOver ? 'Drop files here...' : 'Reply...'}
+              rows={1}
+              disabled={isRunning}
+              className={cn(
+                'placeholder:text-foreground-subtle relative block min-h-[24px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 focus:ring-0 focus:outline-none disabled:opacity-50',
+                hasMentions ? 'caret-foreground text-transparent' : 'text-foreground'
+              )}
+            />
+          </div>
 
           {isRunning ? (
             <button
@@ -166,8 +361,105 @@ export default function AgentPromptBar({ onSubmit, onStop, isRunning }: AgentPro
             </button>
           )}
         </div>
+
+        {showMentionMenu && (
+          <div className="border-border bg-surface absolute bottom-full left-0 z-20 mb-1 w-full max-w-md overflow-hidden rounded-lg border shadow-lg">
+            <div className="text-foreground-subtle border-border border-b px-3 py-1.5 text-xs">
+              Mention a pull request
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {mentionSuggestions.map((pr, index) => (
+                <PRSuggestionRow
+                  key={pr.number}
+                  pr={pr}
+                  selected={index === selectedMentionIndex}
+                  onSelect={() => acceptMention(pr)}
+                  onHover={() => setSelectedMentionIndex(index)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
+  )
+})
+
+export default AgentPromptBar
+
+function PRMentionPill({
+  prNumber,
+  detail,
+  isLoading,
+  isError,
+  onRemove
+}: {
+  prNumber: number
+  detail: PullRequestDetail | undefined
+  isLoading: boolean
+  isError: boolean
+  onRemove: () => void
+}) {
+  const state = detail ? prStateLabel(detail) : null
+
+  return (
+    <div className="border-border bg-interactive hover:bg-surface-hover group inline-flex max-w-full items-center gap-1.5 rounded-md border py-1 pr-1 pl-2 text-xs transition-colors">
+      {state ? (
+        <PRStateIcon state={state} size={13} />
+      ) : (
+        <GitPullRequest size={13} className="text-foreground-subtle shrink-0" />
+      )}
+      <span className="text-foreground-muted font-mono text-[11px]">#{prNumber}</span>
+      <span className="text-foreground max-w-[260px] truncate font-medium">
+        {detail ? detail.title : isError ? 'Not found' : isLoading ? 'Loading…' : '—'}
+      </span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="text-foreground-subtle hover:text-foreground hover:bg-surface ml-0.5 flex size-4 shrink-0 items-center justify-center rounded transition-colors"
+        title="Remove reference"
+      >
+        <X size={11} />
+      </button>
+    </div>
+  )
+}
+
+function PRSuggestionRow({
+  pr,
+  selected,
+  onSelect,
+  onHover
+}: {
+  pr: PullRequest
+  selected: boolean
+  onSelect: () => void
+  onHover: () => void
+}) {
+  const state = prStateLabel(pr)
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => {
+        e.preventDefault()
+        onSelect()
+      }}
+      onMouseEnter={onHover}
+      className={cn(
+        'flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors',
+        selected ? 'bg-surface-hover' : 'hover:bg-surface-hover'
+      )}
+    >
+      <PRStateIcon state={state} />
+      <div className="min-w-0 flex-1">
+        <p className="text-foreground truncate text-sm font-medium">
+          <span className="text-foreground-muted font-normal">#{pr.number}</span> {pr.title}
+        </p>
+        <p className="text-foreground-muted truncate text-xs">
+          {state} · {pr.user.login}
+        </p>
+      </div>
+    </button>
   )
 }
 

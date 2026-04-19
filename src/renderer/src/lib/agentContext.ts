@@ -1,4 +1,5 @@
 import type { AgentContext, PullRequestDetail, PullRequestFile } from '../../../shared/types'
+import { prStateLabel } from './prMentions'
 
 const MAX_FILES_IN_PROMPT = 50
 
@@ -52,6 +53,7 @@ export function buildPullRequestAgentContext(params: {
     inline: true,
     prNumber: pr.number,
     prTitle: pr.title,
+    prState: prStateLabel(pr),
     headBranch: pr.head.ref,
     baseBranch: pr.base.ref,
     repoFullName: `${owner}/${repo}`
@@ -102,6 +104,7 @@ export function buildDiffLineAgentContext(params: {
     side,
     prNumber: pr.number,
     prTitle: pr.title,
+    prState: prStateLabel(pr),
     headBranch: pr.head.ref,
     baseBranch: pr.base.ref,
     repoFullName: `${owner}/${repo}`

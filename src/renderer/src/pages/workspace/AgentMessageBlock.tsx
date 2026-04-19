@@ -10,12 +10,13 @@ import type {
 } from '../../../../shared/types'
 import AgentEditDiffBlock from './AgentEditDiffBlock'
 import MarkdownBody from './MarkdownBody'
+import HighlightedMentionText from '../../components/HighlightedMentionText'
 
 export function UserBubble({ text }: { text: string }) {
   return (
     <div className="mt-2 mb-3 flex justify-end">
       <div className="bg-interactive text-foreground max-w-[80%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap">
-        {text}
+        <HighlightedMentionText text={text} />
       </div>
     </div>
   )
