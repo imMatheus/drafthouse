@@ -24,7 +24,8 @@ import type {
   PullRequestReviewComment,
   PullRequestReviewDraftComment,
   PullRequestReviewEvent,
-  PullRequestReviewLineSide
+  PullRequestReviewLineSide,
+  PullRequestReviewThreadSummary
 } from '../../../../shared/types'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import { FolderIcon } from '../../components/FileIcon'
@@ -32,6 +33,9 @@ import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
+import FixWithClaudeButton from '../../components/FixWithClaudeButton'
+import ResolveThreadButton from '../../components/ResolveThreadButton'
+import type { FixWithClaudeInput } from '../../lib/agentContext'
 import Tooltip from '../../components/Tooltip'
 import { cn } from '../../lib/cn'
 import { useSettings } from '../../hooks/useSettings'
@@ -68,6 +72,7 @@ export default function PRFilesTab({
   threadJumpTarget,
   agentSessions,
   onAskClaude,
+  onFixWithClaude,
   onContinueAgent,
   onStopAgent,
   onPromoteAgent
@@ -86,6 +91,7 @@ export default function PRFilesTab({
     lineContent: string,
     side: PullRequestReviewLineSide
   ) => Promise<void>
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent?: (sessionId: string) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void
@@ -122,13 +128,18 @@ export default function PRFilesTab({
     queryFn: () => window.api.auth.getUser(),
     retry: false
   })
+  const { data: reviewThreadSummaries } = useQuery<PullRequestReviewThreadSummary[], Error>({
+    queryKey: ['pull-request-review-threads', owner, repo, pr.number],
+    queryFn: () => window.api.github.pullComments.listReviewThreads(owner, repo, pr.number),
+    retry: false
+  })
 
   const allFiles = files ?? EMPTY_FILES
   const trimmedFilter = filterValue.trim().toLowerCase()
   const filteredFiles =
     trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
   const fileTree = useMemo(() => buildFileTree(filteredFiles), [filteredFiles])
-  const reviewThreads = buildPullRequestReviewThreads(reviewComments ?? [])
+  const reviewThreads = buildPullRequestReviewThreads(reviewComments ?? [], reviewThreadSummaries)
 
   const threadsByFile = new Map<string, PullRequestReviewThread[]>()
   for (const thread of reviewThreads) {
@@ -333,6 +344,8 @@ export default function PRFilesTab({
                 openCommentKey={openCommentKey}
                 onOpenComment={setOpenCommentKey}
                 onAskClaude={onAskClaude}
+                onFixWithClaude={onFixWithClaude}
+                agentSessions={agentSessions ?? []}
                 fileAgentSessions={(agentSessions ?? []).filter(
                   (s) => s.context?.filePath === file.filename && s.context?.inline
                 )}
@@ -394,6 +407,8 @@ function PullRequestFileDiffCard({
   openCommentKey,
   onOpenComment,
   onAskClaude,
+  onFixWithClaude,
+  agentSessions,
   fileAgentSessions,
   onContinueAgent,
   onStopAgent,
@@ -422,6 +437,8 @@ function PullRequestFileDiffCard({
     lineContent: string,
     side: PullRequestReviewLineSide
   ) => Promise<void>
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
+  agentSessions: AgentSession[]
   fileAgentSessions: AgentSession[]
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent?: (sessionId: string) => Promise<void>
@@ -538,6 +555,8 @@ function PullRequestFileDiffCard({
     openCommentKey,
     onOpenComment,
     onAskClaude,
+    onFixWithClaude,
+    agentSessions,
     sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
@@ -621,7 +640,15 @@ function PullRequestFileDiffCard({
               <div className="flex flex-col gap-3">
                 {unanchoredThreads.map((thread) => (
                   <div key={`unanchored-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                    <ReviewThreadCard thread={thread} replyTarget={replyTarget} />
+                    <ReviewThreadCard
+                      thread={thread}
+                      replyTarget={replyTarget}
+                      onFixWithClaude={onFixWithClaude}
+                      agentSessions={agentSessions}
+                      onStopAgent={onStopAgent}
+                      onContinueAgent={onContinueAgent}
+                      onPromoteAgent={onPromoteAgent}
+                    />
                   </div>
                 ))}
               </div>
@@ -787,6 +814,8 @@ interface HunkDiffProps {
     lineContent: string,
     side: PullRequestReviewLineSide
   ) => Promise<void>
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
+  agentSessions: AgentSession[]
   sessionsByLineNumber: Map<number, AgentSession[]>
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent?: (sessionId: string) => Promise<void>
@@ -927,6 +956,8 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
     openCommentKey,
     onOpenComment,
     onAskClaude,
+    onFixWithClaude,
+    agentSessions,
     sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
@@ -1024,7 +1055,15 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
                         <td className={cn('border-border border-b px-4 py-2', getFileDiffRowClassName(line.kind))}>
-                          <InlineDiffThread thread={thread} replyTarget={replyTarget} />
+                          <InlineDiffThread
+                            thread={thread}
+                            replyTarget={replyTarget}
+                            onFixWithClaude={onFixWithClaude}
+                            agentSessions={agentSessions}
+                            onStopAgent={onStopAgent}
+                            onContinueAgent={onContinueAgent}
+                            onPromoteAgent={onPromoteAgent}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -1133,6 +1172,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
     openCommentKey,
     onOpenComment,
     onAskClaude,
+    onFixWithClaude,
+    agentSessions,
     sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
@@ -1290,7 +1331,15 @@ function SplitHunkDiff(props: HunkDiffProps) {
                               <>
                                 <td className="bg-danger/20" />
                                 <td className="border-border border-r bg-danger/10 p-1.5 align-top">
-                                  <InlineDiffThread thread={thread} replyTarget={replyTarget} />
+                                  <InlineDiffThread
+                                    thread={thread}
+                                    replyTarget={replyTarget}
+                                    onFixWithClaude={onFixWithClaude}
+                                    agentSessions={agentSessions}
+                                    onStopAgent={onStopAgent}
+                                    onContinueAgent={onContinueAgent}
+                                    onPromoteAgent={onPromoteAgent}
+                                  />
                                 </td>
                                 <td className="bg-success/20" />
                                 <td className="bg-success/10" />
@@ -1301,7 +1350,15 @@ function SplitHunkDiff(props: HunkDiffProps) {
                                 <td className="border-border border-r bg-danger/10" />
                                 <td className="bg-success/20" />
                                 <td className="bg-success/10 px-3 py-2 align-top">
-                                  <InlineDiffThread thread={thread} replyTarget={replyTarget} />
+                                  <InlineDiffThread
+                                    thread={thread}
+                                    replyTarget={replyTarget}
+                                    onFixWithClaude={onFixWithClaude}
+                                    agentSessions={agentSessions}
+                                    onStopAgent={onStopAgent}
+                                    onContinueAgent={onContinueAgent}
+                                    onPromoteAgent={onPromoteAgent}
+                                  />
                                 </td>
                               </>
                             )}
@@ -1538,10 +1595,20 @@ function DraftCommentCard({
 
 function InlineDiffThread({
   thread,
-  replyTarget
+  replyTarget,
+  onFixWithClaude,
+  agentSessions,
+  onStopAgent,
+  onContinueAgent,
+  onPromoteAgent
 }: {
   thread: PullRequestReviewThread
   replyTarget: { owner: string; repo: string; number: number }
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
+  agentSessions?: AgentSession[]
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
 }) {
   const [replyBody, setReplyBody] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -1575,6 +1642,15 @@ function InlineDiffThread({
   const handleQuoteReply = (quoted: string): void => {
     setReplyBody((prev) => (prev ? `${prev}\n${quoted}` : quoted))
   }
+
+  const sessionsByCommentId = (agentSessions ?? []).reduce<Map<number, AgentSession[]>>((acc, s) => {
+    const id = s.context?.commentId
+    if (id === undefined) return acc
+    const existing = acc.get(id) ?? []
+    existing.push(s)
+    acc.set(id, existing)
+    return acc
+  }, new Map())
 
   const allComments = [thread.topLevelComment, ...thread.replies]
 
@@ -1618,14 +1694,64 @@ function InlineDiffThread({
               <MarkdownBody className="">{comment.body}</MarkdownBody>
             )}
           </div>
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <ReactionBar
               owner={replyTarget.owner}
               repo={replyTarget.repo}
               commentId={comment.id}
               commentType="pull-comment"
             />
+            {onFixWithClaude ? (
+              <FixWithClaudeButton
+                onClick={() =>
+                  onFixWithClaude({
+                    commentId: comment.id,
+                    body: comment.body,
+                    author: comment.user.login,
+                    filePath: thread.path,
+                    line: thread.line,
+                    diffHunk: comment.diff_hunk
+                  })
+                }
+              />
+            ) : null}
+            {comment.id === thread.topLevelComment.id ? (
+              <ResolveThreadButton
+                threadId={thread.graphqlId}
+                isResolved={thread.isResolved}
+                owner={replyTarget.owner}
+                repo={replyTarget.repo}
+                number={replyTarget.number}
+              />
+            ) : null}
           </div>
+          {(sessionsByCommentId.get(comment.id) ?? []).map((session) => (
+            <div key={session.id} className="border-border mt-2 border-t pt-2">
+              <InlineAgentResponseCard
+                session={session}
+                variant="nested"
+                onStop={() => onStopAgent?.(session.id)}
+                onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                onOpenInChat={() => onPromoteAgent?.(session.id)}
+              />
+              {session.status === 'completed' &&
+              comment.id === thread.topLevelComment.id &&
+              thread.graphqlId &&
+              !thread.isResolved ? (
+                <div className="border-border bg-background mt-2 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+                  <span className="text-foreground-muted text-xs">Claude is done. Mark resolved?</span>
+                  <ResolveThreadButton
+                    threadId={thread.graphqlId}
+                    isResolved={thread.isResolved}
+                    owner={replyTarget.owner}
+                    repo={replyTarget.repo}
+                    number={replyTarget.number}
+                    variant="solid"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ))}
         </div>
       ))}
       <div className="">

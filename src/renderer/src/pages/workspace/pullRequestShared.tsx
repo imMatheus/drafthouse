@@ -1,4 +1,8 @@
-import type { PullRequestReviewComment, PullRequestReviewLineSide } from '../../../../shared/types'
+import type {
+  PullRequestReviewComment,
+  PullRequestReviewLineSide,
+  PullRequestReviewThreadSummary
+} from '../../../../shared/types'
 import { getReviewCommentAnchor } from './pullRequestDiff'
 
 export interface PullRequestReviewThread {
@@ -13,6 +17,9 @@ export interface PullRequestReviewThread {
    * isn't anchored to a line in the inline diff viewer.
    */
   isOutdated: boolean
+  /** GraphQL thread node ID — needed to resolve/unresolve. Null when not yet loaded. */
+  graphqlId: string | null
+  isResolved: boolean
   topLevelComment: PullRequestReviewComment
   replies: PullRequestReviewComment[]
 }
@@ -21,7 +28,10 @@ export function isOutdatedReviewComment(comment: PullRequestReviewComment): bool
   return comment.line == null
 }
 
-export function buildPullRequestReviewThreads(reviewComments: PullRequestReviewComment[]): PullRequestReviewThread[] {
+export function buildPullRequestReviewThreads(
+  reviewComments: PullRequestReviewComment[],
+  threadSummaries?: PullRequestReviewThreadSummary[]
+): PullRequestReviewThread[] {
   const repliesByParent = new Map<number, PullRequestReviewComment[]>()
 
   for (const comment of reviewComments) {
@@ -32,6 +42,13 @@ export function buildPullRequestReviewThreads(reviewComments: PullRequestReviewC
     }
   }
 
+  const summaryByRestCommentId = new Map<number, PullRequestReviewThreadSummary>()
+  for (const summary of threadSummaries ?? []) {
+    for (const id of summary.commentDatabaseIds) {
+      summaryByRestCommentId.set(id, summary)
+    }
+  }
+
   return reviewComments.flatMap((comment) => {
     if (comment.in_reply_to_id != null) {
       return []
@@ -39,6 +56,7 @@ export function buildPullRequestReviewThreads(reviewComments: PullRequestReviewC
 
     const outdated = isOutdatedReviewComment(comment)
     const anchor = outdated ? null : getReviewCommentAnchor(comment)
+    const summary = summaryByRestCommentId.get(comment.id)
 
     return [
       {
@@ -47,6 +65,8 @@ export function buildPullRequestReviewThreads(reviewComments: PullRequestReviewC
         line: outdated ? null : (anchor?.line ?? comment.line ?? null),
         side: outdated ? null : (anchor?.side ?? null),
         isOutdated: outdated,
+        graphqlId: summary?.id ?? null,
+        isResolved: summary?.isResolved ?? false,
         topLevelComment: comment,
         replies: (repliesByParent.get(comment.id) ?? []).sort(
           (left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime()

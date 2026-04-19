@@ -31,6 +31,7 @@ import type {
   PullRequestCommit,
   PaginatedPullRequestCommits,
   PullRequestCommitAuthors,
+  PullRequestReviewThreadSummary,
   PullRequestFile,
   PullRequestMergeMethod,
   PullRequestMergeResult,
@@ -232,6 +233,9 @@ interface GitHubPullCommentsAPI {
   updateIssueComment: (owner: string, repo: string, commentId: number, body: string) => Promise<PullRequestComment>
   deleteIssueComment: (owner: string, repo: string, commentId: number) => Promise<void>
   minimize: (nodeId: string, classifier: MinimizeClassifier) => Promise<void>
+  listReviewThreads: (owner: string, repo: string, number: number) => Promise<PullRequestReviewThreadSummary[]>
+  resolveThread: (threadId: string) => Promise<void>
+  unresolveThread: (threadId: string) => Promise<void>
   listForPull: (
     owner: string,
     repo: string,

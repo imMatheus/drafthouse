@@ -8,6 +8,8 @@ interface AgentEditDiffBlockProps {
   filePath: string
   oldString: string
   newString: string
+  /** Label shown in the header. Defaults to "Edit". */
+  toolLabel?: string
 }
 
 interface DiffLine {
@@ -97,7 +99,12 @@ function buildHunk(filePath: string, diffLines: DiffLine[]): ParsedDiffHunk {
   }
 }
 
-export default function AgentEditDiffBlock({ filePath, oldString, newString }: AgentEditDiffBlockProps) {
+export default function AgentEditDiffBlock({
+  filePath,
+  oldString,
+  newString,
+  toolLabel = 'Edit'
+}: AgentEditDiffBlockProps) {
   const { theme } = useTheme()
   const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
 
@@ -122,7 +129,7 @@ export default function AgentEditDiffBlock({ filePath, oldString, newString }: A
       <div className="border-border flex items-center gap-2 border-b px-3 py-2">
         <span className="bg-success size-2 rounded-full" />
         <span className="text-foreground text-xs font-medium">
-          Edit(<span className="text-foreground-muted">{fileName}</span>)
+          {toolLabel}(<span className="text-foreground-muted">{fileName}</span>)
         </span>
       </div>
 

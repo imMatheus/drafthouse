@@ -380,6 +380,14 @@ export interface ResolvedCommitAuthor {
 
 export type PullRequestCommitAuthors = Record<string, ResolvedCommitAuthor[]>
 
+export interface PullRequestReviewThreadSummary {
+  /** GraphQL node ID for the thread (needed for resolve/unresolve mutations) */
+  id: string
+  isResolved: boolean
+  /** REST comment IDs belonging to this thread — used to correlate with REST comment data */
+  commentDatabaseIds: number[]
+}
+
 export interface PullRequestFile {
   sha: string | null
   filename: string
@@ -537,6 +545,8 @@ export interface AgentContext {
   repoFullName?: string
   /** For sessions started from multiple `@prN` mentions in the agents view */
   prs?: { number: number; title: string; state: 'open' | 'merged' | 'closed' | 'draft' }[]
+  /** For "Fix with Claude" sessions: the comment ID the session was launched from */
+  commentId?: number
 }
 
 export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'

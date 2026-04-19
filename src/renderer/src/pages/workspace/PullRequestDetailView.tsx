@@ -36,9 +36,15 @@ import type {
   PullRequestMergeMethod,
   PullRequestReview,
   PullRequestReviewComment,
-  PullRequestReviewDraftComment
+  PullRequestReviewDraftComment,
+  PullRequestReviewThreadSummary
 } from '../../../../shared/types'
-import { buildDiffLineAgentContext, buildPullRequestAgentContext } from '../../lib/agentContext'
+import {
+  buildDiffLineAgentContext,
+  buildFixWithClaudePrompt,
+  buildPullRequestAgentContext,
+  type FixWithClaudeInput
+} from '../../lib/agentContext'
 import { cn } from '../../lib/cn'
 import type { PullRequestSubview } from '../../lib/workspaceTabs'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
@@ -47,6 +53,7 @@ import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
 import CommitActorStack, { getCommitActors } from '../../components/CommitActorStack'
+import FixWithClaudeButton from '../../components/FixWithClaudeButton'
 import Tooltip from '../../components/Tooltip'
 import MarkdownBody from './MarkdownBody'
 import PRCommitsTab from './PRCommitsTab'
@@ -130,6 +137,33 @@ export default function PullRequestDetailView({
     setDraftReviewComments([])
     setThreadJumpTarget(null)
   }, [number, owner, repo])
+
+  // When an agent session that was scoped to this PR completes, it likely
+  // pushed a new commit to the PR branch. Refetch the PR data so the diff,
+  // commit list, and review threads reflect the new HEAD.
+  const queryClient = useQueryClient()
+  const invalidatedSessionsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const prLabel = `PR #${number}`
+    const newlyCompleted = agentSessions.filter(
+      (session) =>
+        session.status === 'completed' &&
+        session.context?.source === 'pull-request' &&
+        session.context.label === prLabel &&
+        !invalidatedSessionsRef.current.has(session.id)
+    )
+    if (newlyCompleted.length === 0) return
+
+    for (const session of newlyCompleted) invalidatedSessionsRef.current.add(session.id)
+
+    void queryClient.invalidateQueries({ queryKey: ['pull-request', owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pull-request-files', owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pull-request-commits', owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pull-request-commit-authors', owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pull-request-review-comments', owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pull-request-comments', owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pull-request-review-threads', owner, repo, number] })
+  }, [agentSessions, owner, repo, number, queryClient])
 
   if (isLoading) return <p className="text-foreground-muted text-sm">Loading pull request...</p>
 
@@ -250,13 +284,18 @@ export default function PullRequestDetailView({
                 onContinueAgent={onContinueAgent}
                 onStopAgent={onStopAgent}
                 onPromoteAgent={onPromoteAgent}
+                onFixWithClaude={async (input) => {
+                  const context = buildPullRequestAgentContext({ owner, repo, pr })
+                  context.commentId = input.commentId
+                  await onStartAgent(buildFixWithClaudePrompt(input), undefined, context)
+                }}
               />
               {pr.merged && branchInfo?.name === pr.head.ref ? (
                 <MergedBranchSwitchBanner folderPath={folderPath} headBranch={pr.head.ref} baseBranch={pr.base.ref} />
               ) : null}
             </div>
             <div className="hidden w-48 shrink-0 lg:block">
-              <PRDetailSidebar pr={pr} />
+              <PRDetailSidebar pr={pr} owner={owner} repo={repo} />
             </div>
           </div>
         ) : null}
@@ -277,6 +316,11 @@ export default function PullRequestDetailView({
             onAskClaude={async (prompt, filePath, lineNumber, lineContent, side) => {
               const context = buildDiffLineAgentContext({ owner, repo, pr, filePath, lineNumber, lineContent, side })
               await onStartAgent(prompt, undefined, context)
+            }}
+            onFixWithClaude={async (input) => {
+              const context = buildPullRequestAgentContext({ owner, repo, pr })
+              context.commentId = input.commentId
+              await onStartAgent(buildFixWithClaudePrompt(input), undefined, context)
             }}
             onContinueAgent={onContinueAgent}
             onStopAgent={onStopAgent}
@@ -331,7 +375,8 @@ function PRConversationTab({
   onStartAgent,
   onContinueAgent,
   onStopAgent,
-  onPromoteAgent
+  onPromoteAgent,
+  onFixWithClaude
 }: {
   pr: PullRequestDetail
   owner: string
@@ -342,6 +387,7 @@ function PRConversationTab({
   onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent: (sessionId: string) => Promise<void>
   onPromoteAgent: (sessionId: string) => void
+  onFixWithClaude: (input: FixWithClaudeInput) => Promise<void>
 }) {
   const { data: prFiles } = useQuery<PullRequestFile[], Error>({
     queryKey: ['pull-request-files', owner, repo, pr.number],
@@ -349,11 +395,16 @@ function PRConversationTab({
     retry: false
   })
 
-  // Filter workspace sessions to find this PR's inline agents (exclude diff-line sessions)
+  // Filter workspace sessions to find this PR's inline agents (exclude diff-line sessions
+  // and comment-tied sessions — those are rendered inside their originating comment card).
   const prLabel = `PR #${pr.number}`
   const inlineSessions = agentSessions.filter(
     (s) =>
-      s.context?.source === 'pull-request' && s.context.label === prLabel && s.context.inline && !s.context.filePath
+      s.context?.source === 'pull-request' &&
+      s.context.label === prLabel &&
+      s.context.inline &&
+      !s.context.filePath &&
+      s.context.commentId === undefined
   )
 
   const handleAskClaude = async (prompt: string): Promise<void> => {
@@ -377,6 +428,11 @@ function PRConversationTab({
   } = useQuery<PullRequestReviewComment[], Error>({
     queryKey: ['pull-request-review-comments', owner, repo, pr.number],
     queryFn: () => window.api.github.pullComments.listForPull(owner, repo, pr.number),
+    retry: false
+  })
+  const { data: reviewThreadSummaries } = useQuery<PullRequestReviewThreadSummary[], Error>({
+    queryKey: ['pull-request-review-threads', owner, repo, pr.number],
+    queryFn: () => window.api.github.pullComments.listReviewThreads(owner, repo, pr.number),
     retry: false
   })
   const {
@@ -412,7 +468,8 @@ function PRConversationTab({
     comments ?? [],
     reviewComments ?? [],
     reviews ?? [],
-    commitsData?.items ?? []
+    commitsData?.items ?? [],
+    reviewThreadSummaries
   )
   const conversationError = commentsError ?? reviewCommentsError ?? reviewsError ?? commitsError
   const isLoadingConversation = isLoadingComments || isLoadingReviewComments || isLoadingReviews || isLoadingCommits
@@ -445,8 +502,13 @@ function PRConversationTab({
           repo={repo}
           prNumber={pr.number}
           resolvedAuthors={resolvedAuthors}
+          agentSessions={agentSessions}
           onViewReviewThread={onViewReviewThread}
           onQuoteReply={handleQuoteReply}
+          onFixWithClaude={onFixWithClaude}
+          onStopAgent={onStopAgent}
+          onContinueAgent={onContinueAgent}
+          onPromoteAgent={onPromoteAgent}
         />
       ))}
 
@@ -501,10 +563,11 @@ function buildPullRequestTimelineItems(
   comments: PullRequestComment[],
   reviewComments: PullRequestReviewComment[],
   reviews: PullRequestReview[],
-  commits: PullRequestCommit[]
+  commits: PullRequestCommit[],
+  threadSummaries: PullRequestReviewThreadSummary[] | undefined
 ): PullRequestTimelineItem[] {
   const threadsByReviewId = new Map<number, PullRequestReviewThread[]>()
-  const threads = buildPullRequestReviewThreads(reviewComments)
+  const threads = buildPullRequestReviewThreads(reviewComments, threadSummaries)
 
   for (const thread of threads) {
     const reviewThreads = threadsByReviewId.get(thread.topLevelComment.pull_request_review_id) ?? []
@@ -566,16 +629,26 @@ function PullRequestTimelineCard({
   repo,
   prNumber,
   resolvedAuthors,
+  agentSessions,
   onViewReviewThread,
-  onQuoteReply
+  onQuoteReply,
+  onFixWithClaude,
+  onStopAgent,
+  onContinueAgent,
+  onPromoteAgent
 }: {
   item: PullRequestTimelineItem
   owner: string
   repo: string
   prNumber: number
   resolvedAuthors: PullRequestCommitAuthors | undefined
+  agentSessions: AgentSession[]
   onViewReviewThread: (thread: PullRequestReviewThread) => void
   onQuoteReply: (quoted: string) => void
+  onFixWithClaude: (input: FixWithClaudeInput) => Promise<void>
+  onStopAgent: (sessionId: string) => Promise<void>
+  onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onPromoteAgent: (sessionId: string) => void
 }) {
   if (item.type === 'issue-comment') {
     return (
@@ -584,7 +657,12 @@ function PullRequestTimelineCard({
         owner={owner}
         repo={repo}
         prNumber={prNumber}
+        agentSessions={agentSessions}
         onQuoteReply={onQuoteReply}
+        onFixWithClaude={onFixWithClaude}
+        onStopAgent={onStopAgent}
+        onContinueAgent={onContinueAgent}
+        onPromoteAgent={onPromoteAgent}
       />
     )
   }
@@ -632,6 +710,11 @@ function PullRequestTimelineCard({
                 prNumber={prNumber}
                 onViewReviewThread={onViewReviewThread}
                 onQuoteReply={onQuoteReply}
+                onFixWithClaude={onFixWithClaude}
+                agentSessions={agentSessions}
+                onStopAgent={onStopAgent}
+                onContinueAgent={onContinueAgent}
+                onPromoteAgent={onPromoteAgent}
               />
             ))}
           </div>
@@ -713,14 +796,25 @@ function IssueCommentCard({
   owner,
   repo,
   prNumber,
-  onQuoteReply
+  agentSessions,
+  onQuoteReply,
+  onFixWithClaude,
+  onStopAgent,
+  onContinueAgent,
+  onPromoteAgent
 }: {
   comment: PullRequestComment
   owner: string
   repo: string
   prNumber: number
+  agentSessions: AgentSession[]
   onQuoteReply: (quoted: string) => void
+  onFixWithClaude: (input: FixWithClaudeInput) => Promise<void>
+  onStopAgent: (sessionId: string) => Promise<void>
+  onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onPromoteAgent: (sessionId: string) => void
 }) {
+  const commentSessions = agentSessions.filter((s) => s.context?.commentId === comment.id)
   const [isEditing, setIsEditing] = useState(false)
   return (
     <div className="border-border bg-surface rounded-lg border">
@@ -760,9 +854,29 @@ function IssueCommentCard({
       ) : (
         <MarkdownBody className="p-4">{comment.body}</MarkdownBody>
       )}
-      <div className="px-4 pb-2">
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
         <ReactionBar owner={owner} repo={repo} commentId={comment.id} commentType="issue-comment" />
+        <FixWithClaudeButton
+          onClick={() =>
+            onFixWithClaude({
+              commentId: comment.id,
+              body: comment.body,
+              author: comment.user.login
+            })
+          }
+        />
       </div>
+      {commentSessions.map((session) => (
+        <div key={session.id} className="border-border border-t">
+          <InlineAgentResponseCard
+            session={session}
+            variant="nested"
+            onStop={() => onStopAgent(session.id)}
+            onContinue={(prompt) => onContinueAgent(session.id, prompt)}
+            onOpenInChat={() => onPromoteAgent(session.id)}
+          />
+        </div>
+      ))}
     </div>
   )
 }
@@ -1521,7 +1635,32 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
   )
 }
 
-function PRDetailSidebar({ pr }: { pr: PullRequestDetail }) {
+function PRDetailSidebar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string; repo: string }) {
+  // Reuse the same queryKeys as `PRConversationTab` so react-query dedupes —
+  // these are already loaded by the conversation view and don't refetch here.
+  const { data: comments } = useQuery<PullRequestComment[]>({
+    queryKey: ['pull-request-comments', owner, repo, pr.number],
+    queryFn: () => window.api.github.pullComments.listIssueComments(owner, repo, pr.number),
+    retry: false
+  })
+  const { data: reviewComments } = useQuery<PullRequestReviewComment[]>({
+    queryKey: ['pull-request-review-comments', owner, repo, pr.number],
+    queryFn: () => window.api.github.pullComments.listForPull(owner, repo, pr.number),
+    retry: false
+  })
+  const { data: reviews } = useQuery<PullRequestReview[]>({
+    queryKey: ['pull-request-reviews', owner, repo, pr.number],
+    queryFn: () => window.api.github.reviews.list(owner, repo, pr.number),
+    retry: false
+  })
+
+  const participantsMap = new Map<string, { login: string; avatar_url: string }>()
+  participantsMap.set(pr.user.login, pr.user)
+  for (const c of comments ?? []) if (c.user) participantsMap.set(c.user.login, c.user)
+  for (const r of reviews ?? []) if (r.user) participantsMap.set(r.user.login, r.user)
+  for (const rc of reviewComments ?? []) if (rc.user) participantsMap.set(rc.user.login, rc.user)
+  const participants = Array.from(participantsMap.values())
+
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -1573,6 +1712,19 @@ function PRDetailSidebar({ pr }: { pr: PullRequestDetail }) {
         ) : (
           <p className="text-foreground-subtle text-xs">None yet</p>
         )}
+      </div>
+
+      <div>
+        <p className="text-foreground-muted mb-2 text-xs font-medium">
+          {participants.length} participant{participants.length !== 1 ? 's' : ''}
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {participants.map((p) => (
+            <Tooltip key={p.login} label={p.login} side="top">
+              <img src={p.avatar_url} alt={p.login} className="size-5 rounded-full" />
+            </Tooltip>
+          ))}
+        </div>
       </div>
     </div>
   )

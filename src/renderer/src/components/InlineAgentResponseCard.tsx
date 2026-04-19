@@ -3,7 +3,7 @@ import { ArrowUp, ChevronRight, ExternalLink, Square } from 'lucide-react'
 import type { AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import claudeLogoUrl from '../assets/claude.png'
-import AgentMessageBlock, { UserBubble } from '../pages/workspace/AgentMessageBlock'
+import AgentMessageBlock, { eventHasVisibleResponse, FILE_EDIT_TOOLS, UserBubble } from '../pages/workspace/AgentMessageBlock'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
 import Tooltip from './Tooltip'
 
@@ -30,12 +30,14 @@ export default function InlineAgentResponseCard({
   session,
   onStop,
   onContinue,
-  onOpenInChat
+  onOpenInChat,
+  variant = 'standalone'
 }: {
   session: AgentSession
   onStop: () => void
   onContinue: (prompt: string) => void
   onOpenInChat: () => void
+  variant?: 'standalone' | 'nested'
 }) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
@@ -48,7 +50,10 @@ export default function InlineAgentResponseCard({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [session.events.length])
 
-  // Separate thinking steps from the final response
+  // Separate thinking steps from the response. File-edit tool uses (Edit/Write/MultiEdit)
+  // are rendered inline in the response area; other tool uses stay in the collapsible
+  // thinking accordion. An event can appear in both lists — response renders only the
+  // visible blocks, thinking renders only the hidden tool uses.
   const thinkingEvents: AgentStreamEvent[] = []
   const responseEvents: AgentStreamEvent[] = []
   let thinkingStepCount = 0
@@ -56,18 +61,19 @@ export default function InlineAgentResponseCard({
 
   for (const event of session.events) {
     if (event.type === 'assistant') {
-      const hasToolUse = event.message.content.some((b) => b.type === 'tool_use')
-      if (hasToolUse) {
-        thinkingEvents.push(event)
-        for (const b of event.message.content) {
-          if (b.type === 'tool_use') {
+      const hasVisible = eventHasVisibleResponse(event)
+      let hasHiddenToolUse = false
+      for (const b of event.message.content) {
+        if (b.type === 'tool_use') {
+          if (!FILE_EDIT_TOOLS.has(b.name)) {
+            hasHiddenToolUse = true
             thinkingStepCount++
             latestThinkingLabel = getThinkingStepLabel(b.name, b.input)
           }
         }
-      } else {
-        responseEvents.push(event)
       }
+      if (hasVisible) responseEvents.push(event)
+      if (hasHiddenToolUse) thinkingEvents.push(event)
     } else if (event.type === 'user') {
       const hasText = event.message.content.some((b) => b.type === 'text')
       if (hasText) {
@@ -104,8 +110,18 @@ export default function InlineAgentResponseCard({
   }
 
   return (
-    <div className="border-border bg-surface rounded-lg border">
-      <div className="border-border flex items-center gap-2 border-b px-4 py-3">
+    <div
+      className={cn(
+        'bg-surface',
+        variant === 'standalone' && 'border-border rounded-lg border'
+      )}
+    >
+      <div
+        className={cn(
+          'flex items-center gap-2 px-4 py-3',
+          variant === 'standalone' && 'border-border border-b'
+        )}
+      >
         <img src={claudeLogoUrl} alt="Claude" className="size-6 rounded-full" />
         <span className="text-foreground text-sm font-medium">Claude</span>
         <div className="ml-auto flex items-center gap-1.5">
@@ -135,8 +151,16 @@ export default function InlineAgentResponseCard({
       </div>
 
       <div className="px-4 py-3">
-        {/* User prompt as a message bubble */}
-        <UserBubble text={session.prompt} />
+        {/* For Fix-with-Claude sessions the comment itself sits right above this card,
+             so skip the full prompt bubble and show a compact chip instead. */}
+        {session.context?.commentId !== undefined ? (
+          <div className="text-foreground-muted mb-3 flex items-center gap-1.5 text-xs">
+            <img src={claudeLogoUrl} alt="" className="size-3 shrink-0" />
+            <span>Fixing this comment</span>
+          </div>
+        ) : (
+          <UserBubble text={session.prompt} />
+        )}
         {/* While thinking and no response yet: show latest step */}
         {isRunning && !hasResponse && thinkingStepCount > 0 && (
           <div className="text-accent flex items-center gap-2 py-1">
@@ -179,9 +203,9 @@ export default function InlineAgentResponseCard({
           </div>
         )}
 
-        {/* The actual response */}
+        {/* The actual response — text and file-edit tool uses only */}
         {responseEvents.map((event, i) => (
-          <AgentMessageBlock key={`response-${i}`} event={event} inlineToolIds={new Set()} />
+          <AgentMessageBlock key={`response-${i}`} event={event} inlineToolIds={new Set()} visibleOnly />
         ))}
 
         {/* Streaming indicator when response is coming in */}
@@ -194,7 +218,6 @@ export default function InlineAgentResponseCard({
         {lastResultEvent && !isRunning && (
           <div className="text-foreground-subtle mt-2 flex items-center gap-3 text-xs">
             <span>{(lastResultEvent.duration_ms / 1000).toFixed(1)}s</span>
-            <span>${lastResultEvent.total_cost_usd.toFixed(4)}</span>
           </div>
         )}
 

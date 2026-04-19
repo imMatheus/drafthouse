@@ -3,6 +3,43 @@ import { prStateLabel } from './prMentions'
 
 const MAX_FILES_IN_PROMPT = 50
 
+export interface FixWithClaudeInput {
+  commentId: number
+  body: string
+  author: string
+  filePath?: string
+  line?: number | null
+  diffHunk?: string | null
+}
+
+export function buildFixWithClaudePrompt(input: FixWithClaudeInput): string {
+  const { body, author, filePath, line, diffHunk } = input
+  const lines: string[] = [
+    `The following PR comment needs to be addressed. Read it carefully, make the necessary code changes, and commit the fix directly to the PR branch.`,
+    ``,
+    `## Comment from @${author}`,
+    ``,
+    body
+      .split('\n')
+      .map((l) => `> ${l}`)
+      .join('\n')
+  ]
+
+  if (filePath) {
+    lines.push('', '## Location', `- File: \`${filePath}\``)
+    if (line != null) lines.push(`- Line: ${line}`)
+    if (diffHunk) {
+      lines.push('', '## Diff hunk', '```diff', diffHunk, '```')
+    }
+  }
+
+  lines.push(
+    '',
+    'Follow the worktree workflow from your instructions: implement the change, commit it with a concise message describing the fix, and push to the PR branch.'
+  )
+  return lines.join('\n')
+}
+
 export function buildPullRequestAgentContext(params: {
   owner: string
   repo: string

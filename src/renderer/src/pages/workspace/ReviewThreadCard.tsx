@@ -9,6 +9,12 @@ import { getMonacoTheme, getMonacoLanguage, BASE_DIFF_OPTIONS } from '../../lib/
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
+import FixWithClaudeButton from '../../components/FixWithClaudeButton'
+import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
+import ResolveThreadButton from '../../components/ResolveThreadButton'
+import type { AgentSession } from '../../../../shared/types'
+import type { FixWithClaudeInput } from '../../lib/agentContext'
+import { cn } from '../../lib/cn'
 import MarkdownBody from './MarkdownBody'
 import { splitDiffHunkToContents } from './pullRequestDiff'
 import { formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
@@ -20,7 +26,12 @@ export default function ReviewThreadCard({
   prNumber,
   onViewReviewThread,
   replyTarget,
-  onQuoteReply: externalQuoteReply
+  onQuoteReply: externalQuoteReply,
+  onFixWithClaude,
+  agentSessions,
+  onStopAgent,
+  onContinueAgent,
+  onPromoteAgent
 }: {
   thread: PullRequestReviewThread
   owner?: string
@@ -29,6 +40,11 @@ export default function ReviewThreadCard({
   onViewReviewThread?: (thread: PullRequestReviewThread) => void
   replyTarget?: { owner: string; repo: string; number: number }
   onQuoteReply?: (quoted: string) => void
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
+  agentSessions?: AgentSession[]
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
 }) {
   const { topLevelComment, replies } = thread
   const resolvedOwner = owner ?? replyTarget?.owner
@@ -51,6 +67,7 @@ export default function ReviewThreadCard({
   const renderComment = (comment: PullRequestReviewComment, isReply: boolean): React.ReactNode => {
     const canShowMenu = resolvedOwner && resolvedRepo && resolvedNumber !== undefined
     const isEditing = editingId === comment.id
+    const commentSessions = (agentSessions ?? []).filter((s) => s.context?.commentId === comment.id)
 
     return (
       <>
@@ -95,13 +112,70 @@ export default function ReviewThreadCard({
           )}
         </div>
         {resolvedOwner && resolvedRepo ? (
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <ReactionBar
               owner={resolvedOwner}
               repo={resolvedRepo}
               commentId={comment.id}
               commentType="pull-comment"
             />
+            {onFixWithClaude ? (
+              <FixWithClaudeButton
+                onClick={() =>
+                  onFixWithClaude({
+                    commentId: comment.id,
+                    body: comment.body,
+                    author: comment.user.login,
+                    filePath: thread.path,
+                    line: thread.line,
+                    diffHunk: comment.diff_hunk
+                  })
+                }
+              />
+            ) : null}
+            {!isReply && resolvedOwner && resolvedRepo && resolvedNumber !== undefined ? (
+              <ResolveThreadButton
+                threadId={thread.graphqlId}
+                isResolved={thread.isResolved}
+                owner={resolvedOwner}
+                repo={resolvedRepo}
+                number={resolvedNumber}
+              />
+            ) : null}
+          </div>
+        ) : null}
+        {commentSessions.length > 0 ? (
+          <div className="border-border mt-4 -mx-4 -mb-4 border-t">
+            {commentSessions.map((session) => (
+              <div key={session.id}>
+                <InlineAgentResponseCard
+                  session={session}
+                  variant="nested"
+                  onStop={() => onStopAgent?.(session.id)}
+                  onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                  onOpenInChat={() => onPromoteAgent?.(session.id)}
+                />
+                {session.status === 'completed' &&
+                !isReply &&
+                resolvedOwner &&
+                resolvedRepo &&
+                resolvedNumber !== undefined &&
+                thread.graphqlId &&
+                !thread.isResolved ? (
+                  <div className="border-border bg-background flex items-center justify-between gap-3 border-t px-4 py-3">
+                    <span className="text-foreground-muted text-xs">Claude is done. Mark this thread as resolved?</span>
+                    <ResolveThreadButton
+                      threadId={thread.graphqlId}
+                      isResolved={thread.isResolved}
+                      owner={resolvedOwner}
+                      repo={resolvedRepo}
+                      number={resolvedNumber}
+                      variant="solid"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ))}
           </div>
         ) : null}
       </>
@@ -109,13 +183,23 @@ export default function ReviewThreadCard({
   }
 
   return (
-    <div className="border-border bg-surface overflow-hidden rounded-xl border">
+    <div
+      className={cn(
+        'border-border bg-surface overflow-hidden rounded-xl border',
+        thread.isResolved && 'opacity-70'
+      )}
+    >
       <div className="border-border bg-interactive flex items-center justify-between gap-3 border-b px-4 py-2">
         <div className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">
           <span className="truncate">
             {thread.path}
             {thread.line !== null ? <span className="text-foreground-muted">:{thread.line}</span> : null}
           </span>
+          {thread.isResolved ? (
+            <span className="border-success/40 bg-success/10 text-success shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+              Resolved
+            </span>
+          ) : null}
           {thread.isOutdated ? (
             <span
               title="The line this comment was anchored to no longer exists in the latest diff"

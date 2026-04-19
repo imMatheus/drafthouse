@@ -68,6 +68,101 @@ export function registerPullCommentsHandlers(): void {
     }
   )
 
+  // List review threads via GraphQL — gives us thread IDs + isResolved state
+  // that the REST API doesn't expose. Correlated to REST comments via databaseId.
+  ipcMain.handle(
+    'github:pull-comments:list-review-threads',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      number: number
+    ): Promise<Array<{ id: string; isResolved: boolean; commentDatabaseIds: number[] }>> => {
+      const token = requireAuth()
+      const results: Array<{ id: string; isResolved: boolean; commentDatabaseIds: number[] }> = []
+      let cursor: string | null = null
+
+      while (true) {
+        const data = await fetchGitHubGraphQL<{
+          repository: {
+            pullRequest: {
+              reviewThreads: {
+                nodes: Array<{
+                  id: string
+                  isResolved: boolean
+                  comments: { nodes: Array<{ databaseId: number | null }> }
+                }>
+                pageInfo: { hasNextPage: boolean; endCursor: string | null }
+              }
+            }
+          }
+        }>(
+          token,
+          `query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                reviewThreads(first: 100, after: $cursor) {
+                  nodes {
+                    id
+                    isResolved
+                    comments(first: 100) { nodes { databaseId } }
+                  }
+                  pageInfo { hasNextPage endCursor }
+                }
+              }
+            }
+          }`,
+          { owner, name: repo, number, cursor },
+          `Failed to load review threads for PR #${number}`
+        )
+
+        const connection = data.repository.pullRequest.reviewThreads
+        for (const node of connection.nodes) {
+          results.push({
+            id: node.id,
+            isResolved: node.isResolved,
+            commentDatabaseIds: node.comments.nodes
+              .map((c) => c.databaseId)
+              .filter((id): id is number => id != null)
+          })
+        }
+
+        if (!connection.pageInfo.hasNextPage || !connection.pageInfo.endCursor) break
+        cursor = connection.pageInfo.endCursor
+      }
+
+      return results
+    }
+  )
+
+  // Resolve a review thread (GraphQL)
+  ipcMain.handle(
+    'github:pull-comments:resolve-thread',
+    async (_event, threadId: string): Promise<void> => {
+      const token = requireAuth()
+      await fetchGitHubGraphQL(
+        token,
+        `mutation($id: ID!) { resolveReviewThread(input: { threadId: $id }) { thread { isResolved } } }`,
+        { id: threadId },
+        'Failed to resolve review thread'
+      )
+    }
+  )
+
+  // Unresolve a review thread (GraphQL)
+  ipcMain.handle(
+    'github:pull-comments:unresolve-thread',
+    async (_event, threadId: string): Promise<void> => {
+      const token = requireAuth()
+      await fetchGitHubGraphQL(
+        token,
+        `mutation($id: ID!) { unresolveReviewThread(input: { threadId: $id }) { thread { isResolved } } }`,
+        { id: threadId },
+        'Failed to unresolve review thread'
+      )
+    }
+  )
+
   // Minimize a comment (Hide) — works for both issue and review comments.
   // GraphQL: minimizeComment(subjectId, classifier)
   ipcMain.handle(

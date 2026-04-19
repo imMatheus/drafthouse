@@ -12,11 +12,31 @@ import AgentEditDiffBlock from './AgentEditDiffBlock'
 import MarkdownBody from './MarkdownBody'
 import HighlightedMentionText from '../../components/HighlightedMentionText'
 
-export function UserBubble({ text }: { text: string }) {
+export const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit'])
+
+export function isVisibleResponseBlock(block: AgentContentBlock): boolean {
+  if (block.type === 'text') return typeof block.text === 'string' && block.text.trim().length > 0
+  if (block.type === 'tool_use') return FILE_EDIT_TOOLS.has(block.name)
+  return false
+}
+
+export function eventHasVisibleResponse(event: AgentStreamEvent): boolean {
+  if (event.type === 'assistant') return event.message.content.some(isVisibleResponseBlock)
+  if (event.type === 'user') return event.message.content.some((b) => b.type === 'text')
+  return false
+}
+
+export function UserBubble({ text, markdown }: { text: string; markdown?: boolean }) {
   return (
     <div className="mt-2 mb-3 flex justify-end">
-      <div className="bg-interactive text-foreground max-w-[80%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap">
-        <HighlightedMentionText text={text} />
+      <div className="bg-interactive text-foreground max-w-[80%] rounded-2xl px-3 py-2 text-sm">
+        {markdown ? (
+          <MarkdownBody>{text}</MarkdownBody>
+        ) : (
+          <span className="whitespace-pre-wrap">
+            <HighlightedMentionText text={text} />
+          </span>
+        )}
       </div>
     </div>
   )
@@ -25,12 +45,14 @@ export function UserBubble({ text }: { text: string }) {
 interface AgentMessageBlockProps {
   event: AgentStreamEvent
   inlineToolIds: Set<string>
+  /** When true, only render text and file-edit tool uses (Edit/Write/MultiEdit) */
+  visibleOnly?: boolean
 }
 
-export default function AgentMessageBlock({ event, inlineToolIds }: AgentMessageBlockProps) {
+export default function AgentMessageBlock({ event, inlineToolIds, visibleOnly }: AgentMessageBlockProps) {
   switch (event.type) {
     case 'assistant':
-      return <AssistantMessage event={event} />
+      return <AssistantMessage event={event} visibleOnly={visibleOnly} />
     case 'user':
       return <UserMessage event={event} inlineToolIds={inlineToolIds} />
     case 'system':
@@ -42,10 +64,12 @@ export default function AgentMessageBlock({ event, inlineToolIds }: AgentMessage
   }
 }
 
-function AssistantMessage({ event }: { event: AgentStreamAssistant }) {
+function AssistantMessage({ event, visibleOnly }: { event: AgentStreamAssistant; visibleOnly?: boolean }) {
+  const blocks = visibleOnly ? event.message.content.filter(isVisibleResponseBlock) : event.message.content
+  if (blocks.length === 0) return null
   return (
     <div className="mb-4">
-      {event.message.content.map((block, i) => (
+      {blocks.map((block, i) => (
         <ContentBlock key={i} block={block} />
       ))}
     </div>
@@ -84,7 +108,7 @@ function ContentBlock({ block }: { block: AgentContentBlock }) {
   switch (block.type) {
     case 'text':
       return <MarkdownBody className="p-4">{block.text}</MarkdownBody>
-    case 'tool_use':
+    case 'tool_use': {
       if (
         block.name === 'Edit' &&
         typeof block.input.file_path === 'string' &&
@@ -99,10 +123,40 @@ function ContentBlock({ block }: { block: AgentContentBlock }) {
           />
         )
       }
+      if (block.name === 'Write' && typeof block.input.file_path === 'string' && typeof block.input.content === 'string') {
+        return (
+          <AgentEditDiffBlock
+            filePath={block.input.file_path}
+            oldString=""
+            newString={block.input.content}
+            toolLabel="Write"
+          />
+        )
+      }
+      if (block.name === 'MultiEdit' && typeof block.input.file_path === 'string' && Array.isArray(block.input.edits)) {
+        const filePath = block.input.file_path
+        const edits = block.input.edits as Array<{ old_string?: unknown; new_string?: unknown }>
+        return (
+          <>
+            {edits.map((edit, i) =>
+              typeof edit.old_string === 'string' && typeof edit.new_string === 'string' ? (
+                <AgentEditDiffBlock
+                  key={i}
+                  filePath={filePath}
+                  oldString={edit.old_string}
+                  newString={edit.new_string}
+                  toolLabel="Edit"
+                />
+              ) : null
+            )}
+          </>
+        )
+      }
       if (block.name === 'Read' || block.name === 'Glob' || block.name === 'Grep') {
         return <InlineToolBlock name={block.name} input={block.input} />
       }
       return <ToolUseBlock name={block.name} input={block.input} />
+    }
     case 'tool_result':
       return <ToolResultBlock content={block.content} />
     default:

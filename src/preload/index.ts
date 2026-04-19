@@ -196,6 +196,12 @@ const api = {
         ipcRenderer.invoke('github:pull-comments:delete-issue-comment', owner, repo, commentId),
       minimize: (nodeId: string, classifier: string): Promise<unknown> =>
         ipcRenderer.invoke('github:pull-comments:minimize', nodeId, classifier),
+      listReviewThreads: (owner: string, repo: string, number: number): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:list-review-threads', owner, repo, number),
+      resolveThread: (threadId: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:resolve-thread', threadId),
+      unresolveThread: (threadId: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:pull-comments:unresolve-thread', threadId),
       listForPull: (
         owner: string,
         repo: string,
