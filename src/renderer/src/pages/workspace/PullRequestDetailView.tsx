@@ -635,7 +635,7 @@ function IssueCommentCard({
       ) : (
         <MarkdownBody className="p-4">{comment.body}</MarkdownBody>
       )}
-      <div className="border-border border-t px-4 py-2">
+      <div className="px-4 pb-2">
         <ReactionBar owner={owner} repo={repo} commentId={comment.id} commentType="issue-comment" />
       </div>
     </div>
@@ -773,44 +773,84 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
           {editTab === 'write' ? (
             <div className="flex items-center gap-0.5">
               <Tooltip label="Heading" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('### ')} aria-label="Heading">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('### ')}
+                  aria-label="Heading"
+                >
                   <Heading size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Bold" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('**', '**', 'bold text')} aria-label="Bold">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('**', '**', 'bold text')}
+                  aria-label="Bold"
+                >
                   <Bold size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Italic" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('_', '_', 'italic text')} aria-label="Italic">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('_', '_', 'italic text')}
+                  aria-label="Italic"
+                >
                   <Italic size={14} />
                 </button>
               </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
               <Tooltip label="Unordered list" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('- ')} aria-label="Unordered list">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('- ')}
+                  aria-label="Unordered list"
+                >
                   <List size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Ordered list" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('1. ')} aria-label="Ordered list">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('1. ')}
+                  aria-label="Ordered list"
+                >
                   <ListOrdered size={14} />
                 </button>
               </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
               <Tooltip label="Code" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('`', '`', 'code')} aria-label="Code">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('`', '`', 'code')}
+                  aria-label="Code"
+                >
                   <Code size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Link" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('[', '](url)', 'link text')} aria-label="Link">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('[', '](url)', 'link text')}
+                  aria-label="Link"
+                >
                   <Link size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Quote" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')} aria-label="Quote">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('> ')}
+                  aria-label="Quote"
+                >
                   <Quote size={14} />
                 </button>
               </Tooltip>
@@ -1011,44 +1051,84 @@ function CommentBox({
           {activeTab === 'write' ? (
             <div className="flex items-center gap-0.5">
               <Tooltip label="Heading" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('### ')} aria-label="Heading">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('### ')}
+                  aria-label="Heading"
+                >
                   <Heading size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Bold" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('**', '**', 'bold text')} aria-label="Bold">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('**', '**', 'bold text')}
+                  aria-label="Bold"
+                >
                   <Bold size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Italic" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('_', '_', 'italic text')} aria-label="Italic">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('_', '_', 'italic text')}
+                  aria-label="Italic"
+                >
                   <Italic size={14} />
                 </button>
               </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
               <Tooltip label="Unordered list" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('- ')} aria-label="Unordered list">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('- ')}
+                  aria-label="Unordered list"
+                >
                   <List size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Ordered list" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('1. ')} aria-label="Ordered list">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('1. ')}
+                  aria-label="Ordered list"
+                >
                   <ListOrdered size={14} />
                 </button>
               </Tooltip>
               <div className="bg-border mx-1 h-4 w-px" />
               <Tooltip label="Code" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('`', '`', 'code')} aria-label="Code">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('`', '`', 'code')}
+                  aria-label="Code"
+                >
                   <Code size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Link" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => wrapSelection('[', '](url)', 'link text')} aria-label="Link">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => wrapSelection('[', '](url)', 'link text')}
+                  aria-label="Link"
+                >
                   <Link size={14} />
                 </button>
               </Tooltip>
               <Tooltip label="Quote" side="top">
-                <button type="button" className={toolbarBtnClass} onClick={() => insertAtLineStart('> ')} aria-label="Quote">
+                <button
+                  type="button"
+                  className={toolbarBtnClass}
+                  onClick={() => insertAtLineStart('> ')}
+                  aria-label="Quote"
+                >
                   <Quote size={14} />
                 </button>
               </Tooltip>
