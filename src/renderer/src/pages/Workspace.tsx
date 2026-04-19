@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Files, GitBranch, GitGraph, Terminal } from 'lucide-react'
-import { Navigate } from 'react-router-dom'
 import type { AgentContext, AgentSession, GitChangedFile, GitRepoInfo } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
@@ -33,16 +32,12 @@ import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
 
 interface WorkspaceProps {
-  session: WorkspaceSession | null
+  session: WorkspaceSession
   onCloseWorkspace: () => void
   onUpdateSession: (patch: Partial<WorkspaceSession>) => void
 }
 
 export default function Workspace({ session, onCloseWorkspace, onUpdateSession }: WorkspaceProps) {
-  if (!session) {
-    return <Navigate to="/" replace />
-  }
-
   const { folderPath, sidebar, tabs, activeTabId, activeView } = session
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
   const activeFilePath = activeTab?.kind === 'file' ? activeTab.path : null

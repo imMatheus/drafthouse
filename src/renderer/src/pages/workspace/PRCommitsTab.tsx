@@ -2,11 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCheck, ChevronLeft, ChevronRight, Copy, ExternalLink, GitCommit } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import type {
-  PaginatedPullRequestCommits,
-  PullRequestCommit,
-  PullRequestCommitAuthors
-} from '../../../../shared/types'
+import type { PaginatedPullRequestCommits, PullRequestCommit, PullRequestCommitAuthors } from '../../../../shared/types'
 import PlaceholderView from './PlaceholderView'
 import Tooltip from '../../components/Tooltip'
 import CommitActorStack, { formatCommitActorNames, getCommitActors } from '../../components/CommitActorStack'
@@ -321,4 +317,3 @@ function formatCommitGroupLabel(dateStr: string): string {
     year: 'numeric'
   }).format(new Date(dateStr))
 }
-

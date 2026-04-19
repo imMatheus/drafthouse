@@ -60,9 +60,7 @@ export default function Home({ onOpenFolder }: { onOpenFolder: (path: string) =>
 
         {recentFolders && recentFolders.length > 0 ? (
           <div className="w-full">
-            <h2 className="text-foreground-subtle mb-2 text-[11px] font-semibold tracking-wider uppercase">
-              Recent
-            </h2>
+            <h2 className="text-foreground-subtle mb-2 text-[11px] font-semibold tracking-wider uppercase">Recent</h2>
             <ul className="-mx-2 flex flex-col">
               {recentFolders.map((folder) => (
                 <li key={folder}>

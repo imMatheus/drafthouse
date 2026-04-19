@@ -138,39 +138,58 @@ export default function PRFilesTab({
   const trimmedFilter = filterValue.trim().toLowerCase()
   const filteredFiles =
     trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
-  const fileTree = useMemo(() => buildFileTree(filteredFiles), [filteredFiles])
-  const reviewThreads = buildPullRequestReviewThreads(reviewComments ?? [], reviewThreadSummaries)
+  const fileTree = buildFileTree(filteredFiles)
 
-  const threadsByFile = new Map<string, PullRequestReviewThread[]>()
-  for (const thread of reviewThreads) {
-    const fileThreads = threadsByFile.get(thread.path) ?? []
-    fileThreads.push(thread)
-    threadsByFile.set(thread.path, fileThreads)
-  }
+  const reviewThreads = useMemo(
+    () => buildPullRequestReviewThreads(reviewComments ?? [], reviewThreadSummaries),
+    [reviewComments, reviewThreadSummaries]
+  )
 
-  const commentCountsByFile = new Map<string, number>()
-  for (const comment of reviewComments ?? []) {
-    commentCountsByFile.set(comment.path, (commentCountsByFile.get(comment.path) ?? 0) + 1)
-  }
+  const threadsByFile = useMemo(() => {
+    const map = new Map<string, PullRequestReviewThread[]>()
+    for (const thread of reviewThreads) {
+      const fileThreads = map.get(thread.path) ?? []
+      fileThreads.push(thread)
+      map.set(thread.path, fileThreads)
+    }
+    return map
+  }, [reviewThreads])
 
-  const threadsByKey = new Map<string, PullRequestReviewThread[]>()
-  for (const thread of reviewThreads) {
-    if (thread.side == null || thread.line == null) continue
-    const key = getDiffThreadKey(thread.path, thread.side, thread.line)
-    const rowThreads = threadsByKey.get(key) ?? []
-    rowThreads.push(thread)
-    threadsByKey.set(key, rowThreads)
-  }
+  const commentCountsByFile = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const comment of reviewComments ?? []) {
+      map.set(comment.path, (map.get(comment.path) ?? 0) + 1)
+    }
+    return map
+  }, [reviewComments])
 
-  const threadsByCommentId = new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread]))
+  const threadsByKey = useMemo(() => {
+    const map = new Map<string, PullRequestReviewThread[]>()
+    for (const thread of reviewThreads) {
+      if (thread.side == null || thread.line == null) continue
+      const key = getDiffThreadKey(thread.path, thread.side, thread.line)
+      const rowThreads = map.get(key) ?? []
+      rowThreads.push(thread)
+      map.set(key, rowThreads)
+    }
+    return map
+  }, [reviewThreads])
 
-  const draftCommentsByKey = new Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>()
-  draftReviewComments.forEach((comment, index) => {
-    const key = getDiffThreadKey(comment.path, comment.side, comment.line)
-    const rowComments = draftCommentsByKey.get(key) ?? []
-    rowComments.push({ comment, index })
-    draftCommentsByKey.set(key, rowComments)
-  })
+  const threadsByCommentId = useMemo(
+    () => new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread])),
+    [reviewThreads]
+  )
+
+  const draftCommentsByKey = useMemo(() => {
+    const map = new Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>()
+    draftReviewComments.forEach((comment, index) => {
+      const key = getDiffThreadKey(comment.path, comment.side, comment.line)
+      const rowComments = map.get(key) ?? []
+      rowComments.push({ comment, index })
+      map.set(key, rowComments)
+    })
+    return map
+  }, [draftReviewComments])
 
   const filesErrorMessage = filesError ?? reviewCommentsError
   const isLoading = isLoadingFiles || isLoadingReviewComments
@@ -451,6 +470,8 @@ function PullRequestFileDiffCard({
 }) {
   const { theme } = useTheme()
   const { settings } = useSettings()
+  // Keep `diffShape` memoized — `parsedDiff` is a dep of the tokenization useEffect
+  // below, so a fresh reference every render would re-run tokenization on every render.
   const diffShape = useMemo(() => buildDiffShape(file), [file.patch, file.filename])
   const { parsed: parsedDiff, hunkGaps, beforeFirstGap, gapAfterByStartLine, pairsByHunkId } = diffShape
   const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
@@ -520,26 +541,33 @@ function PullRequestFileDiffCard({
   }
 
   // Determine anchored vs unanchored threads
-  const anchoredThreadIds = new Set<number>()
-  for (const hunk of parsedDiff.hunks) {
-    for (const line of hunk.lines) {
-      if (!line.commentSide || !line.commentLine) continue
-      const rowThreads = threadsByKey.get(getDiffThreadKey(file.filename, line.commentSide, line.commentLine)) ?? []
-      rowThreads.forEach((thread) => anchoredThreadIds.add(thread.id))
+  const anchoredThreadIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const hunk of parsedDiff.hunks) {
+      for (const line of hunk.lines) {
+        if (!line.commentSide || !line.commentLine) continue
+        const rowThreads = threadsByKey.get(getDiffThreadKey(file.filename, line.commentSide, line.commentLine)) ?? []
+        rowThreads.forEach((thread) => ids.add(thread.id))
+      }
     }
-  }
+    return ids
+  }, [parsedDiff, threadsByKey, file.filename])
+
   const unanchoredThreads = fileThreads.filter((thread) => !anchoredThreadIds.has(thread.id))
   const replyTarget = { owner, repo, number }
 
   // Index agent sessions by line number so diff rows don't filter the whole list each render
-  const sessionsByLineNumber = new Map<number, AgentSession[]>()
-  for (const session of fileAgentSessions) {
-    const lineNum = session.context?.lineNumber
-    if (typeof lineNum !== 'number') continue
-    const bucket = sessionsByLineNumber.get(lineNum)
-    if (bucket) bucket.push(session)
-    else sessionsByLineNumber.set(lineNum, [session])
-  }
+  const sessionsByLineNumber = useMemo(() => {
+    const map = new Map<number, AgentSession[]>()
+    for (const session of fileAgentSessions) {
+      const lineNum = session.context?.lineNumber
+      if (typeof lineNum !== 'number') continue
+      const bucket = map.get(lineNum)
+      if (bucket) bucket.push(session)
+      else map.set(lineNum, [session])
+    }
+    return map
+  }, [fileAgentSessions])
 
   const diffProps = {
     hunks: parsedDiff.hunks,
@@ -1034,7 +1062,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                           <button
                             type="button"
                             onClick={() => onOpenComment(isComposerOpen ? null : rowKey)}
-                            className="bg-accent absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover:inline-flex"
+                            className="bg-accent text-accent-foreground absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded group-hover:inline-flex"
                             aria-label="Add line comment"
                           >
                             <Plus size={12} />
@@ -1263,7 +1291,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             <button
                               type="button"
                               onClick={() => onOpenComment(isLeftComposerOpen ? null : leftKey)}
-                              className="bg-accent absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/left:inline-flex"
+                              className="bg-accent text-accent-foreground absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded group-hover/left:inline-flex"
                               aria-label="Add line comment"
                             >
                               <Plus size={12} />
@@ -1297,7 +1325,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             <button
                               type="button"
                               onClick={() => onOpenComment(isRightComposerOpen ? null : rightKey)}
-                              className="bg-accent absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded text-white group-hover/right:inline-flex"
+                              className="bg-accent text-accent-foreground absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded group-hover/right:inline-flex"
                               aria-label="Add line comment"
                             >
                               <Plus size={12} />
@@ -1330,7 +1358,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             {isLeft ? (
                               <>
                                 <td className="bg-danger/20" />
-                                <td className="border-border border-r bg-danger/10 p-1.5 align-top">
+                                <td className="border-border bg-danger/10 border-r p-1.5 align-top">
                                   <InlineDiffThread
                                     thread={thread}
                                     replyTarget={replyTarget}
@@ -1347,7 +1375,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             ) : (
                               <>
                                 <td className="bg-danger/20" />
-                                <td className="border-border border-r bg-danger/10" />
+                                <td className="border-border bg-danger/10 border-r" />
                                 <td className="bg-success/20" />
                                 <td className="bg-success/10 px-3 py-2 align-top">
                                   <InlineDiffThread
@@ -1369,7 +1397,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       {leftDrafts.map(({ comment, index }) => (
                         <tr key={`draft-left-${index}`}>
                           <td className="bg-danger/20" />
-                          <td className="border-border border-r bg-danger/10 px-3 py-3 align-top">
+                          <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
                             <DraftCommentCard
                               comment={comment}
                               auth={auth}
@@ -1383,7 +1411,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       {rightDrafts.map(({ comment, index }) => (
                         <tr key={`draft-right-${index}`}>
                           <td className="bg-danger/20" />
-                          <td className="border-border border-r bg-danger/10" />
+                          <td className="border-border bg-danger/10 border-r" />
                           <td className="bg-success/20" />
                           <td className="bg-success/10 px-3 py-3 align-top">
                             <DraftCommentCard
@@ -1398,7 +1426,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       {isLeftComposerOpen && leftKey && pair.left?.commentSide && pair.left.commentLine ? (
                         <tr>
                           <td className="bg-danger/20" />
-                          <td className="border-border border-r bg-danger/10 px-3 py-3 align-top">
+                          <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
                             <InlineDiffCommentComposer
                               owner={owner}
                               repo={repo}
@@ -1422,7 +1450,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       {isRightComposerOpen && rightKey && pair.right?.commentSide && pair.right.commentLine ? (
                         <tr>
                           <td className="bg-danger/20" />
-                          <td className="border-border border-r bg-danger/10" />
+                          <td className="border-border bg-danger/10 border-r" />
                           <td className="bg-success/20" />
                           <td className="bg-success/10 px-3 py-3 align-top">
                             <InlineDiffCommentComposer
@@ -1456,7 +1484,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             {session.context?.side === 'RIGHT' ? (
                               <>
                                 <td className="bg-danger/20" />
-                                <td className="border-border border-r bg-danger/10" />
+                                <td className="border-border bg-danger/10 border-r" />
                                 <td className="bg-success/20" />
                                 <td className="bg-success/10 px-3 py-3 align-top">
                                   <InlineAgentResponseCard
@@ -1470,7 +1498,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                             ) : (
                               <>
                                 <td className="bg-danger/20" />
-                                <td className="border-border border-r bg-danger/10 px-3 py-3 align-top">
+                                <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
                                   <InlineAgentResponseCard
                                     session={session}
                                     onStop={() => onStopAgent?.(session.id)}
@@ -1655,7 +1683,7 @@ function InlineDiffThread({
   const allComments = [thread.topLevelComment, ...thread.replies]
 
   return (
-    <div className="bg-surface p-3 space-y-2 rounded-md border border-border">
+    <div className="bg-surface border-border space-y-2 rounded-md border p-3">
       {allComments.map((comment) => (
         <div key={comment.id}>
           <div className="flex items-center gap-2">

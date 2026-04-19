@@ -112,7 +112,7 @@ export default function RepoSidebar() {
                       <img
                         src={repo.owner.avatar_url}
                         alt={repo.owner.login}
-                        className="h-4 w-4 shrink-0 rounded-full"
+                        className="size-4 shrink-0 rounded-full"
                       />
                       <span className="text-foreground-muted truncate text-xs">{repo.full_name}</span>
                     </button>
@@ -125,7 +125,7 @@ export default function RepoSidebar() {
           {/* Footer */}
           <div className="border-border border-t p-2">
             <div className="flex items-center gap-2">
-              <img src={user?.avatar_url} alt={user?.login} className="h-6 w-6 shrink-0 rounded-full" />
+              <img src={user?.avatar_url} alt={user?.login} className="size-6 shrink-0 rounded-full" />
               <div className="flex-1 overflow-hidden">
                 <p className="text-foreground truncate text-xs font-medium">{user?.name ?? user?.login}</p>
               </div>
@@ -164,7 +164,7 @@ export default function RepoSidebar() {
               {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
             </button>
           </Tooltip>
-          <img src={user?.avatar_url} alt={user?.login} className="h-6 w-6 rounded-full" />
+          <img src={user?.avatar_url} alt={user?.login} className="size-6 rounded-full" />
         </div>
       )}
     </aside>

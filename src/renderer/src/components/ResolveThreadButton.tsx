@@ -44,13 +44,7 @@ export default function ResolveThreadButton({
 
   if (!threadId) return null
 
-  const label = isPending
-    ? isResolved
-      ? 'Unresolving...'
-      : 'Resolving...'
-    : isResolved
-      ? 'Resolved'
-      : 'Resolve'
+  const label = isPending ? (isResolved ? 'Unresolving...' : 'Resolving...') : isResolved ? 'Resolved' : 'Resolve'
 
   if (variant === 'solid') {
     return (

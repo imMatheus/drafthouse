@@ -121,9 +121,7 @@ export function registerPullCommentsHandlers(): void {
           results.push({
             id: node.id,
             isResolved: node.isResolved,
-            commentDatabaseIds: node.comments.nodes
-              .map((c) => c.databaseId)
-              .filter((id): id is number => id != null)
+            commentDatabaseIds: node.comments.nodes.map((c) => c.databaseId).filter((id): id is number => id != null)
           })
         }
 
@@ -136,32 +134,26 @@ export function registerPullCommentsHandlers(): void {
   )
 
   // Resolve a review thread (GraphQL)
-  ipcMain.handle(
-    'github:pull-comments:resolve-thread',
-    async (_event, threadId: string): Promise<void> => {
-      const token = requireAuth()
-      await fetchGitHubGraphQL(
-        token,
-        `mutation($id: ID!) { resolveReviewThread(input: { threadId: $id }) { thread { isResolved } } }`,
-        { id: threadId },
-        'Failed to resolve review thread'
-      )
-    }
-  )
+  ipcMain.handle('github:pull-comments:resolve-thread', async (_event, threadId: string): Promise<void> => {
+    const token = requireAuth()
+    await fetchGitHubGraphQL(
+      token,
+      `mutation($id: ID!) { resolveReviewThread(input: { threadId: $id }) { thread { isResolved } } }`,
+      { id: threadId },
+      'Failed to resolve review thread'
+    )
+  })
 
   // Unresolve a review thread (GraphQL)
-  ipcMain.handle(
-    'github:pull-comments:unresolve-thread',
-    async (_event, threadId: string): Promise<void> => {
-      const token = requireAuth()
-      await fetchGitHubGraphQL(
-        token,
-        `mutation($id: ID!) { unresolveReviewThread(input: { threadId: $id }) { thread { isResolved } } }`,
-        { id: threadId },
-        'Failed to unresolve review thread'
-      )
-    }
-  )
+  ipcMain.handle('github:pull-comments:unresolve-thread', async (_event, threadId: string): Promise<void> => {
+    const token = requireAuth()
+    await fetchGitHubGraphQL(
+      token,
+      `mutation($id: ID!) { unresolveReviewThread(input: { threadId: $id }) { thread { isResolved } } }`,
+      { id: threadId },
+      'Failed to unresolve review thread'
+    )
+  })
 
   // Minimize a comment (Hide) — works for both issue and review comments.
   // GraphQL: minimizeComment(subjectId, classifier)

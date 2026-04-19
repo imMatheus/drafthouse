@@ -1,75 +1,32 @@
 import { defineConfig } from 'eslint/config'
+import tseslint from '@electron-toolkit/eslint-config-ts'
 import eslintConfigPrettier from '@electron-toolkit/eslint-config-prettier'
+import reactHooks from 'eslint-plugin-react-hooks'
 
 export default defineConfig(
-  { ignores: ['**/node_modules', '**/dist', '**/out'] },
-  {
-    settings: {
-      react: {
-        version: 'detect'
-      }
-    }
-  },
+  { ignores: ['**/node_modules', '**/dist', '**/out', '**/build'] },
+  ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
-    plugins: {},
+    plugins: {
+      'react-hooks': reactHooks
+    },
     rules: {
-      'no-unused-vars': 'allow',
-      'no-unused-labels': 'allow',
-      'no-extra-boolean-cast': 'allow',
-      'no-control-regex': 'allow',
+      // TypeScript already enforces unused locals/params via tsconfig.
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
 
-      'prefer-ts-expect-error': 'error',
-      'no-unnecessary-type-assertion': 'error',
-      'no-unreachable': 'error', // we use this instead of typescript's "allowUnreachableCode" (see tsconfig)
-      '@typescript-eslint/no-unsafe-assignment': 'error',
-      '@typescript-eslint/no-unsafe-return': 'error',
       '@typescript-eslint/no-explicit-any': 'error',
-      // there are too many anys in the codebase; gradually remove the inline suppressions
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-      '@typescript-eslint/prefer-nullish-coalescing': [
-        'error',
-        {
-          ignorePrimitives: {
-            boolean: true
-          }
-        }
-      ],
-      '@typescript-eslint/strict-boolean-expressions': [
-        'error',
-        {
-          allowNullableBoolean: true,
-          allowString: false // disable `!myString` and `!myNullableString`
-        }
-      ],
-      '@typescript-eslint/switch-exhaustiveness-check': [
-        'error',
-        {
-          allowDefaultCaseForExhaustiveSwitch: false,
-          considerDefaultExhaustiveForUnions: true,
-          requireDefaultForNonUnion: true
-        }
-      ],
-      '@typescript-eslint/no-unnecessary-condition': [
-        'error',
-        {
-          allowConstantLoopConditions: true
-        }
-      ],
-      'no-unused-expressions': [
-        'error',
-        {
-          allowTernary: true,
-          allowShortCircuit: true
-        }
-      ],
-      // "@typescript-eslint/no-base-to-string": "error", // enabled by default already. Prevents showing string [object Object]. This also lets us construct IDs from strings, without letting these IDs be subject to string manipulations
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-empty-object-type': 'off',
+      // The codebase consistently relies on inferred return types for React components
+      // and local helpers. Requiring explicit annotations would be noise.
+      '@typescript-eslint/explicit-function-return-type': 'off',
 
-      'react/rules-of-hooks': 'error',
-      'react/exhaustive-deps': 'off', // this is annoying and over-encourages immutability
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-unused-expressions': ['error', { allowTernary: true, allowShortCircuit: true }],
 
-      // gradually remove these rules
-      'no-floating-promises': 'off'
+      'react-hooks/rules-of-hooks': 'error'
     }
   },
   eslintConfigPrettier

@@ -11,5 +11,5 @@ interface AsciiArtProps {
 export default function AsciiArt({ alt = '', className }: AsciiArtProps) {
   const { theme } = useTheme()
   const src = theme === 'dark' ? asciiArtDark : asciiArtLight
-  return <img src={src} alt={alt} className={cn('w-56 h-48', className)} />
+  return <img src={src} alt={alt} className={cn('h-48 w-56', className)} />
 }

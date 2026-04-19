@@ -237,7 +237,7 @@ function AgentContextBox({ context }: { context: AgentContext }) {
   // Multi-PR mention context (from the agents view): render one row per PR.
   if (context.prs && context.prs.length > 1) {
     return (
-      <div className="border-border ml-auto bg-surface mb-2 flex w-max flex-col items-end gap-1.5 rounded-lg border px-3 py-2">
+      <div className="border-border bg-surface mb-2 ml-auto flex w-max flex-col items-end gap-1.5 rounded-lg border px-3 py-2">
         {context.prs.map((pr) => (
           <div key={pr.number} className="text-foreground flex items-center gap-1.5 text-xs">
             <PRStateIcon state={pr.state} size={13} />
@@ -252,7 +252,7 @@ function AgentContextBox({ context }: { context: AgentContext }) {
   if (!context.prNumber) return null
 
   return (
-    <div className="border-border ml-auto bg-surface mb-2 flex w-max flex-col items-end gap-x-4 gap-y-1.5 rounded-lg border px-3 py-2">
+    <div className="border-border bg-surface mb-2 ml-auto flex w-max flex-col items-end gap-x-4 gap-y-1.5 rounded-lg border px-3 py-2">
       <div className="text-foreground flex items-center gap-1.5 text-xs">
         <PRStateIcon state={context.prState ?? 'open'} size={13} />
         <span className="font-semibold">#{context.prNumber}</span>

@@ -32,11 +32,7 @@ export default function AgentView({
   const canContinue =
     activeSession !== null && activeSession.status !== 'running' && activeSession.cliSessionId !== null
 
-  const handleSubmit = async (
-    prompt: string,
-    files?: string[],
-    mentionedPRs?: PullRequestDetail[]
-  ): Promise<void> => {
+  const handleSubmit = async (prompt: string, files?: string[], mentionedPRs?: PullRequestDetail[]): Promise<void> => {
     if (canContinue) {
       const contextBlock =
         mentionedPRs && gitInfo ? buildMentionedPRContextBlock(gitInfo.owner, gitInfo.repo, mentionedPRs) : null

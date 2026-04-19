@@ -31,7 +31,7 @@ export default function ActivityBar({ items, onSettingsClick, settingsActive }: 
               <button
                 onClick={item.onClick}
                 className={cn(
-                  'relative flex h-10 w-10 items-center justify-center rounded-md transition-colors',
+                  'relative flex size-10 items-center justify-center rounded-md transition-colors',
                   item.active
                     ? 'bg-surface-hover text-foreground'
                     : 'text-foreground-subtle hover:bg-surface-hover hover:text-foreground'
@@ -40,7 +40,7 @@ export default function ActivityBar({ items, onSettingsClick, settingsActive }: 
               >
                 <Icon size={18} strokeWidth={1.75} />
                 {item.badge != null && item.badge > 0 && (
-                  <span className="bg-accent absolute right-0.5 bottom-0.5 flex items-center justify-center rounded-full px-1 text-[7px] font-bold text-white">
+                  <span className="bg-accent text-accent-foreground absolute right-0.5 bottom-0.5 flex items-center justify-center rounded-full px-1 text-[7px] font-bold">
                     {item.badge >= 1000 ? `${Math.floor(item.badge / 1000)}k+` : item.badge}
                   </span>
                 )}
@@ -55,7 +55,7 @@ export default function ActivityBar({ items, onSettingsClick, settingsActive }: 
           <button
             onClick={onSettingsClick}
             className={cn(
-              'flex h-10 w-10 items-center justify-center rounded-md transition-colors',
+              'flex size-10 items-center justify-center rounded-md transition-colors',
               settingsActive
                 ? 'bg-surface-hover text-foreground'
                 : 'text-foreground-subtle hover:bg-surface-hover hover:text-foreground'

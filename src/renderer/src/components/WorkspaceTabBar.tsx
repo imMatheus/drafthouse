@@ -47,7 +47,6 @@ export default function WorkspaceTabBar({
         {tabs.map((tab) => {
           const { icon, label } = getWorkspaceTabPresentation(tab)
           const isActive = tab.id === activeTabId
-          const isDragging = tab.id === dragTabId
           const isDropTarget = tab.id === dropTargetId && dragTabId !== null && dragTabId !== tab.id
 
           return (

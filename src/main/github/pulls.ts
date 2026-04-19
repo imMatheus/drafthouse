@@ -170,9 +170,14 @@ export function registerPullsHandlers(): void {
       owner: string,
       repo: string,
       number: number
-    ): Promise<Record<string, Array<{ name: string; email: string | null; avatarUrl: string; login: string | null }>>> => {
+    ): Promise<
+      Record<string, Array<{ name: string; email: string | null; avatarUrl: string; login: string | null }>>
+    > => {
       const token = requireAuth()
-      const result: Record<string, Array<{ name: string; email: string | null; avatarUrl: string; login: string | null }>> = {}
+      const result: Record<
+        string,
+        Array<{ name: string; email: string | null; avatarUrl: string; login: string | null }>
+      > = {}
       let cursor: string | null = null
 
       while (true) {

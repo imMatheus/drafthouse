@@ -113,12 +113,7 @@ export default function ReviewThreadCard({
         </div>
         {resolvedOwner && resolvedRepo ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <ReactionBar
-              owner={resolvedOwner}
-              repo={resolvedRepo}
-              commentId={comment.id}
-              commentType="pull-comment"
-            />
+            <ReactionBar owner={resolvedOwner} repo={resolvedRepo} commentId={comment.id} commentType="pull-comment" />
             {onFixWithClaude ? (
               <FixWithClaudeButton
                 onClick={() =>
@@ -145,7 +140,7 @@ export default function ReviewThreadCard({
           </div>
         ) : null}
         {commentSessions.length > 0 ? (
-          <div className="border-border mt-4 -mx-4 -mb-4 border-t">
+          <div className="border-border -mx-4 mt-4 -mb-4 border-t">
             {commentSessions.map((session) => (
               <div key={session.id}>
                 <InlineAgentResponseCard
@@ -184,10 +179,7 @@ export default function ReviewThreadCard({
 
   return (
     <div
-      className={cn(
-        'border-border bg-surface overflow-hidden rounded-xl border',
-        thread.isResolved && 'opacity-70'
-      )}
+      className={cn('border-border bg-surface overflow-hidden rounded-xl border', thread.isResolved && 'opacity-70')}
     >
       <div className="border-border bg-interactive flex items-center justify-between gap-3 border-b px-4 py-2">
         <div className="text-foreground flex min-w-0 items-center gap-2 text-sm font-medium">

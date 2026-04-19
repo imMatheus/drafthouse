@@ -125,9 +125,7 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
 
     setIsSubmitting(true)
     try {
-      const resolvedDetails = mentionQueries
-        .map((q) => q.data)
-        .filter((d): d is PullRequestDetail => d != null)
+      const resolvedDetails = mentionQueries.map((q) => q.data).filter((d): d is PullRequestDetail => d != null)
       await onSubmit(
         text.trim(),
         files.length > 0 ? files : undefined,
@@ -349,14 +347,18 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
             <Tooltip label="Stop agent" side="top">
               <button
                 onClick={onStop}
-                className="bg-danger flex size-7 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:opacity-90"
+                className="bg-danger text-danger-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-90"
                 aria-label="Stop agent"
               >
                 <Square size={14} />
               </button>
             </Tooltip>
           ) : (
-            <Tooltip label={canSubmit ? 'Send' : 'Type a message to send'} shortcut={canSubmit ? ['↵'] : undefined} side="top">
+            <Tooltip
+              label={canSubmit ? 'Send' : 'Type a message to send'}
+              shortcut={canSubmit ? ['↵'] : undefined}
+              side="top"
+            >
               <button
                 onClick={() => void handleSubmit()}
                 disabled={!canSubmit}

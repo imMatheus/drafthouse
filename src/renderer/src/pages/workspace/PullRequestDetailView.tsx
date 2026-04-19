@@ -226,7 +226,7 @@ export default function PullRequestDetailView({
                   setTimeout(() => setHeadBranchCopied(false), 1500)
                 })
               }}
-              className="text-foreground-subtle hover:bg-interactive hover:text-foreground ml-1 inline-flex size-5 items-center justify-center rounded transition-colors align-middle"
+              className="text-foreground-subtle hover:bg-interactive hover:text-foreground ml-1 inline-flex size-5 items-center justify-center rounded align-middle transition-colors"
               aria-label="Copy branch name"
             >
               {headBranchCopied ? <Check size={12} className="text-success" /> : <Copy size={12} />}

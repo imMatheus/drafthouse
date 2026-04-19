@@ -42,7 +42,7 @@ export default function CommitActorStack({ actors, size = 'md', max = 2, classNa
       {extra > 0 ? (
         <div
           className={cn(
-            'border-surface bg-interactive text-foreground-muted flex items-center justify-center rounded-full border text-[10px] font-medium -ml-2',
+            'border-surface bg-interactive text-foreground-muted -ml-2 flex items-center justify-center rounded-full border text-[10px] font-medium',
             sizeClass
           )}
           title={actors

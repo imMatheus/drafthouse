@@ -31,11 +31,7 @@ export default function AgentSessionTab({
     promptBarRef.current?.focus()
   }, [session?.id])
 
-  const handleSubmit = async (
-    prompt: string,
-    files?: string[],
-    mentionedPRs?: PullRequestDetail[]
-  ): Promise<void> => {
+  const handleSubmit = async (prompt: string, files?: string[], mentionedPRs?: PullRequestDetail[]): Promise<void> => {
     if (canContinue) {
       // Continuation can't re-apply a system prompt, so inline PR context at
       // the top of the message sent to the CLI. The UI bubble keeps the

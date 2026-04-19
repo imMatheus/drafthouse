@@ -3,7 +3,11 @@ import { ArrowUp, ChevronRight, ExternalLink, Square } from 'lucide-react'
 import type { AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import claudeLogoUrl from '../assets/claude.png'
-import AgentMessageBlock, { eventHasVisibleResponse, FILE_EDIT_TOOLS, UserBubble } from '../pages/workspace/AgentMessageBlock'
+import AgentMessageBlock, {
+  eventHasVisibleResponse,
+  FILE_EDIT_TOOLS,
+  UserBubble
+} from '../pages/workspace/AgentMessageBlock'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
 import Tooltip from './Tooltip'
 
@@ -110,18 +114,8 @@ export default function InlineAgentResponseCard({
   }
 
   return (
-    <div
-      className={cn(
-        'bg-surface',
-        variant === 'standalone' && 'border-border rounded-lg border'
-      )}
-    >
-      <div
-        className={cn(
-          'flex items-center gap-2 px-4 py-3',
-          variant === 'standalone' && 'border-border border-b'
-        )}
-      >
+    <div className={cn('bg-surface', variant === 'standalone' && 'border-border rounded-lg border')}>
+      <div className={cn('flex items-center gap-2 px-4 py-3', variant === 'standalone' && 'border-border border-b')}>
         <img src={claudeLogoUrl} alt="Claude" className="size-6 rounded-full" />
         <span className="text-foreground text-sm font-medium">Claude</span>
         <div className="ml-auto flex items-center gap-1.5">

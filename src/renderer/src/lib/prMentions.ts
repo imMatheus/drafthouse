@@ -135,11 +135,7 @@ export function prStateLabel(pr: PullRequest | PullRequestDetail): PRState {
  * inline prompt prefix (for continuation messages where no system prompt
  * can be re-applied).
  */
-export function buildMentionedPRContextBlock(
-  owner: string,
-  repo: string,
-  prs: PullRequestDetail[]
-): string | null {
+export function buildMentionedPRContextBlock(owner: string, repo: string, prs: PullRequestDetail[]): string | null {
   if (prs.length === 0) return null
 
   const sections = prs.map((pr) => {

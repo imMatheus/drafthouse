@@ -252,7 +252,7 @@ export default function SourceControlPanel({
                 <button
                   onClick={handlePublishBranch}
                   disabled={isPublishing}
-                  className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                  className="bg-accent text-accent-foreground hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
                 >
                   <Upload size={12} />
                   {isPublishing ? 'Publishing...' : 'Publish Branch'}
@@ -261,11 +261,11 @@ export default function SourceControlPanel({
                 <button
                   onClick={handlePush}
                   disabled={isPushing}
-                  className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                  className="bg-accent text-accent-foreground hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
                 >
                   <ArrowUp size={12} />
                   Push
-                  <span className="rounded-full bg-white/20 px-1.5 text-[10px]">{branchInfo.ahead}</span>
+                  <span className="bg-accent-foreground/20 rounded-full px-1.5 text-[10px]">{branchInfo.ahead}</span>
                 </button>
               ) : (
                 <Tooltip
@@ -282,7 +282,7 @@ export default function SourceControlPanel({
                   <button
                     onClick={handleCommit}
                     disabled={isCommitting || !commitMessage.trim()}
-                    className="bg-accent hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                    className="bg-accent text-accent-foreground hover:bg-accent-hover flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
                   >
                     <Check size={12} />
                     Commit
@@ -627,7 +627,7 @@ function CreatePullRequestDialog({
             type="button"
             onClick={handleSubmit}
             disabled={!title.trim() || !base || isSubmitting || !headExistsOnRemote}
-            className="bg-accent hover:bg-accent-hover rounded-md px-4 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Creating...' : draft ? 'Create Draft PR' : 'Create Pull Request'}
           </button>

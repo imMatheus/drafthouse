@@ -123,7 +123,11 @@ function ContentBlock({ block }: { block: AgentContentBlock }) {
           />
         )
       }
-      if (block.name === 'Write' && typeof block.input.file_path === 'string' && typeof block.input.content === 'string') {
+      if (
+        block.name === 'Write' &&
+        typeof block.input.file_path === 'string' &&
+        typeof block.input.content === 'string'
+      ) {
         return (
           <AgentEditDiffBlock
             filePath={block.input.file_path}

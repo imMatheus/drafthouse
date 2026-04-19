@@ -93,13 +93,17 @@ function AppContent(): React.JSX.Element {
       <Route
         path="/workspace/*"
         element={
-          <div className="bg-background flex h-screen">
-            <Workspace
-              session={workspaceSession}
-              onCloseWorkspace={closeWorkspace}
-              onUpdateSession={updateWorkspaceSession}
-            />
-          </div>
+          workspaceSession ? (
+            <div className="bg-background flex h-screen">
+              <Workspace
+                session={workspaceSession}
+                onCloseWorkspace={closeWorkspace}
+                onUpdateSession={updateWorkspaceSession}
+              />
+            </div>
+          ) : (
+            <Navigate to="/" replace />
+          )
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -281,8 +281,7 @@ function SplitDiffPreview() {
 
 function DiffRow({ kind, narrow }: { kind: 'context' | 'add' | 'del'; narrow?: boolean }) {
   const bg = kind === 'add' ? 'bg-success/15' : kind === 'del' ? 'bg-danger/15' : ''
-  const barColor =
-    kind === 'add' ? 'bg-success/70' : kind === 'del' ? 'bg-danger/70' : 'bg-foreground-muted/30'
+  const barColor = kind === 'add' ? 'bg-success/70' : kind === 'del' ? 'bg-danger/70' : 'bg-foreground-muted/30'
   return (
     <div className={cn('-mx-1 my-0.5 flex items-center gap-1.5 rounded px-1 py-0.5', bg)}>
       <span
