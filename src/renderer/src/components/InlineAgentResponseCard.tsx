@@ -35,13 +35,15 @@ export default function InlineAgentResponseCard({
   onStop,
   onContinue,
   onOpenInChat,
-  variant = 'standalone'
+  variant = 'standalone',
+  compact = false
 }: {
   session: AgentSession
   onStop: () => void
   onContinue: (prompt: string) => void
   onOpenInChat: () => void
   variant?: 'standalone' | 'nested'
+  compact?: boolean
 }) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
@@ -153,7 +155,7 @@ export default function InlineAgentResponseCard({
             <span>Fixing this comment</span>
           </div>
         ) : (
-          <UserBubble text={session.prompt} />
+          <UserBubble text={session.prompt} compact={compact} />
         )}
         {/* While thinking and no response yet: show latest step */}
         {isRunning && !hasResponse && thinkingStepCount > 0 && (
@@ -190,7 +192,7 @@ export default function InlineAgentResponseCard({
             {thinkingExpanded && (
               <div className="border-border bg-background mt-2 rounded-md border px-3 py-2">
                 {thinkingEvents.map((event, i) => (
-                  <AgentMessageBlock key={i} event={event} inlineToolIds={inlineToolIds} />
+                  <AgentMessageBlock key={i} event={event} inlineToolIds={inlineToolIds} compact={compact} />
                 ))}
               </div>
             )}
@@ -199,7 +201,7 @@ export default function InlineAgentResponseCard({
 
         {/* The actual response — text and file-edit tool uses only */}
         {responseEvents.map((event, i) => (
-          <AgentMessageBlock key={`response-${i}`} event={event} inlineToolIds={new Set()} visibleOnly />
+          <AgentMessageBlock key={`response-${i}`} event={event} inlineToolIds={new Set()} visibleOnly compact={compact} />
         ))}
 
         {/* Streaming indicator when response is coming in */}

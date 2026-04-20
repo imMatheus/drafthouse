@@ -33,6 +33,7 @@ import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
 import { WorkspaceContextProvider } from '../contexts/WorkspaceContext'
+import { appendOrReplaceAssistant, mergePartialMessage } from '../lib/agentStream'
 
 interface WorkspaceProps {
   session: WorkspaceSession
@@ -141,15 +142,23 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
             nextStatus = event.is_error ? 'error' : 'completed'
           }
 
-          // Capture CLI session ID from init event
           let cliSessionId = s.cliSessionId
           if (event.type === 'system' && event.subtype === 'init' && 'session_id' in event) {
             cliSessionId = event.session_id as string
           }
 
+          let nextEvents: typeof s.events
+          if (event.type === 'stream_event') {
+            nextEvents = mergePartialMessage(s.events, event)
+          } else if (event.type === 'assistant') {
+            nextEvents = appendOrReplaceAssistant(s.events, event)
+          } else {
+            nextEvents = [...s.events, event]
+          }
+
           return {
             ...s,
-            events: [...s.events, event],
+            events: nextEvents,
             status: nextStatus,
             cliSessionId
           }

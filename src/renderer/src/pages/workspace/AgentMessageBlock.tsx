@@ -26,12 +26,17 @@ export function eventHasVisibleResponse(event: AgentStreamEvent): boolean {
   return false
 }
 
-export function UserBubble({ text, markdown }: { text: string; markdown?: boolean }) {
+export function UserBubble({ text, markdown, compact }: { text: string; markdown?: boolean; compact?: boolean }) {
   return (
     <div className="mt-2 mb-3 flex justify-end">
-      <div className="bg-interactive text-foreground max-w-[80%] rounded-2xl px-3 py-2 text-sm">
+      <div
+        className={cn(
+          'bg-interactive text-foreground max-w-[80%] rounded-2xl px-3 py-2',
+          compact ? 'text-xs' : 'text-sm'
+        )}
+      >
         {markdown ? (
-          <MarkdownBody>{text}</MarkdownBody>
+          <MarkdownBody compact={compact}>{text}</MarkdownBody>
         ) : (
           <span className="whitespace-pre-wrap">
             <HighlightedMentionText text={text} />
@@ -47,14 +52,15 @@ interface AgentMessageBlockProps {
   inlineToolIds: Set<string>
   /** When true, only render text and file-edit tool uses (Edit/Write/MultiEdit) */
   visibleOnly?: boolean
+  compact?: boolean
 }
 
-export default function AgentMessageBlock({ event, inlineToolIds, visibleOnly }: AgentMessageBlockProps) {
+export default function AgentMessageBlock({ event, inlineToolIds, visibleOnly, compact }: AgentMessageBlockProps) {
   switch (event.type) {
     case 'assistant':
-      return <AssistantMessage event={event} visibleOnly={visibleOnly} />
+      return <AssistantMessage event={event} visibleOnly={visibleOnly} compact={compact} />
     case 'user':
-      return <UserMessage event={event} inlineToolIds={inlineToolIds} />
+      return <UserMessage event={event} inlineToolIds={inlineToolIds} compact={compact} />
     case 'system':
       return <SystemMessage event={event as AgentStreamSystem} />
     case 'result':
@@ -64,32 +70,48 @@ export default function AgentMessageBlock({ event, inlineToolIds, visibleOnly }:
   }
 }
 
-function AssistantMessage({ event, visibleOnly }: { event: AgentStreamAssistant; visibleOnly?: boolean }) {
+function AssistantMessage({
+  event,
+  visibleOnly,
+  compact
+}: {
+  event: AgentStreamAssistant
+  visibleOnly?: boolean
+  compact?: boolean
+}) {
   const blocks = visibleOnly ? event.message.content.filter(isVisibleResponseBlock) : event.message.content
   if (blocks.length === 0) return null
   return (
     <div className="mb-4">
       {blocks.map((block, i) => (
-        <ContentBlock key={i} block={block} />
+        <ContentBlock key={i} block={block} compact={compact} />
       ))}
     </div>
   )
 }
 
-function UserMessage({ event, inlineToolIds }: { event: AgentStreamUser; inlineToolIds: Set<string> }) {
+function UserMessage({
+  event,
+  inlineToolIds,
+  compact
+}: {
+  event: AgentStreamUser
+  inlineToolIds: Set<string>
+  compact?: boolean
+}) {
   const textBlocks = event.message.content.filter((b) => b.type === 'text')
   const nonTextBlocks = event.message.content.filter((b) => b.type !== 'text')
 
   return (
     <div className="mb-4">
       {textBlocks.map((block, i) =>
-        block.type === 'text' && block.text ? <UserBubble key={i} text={block.text} /> : null
+        block.type === 'text' && block.text ? <UserBubble key={i} text={block.text} compact={compact} /> : null
       )}
       {nonTextBlocks.map((block, i) => {
         if (block.type === 'tool_result' && inlineToolIds.has(block.tool_use_id)) {
           return null
         }
-        return <ContentBlock key={i} block={block} />
+        return <ContentBlock key={i} block={block} compact={compact} />
       })}
     </div>
   )
@@ -104,10 +126,14 @@ function SystemMessage({ event }: { event: AgentStreamSystem }) {
   return <div className="text-foreground-subtle mb-2 text-xs italic">{message}</div>
 }
 
-function ContentBlock({ block }: { block: AgentContentBlock }) {
+function ContentBlock({ block, compact }: { block: AgentContentBlock; compact?: boolean }) {
   switch (block.type) {
     case 'text':
-      return <MarkdownBody className="p-4">{block.text}</MarkdownBody>
+      return (
+        <MarkdownBody className={compact ? 'p-2' : 'p-4'} compact={compact}>
+          {block.text}
+        </MarkdownBody>
+      )
     case 'tool_use': {
       if (
         block.name === 'Edit' &&

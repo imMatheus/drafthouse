@@ -1035,6 +1035,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                             onStop={() => onStopAgent?.(session.id)}
                             onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
                             onOpenInChat={() => onPromoteAgent?.(session.id)}
+                            compact
                           />
                         </td>
                       </tr>
@@ -1379,6 +1380,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                                 onStop={() => onStopAgent?.(session.id)}
                                 onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
                                 onOpenInChat={() => onPromoteAgent?.(session.id)}
+                                compact
                               />
                             </td>
                           </>
@@ -1391,6 +1393,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                                 onStop={() => onStopAgent?.(session.id)}
                                 onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
                                 onOpenInChat={() => onPromoteAgent?.(session.id)}
+                                compact
                               />
                             </td>
                             <td className="bg-success/20" />
@@ -1640,6 +1643,7 @@ function InlineDiffThread({
                 onStop={() => onStopAgent?.(session.id)}
                 onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
                 onOpenInChat={() => onPromoteAgent?.(session.id)}
+                compact
               />
               {session.status === 'completed' &&
               comment.id === thread.topLevelComment.id &&

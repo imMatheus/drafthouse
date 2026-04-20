@@ -598,6 +598,7 @@ export interface AgentStreamSystem {
 export interface AgentStreamAssistant {
   type: 'assistant'
   message: {
+    id?: string
     role: 'assistant'
     content: AgentContentBlock[]
     stop_reason: string | null
@@ -606,6 +607,39 @@ export interface AgentStreamAssistant {
       output_tokens: number
     }
   }
+  session_id: string
+  streaming?: boolean
+}
+
+export type AgentPartialMessageSubEvent =
+  | {
+      type: 'message_start'
+      message: {
+        id: string
+        role: 'assistant'
+        content: AgentContentBlock[]
+        stop_reason: string | null
+        usage?: { input_tokens: number; output_tokens: number }
+      }
+    }
+  | { type: 'content_block_start'; index: number; content_block: AgentContentBlock }
+  | {
+      type: 'content_block_delta'
+      index: number
+      delta:
+        | { type: 'text_delta'; text: string }
+        | { type: 'input_json_delta'; partial_json: string }
+        | { type: 'thinking_delta'; thinking: string }
+        | { type: string; [key: string]: unknown }
+    }
+  | { type: 'content_block_stop'; index: number }
+  | { type: 'message_delta'; delta: { stop_reason: string | null }; usage?: { output_tokens: number } }
+  | { type: 'message_stop' }
+
+export interface AgentStreamPartialMessage {
+  type: 'stream_event'
+  event: AgentPartialMessageSubEvent
+  parent_tool_use_id: string | null
   session_id: string
 }
 
@@ -635,6 +669,7 @@ export type AgentStreamEvent =
   | AgentStreamAssistant
   | AgentStreamUser
   | AgentStreamResult
+  | AgentStreamPartialMessage
 
 export interface AgentEvent {
   sessionId: string
