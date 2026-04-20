@@ -43,13 +43,13 @@ import { useTheme } from '../../hooks/useTheme'
 import { getLanguageFromPath, tokenizeCode, tokenizeDiffHunks, type HighlightedToken } from '../../lib/shiki'
 import MarkdownBody from './MarkdownBody'
 import ReviewThreadCard from './ReviewThreadCard'
+import { parsePullRequestFileDiff, type ParsedDiffLine } from './pullRequestDiff'
 import {
-  getDiffThreadKey,
-  parsePullRequestFileDiff,
-  type ParsedDiffHunk,
-  type ParsedDiffLine,
-  type ParsedPullRequestFileDiff
-} from './pullRequestDiff'
+  preparePullRequestFileDiff,
+  type HunkGap,
+  type PreparedDraftEntry,
+  type PreparedFileDiff
+} from './preparedPullRequestDiff'
 import {
   buildPullRequestReviewThreads,
   DiffStat,
@@ -58,6 +58,9 @@ import {
 } from './pullRequestShared'
 
 const EMPTY_FILES: PullRequestFile[] = []
+const EMPTY_THREADS: PullRequestReviewThread[] = []
+const EMPTY_DRAFTS: PreparedDraftEntry[] = []
+const EMPTY_SESSIONS: AgentSession[] = []
 
 // ────────────────────────────────────────────────────────────
 // Main PRFilesTab (unchanged from before)
@@ -145,12 +148,14 @@ export default function PRFilesTab({
     [reviewComments, reviewThreadSummaries]
   )
 
+  // File-scoped groupings. Each card pulls only its own slice so a change in
+  // one file's annotations doesn't invalidate the prepared diffs of other files.
   const threadsByFile = useMemo(() => {
     const map = new Map<string, PullRequestReviewThread[]>()
     for (const thread of reviewThreads) {
-      const fileThreads = map.get(thread.path) ?? []
-      fileThreads.push(thread)
-      map.set(thread.path, fileThreads)
+      const bucket = map.get(thread.path)
+      if (bucket) bucket.push(thread)
+      else map.set(thread.path, [thread])
     }
     return map
   }, [reviewThreads])
@@ -163,33 +168,33 @@ export default function PRFilesTab({
     return map
   }, [reviewComments])
 
-  const threadsByKey = useMemo(() => {
-    const map = new Map<string, PullRequestReviewThread[]>()
-    for (const thread of reviewThreads) {
-      if (thread.side == null || thread.line == null) continue
-      const key = getDiffThreadKey(thread.path, thread.side, thread.line)
-      const rowThreads = map.get(key) ?? []
-      rowThreads.push(thread)
-      map.set(key, rowThreads)
-    }
-    return map
-  }, [reviewThreads])
-
   const threadsByCommentId = useMemo(
     () => new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread])),
     [reviewThreads]
   )
 
-  const draftCommentsByKey = useMemo(() => {
-    const map = new Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>()
+  const draftsByFile = useMemo(() => {
+    const map = new Map<string, PreparedDraftEntry[]>()
     draftReviewComments.forEach((comment, index) => {
-      const key = getDiffThreadKey(comment.path, comment.side, comment.line)
-      const rowComments = map.get(key) ?? []
-      rowComments.push({ comment, index })
-      map.set(key, rowComments)
+      const bucket = map.get(comment.path)
+      const entry: PreparedDraftEntry = { comment, index }
+      if (bucket) bucket.push(entry)
+      else map.set(comment.path, [entry])
     })
     return map
   }, [draftReviewComments])
+
+  const inlineSessionsByFile = useMemo(() => {
+    const map = new Map<string, AgentSession[]>()
+    for (const session of agentSessions ?? []) {
+      const ctx = session.context
+      if (!ctx || !ctx.inline || !ctx.filePath) continue
+      const bucket = map.get(ctx.filePath)
+      if (bucket) bucket.push(session)
+      else map.set(ctx.filePath, [session])
+    }
+    return map
+  }, [agentSessions])
 
   const filesErrorMessage = filesError ?? reviewCommentsError
   const isLoading = isLoadingFiles || isLoadingReviewComments
@@ -357,17 +362,14 @@ export default function PRFilesTab({
                 commitId={pr.head.sha}
                 file={file}
                 auth={auth}
-                fileThreads={threadsByFile.get(file.filename) ?? []}
-                threadsByKey={threadsByKey}
-                draftCommentsByKey={draftCommentsByKey}
+                fileThreads={threadsByFile.get(file.filename) ?? EMPTY_THREADS}
+                fileDrafts={draftsByFile.get(file.filename) ?? EMPTY_DRAFTS}
                 openCommentKey={openCommentKey}
                 onOpenComment={setOpenCommentKey}
                 onAskClaude={onAskClaude}
                 onFixWithClaude={onFixWithClaude}
                 agentSessions={agentSessions ?? []}
-                fileAgentSessions={(agentSessions ?? []).filter(
-                  (s) => s.context?.filePath === file.filename && s.context?.inline
-                )}
+                fileInlineSessions={inlineSessionsByFile.get(file.filename) ?? EMPTY_SESSIONS}
                 onContinueAgent={onContinueAgent}
                 onStopAgent={onStopAgent}
                 onPromoteAgent={onPromoteAgent}
@@ -421,14 +423,13 @@ function PullRequestFileDiffCard({
   file,
   auth,
   fileThreads,
-  threadsByKey,
-  draftCommentsByKey,
+  fileDrafts,
   openCommentKey,
   onOpenComment,
   onAskClaude,
   onFixWithClaude,
   agentSessions,
-  fileAgentSessions,
+  fileInlineSessions,
   onContinueAgent,
   onStopAgent,
   onPromoteAgent,
@@ -444,9 +445,8 @@ function PullRequestFileDiffCard({
   commitId: string
   file: PullRequestFile
   auth: AuthData | null | undefined
-  fileThreads: PullRequestReviewThread[]
-  threadsByKey: Map<string, PullRequestReviewThread[]>
-  draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
+  fileThreads: readonly PullRequestReviewThread[]
+  fileDrafts: readonly PreparedDraftEntry[]
   openCommentKey: string | null
   onOpenComment: (value: string | null) => void
   onAskClaude?: (
@@ -458,7 +458,7 @@ function PullRequestFileDiffCard({
   ) => Promise<void>
   onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
   agentSessions: AgentSession[]
-  fileAgentSessions: AgentSession[]
+  fileInlineSessions: readonly AgentSession[]
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent?: (sessionId: string) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void
@@ -470,10 +470,19 @@ function PullRequestFileDiffCard({
 }) {
   const { theme } = useTheme()
   const { settings } = useSettings()
-  // Keep `diffShape` memoized — `parsedDiff` is a dep of the tokenization useEffect
-  // below, so a fresh reference every render would re-run tokenization on every render.
-  const diffShape = useMemo(() => buildDiffShape(file), [file.patch, file.filename])
-  const { parsed: parsedDiff, hunkGaps, beforeFirstGap, gapAfterByStartLine, pairsByHunkId } = diffShape
+
+  // Stage 1 — parse the raw diff. Depends only on the patch, so it survives
+  // annotation changes (new threads, drafts, agent sessions) and theme switches.
+  const parsedDiff = useMemo(() => parsePullRequestFileDiff(file), [file.patch, file.filename])
+
+  // Stage 2 — single-pass join of the parsed diff with all per-file annotations.
+  // Produces pre-indexed rows/pairs/gaps ready for render, with zero Map lookups
+  // or string concatenation in the hot rendering path.
+  const prepared = useMemo(
+    () => preparePullRequestFileDiff(parsedDiff, file.filename, fileThreads, fileDrafts, fileInlineSessions),
+    [parsedDiff, file.filename, fileThreads, fileDrafts, fileInlineSessions]
+  )
+
   const [tokenMap, setTokenMap] = useState<Map<string, HighlightedToken[]>>(new Map())
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set())
   const [expandedLines, setExpandedLines] = useState<Map<string, ExpandedContextLines>>(new Map())
@@ -540,37 +549,10 @@ function PullRequestFileDiffCard({
     setExpandedGaps((prev) => new Set(prev).add(gapKey))
   }
 
-  // Determine anchored vs unanchored threads
-  const anchoredThreadIds = useMemo(() => {
-    const ids = new Set<number>()
-    for (const hunk of parsedDiff.hunks) {
-      for (const line of hunk.lines) {
-        if (!line.commentSide || !line.commentLine) continue
-        const rowThreads = threadsByKey.get(getDiffThreadKey(file.filename, line.commentSide, line.commentLine)) ?? []
-        rowThreads.forEach((thread) => ids.add(thread.id))
-      }
-    }
-    return ids
-  }, [parsedDiff, threadsByKey, file.filename])
-
-  const unanchoredThreads = fileThreads.filter((thread) => !anchoredThreadIds.has(thread.id))
   const replyTarget = { owner, repo, number }
 
-  // Index agent sessions by line number so diff rows don't filter the whole list each render
-  const sessionsByLineNumber = useMemo(() => {
-    const map = new Map<number, AgentSession[]>()
-    for (const session of fileAgentSessions) {
-      const lineNum = session.context?.lineNumber
-      if (typeof lineNum !== 'number') continue
-      const bucket = map.get(lineNum)
-      if (bucket) bucket.push(session)
-      else map.set(lineNum, [session])
-    }
-    return map
-  }, [fileAgentSessions])
-
-  const diffProps = {
-    hunks: parsedDiff.hunks,
+  const diffProps: HunkDiffProps = {
+    prepared,
     tokenMap,
     filename: file.filename,
     owner,
@@ -578,14 +560,11 @@ function PullRequestFileDiffCard({
     number,
     commitId,
     auth,
-    threadsByKey,
-    draftCommentsByKey,
     openCommentKey,
     onOpenComment,
     onAskClaude,
     onFixWithClaude,
     agentSessions,
-    sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
     onPromoteAgent,
@@ -594,10 +573,6 @@ function PullRequestFileDiffCard({
     onInlineCommentPosted,
     replyTarget,
     threadRef,
-    hunkGaps,
-    beforeFirstGap,
-    gapAfterByStartLine,
-    pairsByHunkId,
     expandedGaps,
     expandedLines,
     onExpandGap: handleExpandGap
@@ -648,7 +623,7 @@ function PullRequestFileDiffCard({
 
       {isCollapsed ? null : (
         <>
-          {parsedDiff.hasRenderablePatch ? (
+          {prepared.hasRenderablePatch ? (
             settings.diffViewMode === 'split' ? (
               <SplitHunkDiff {...diffProps} />
             ) : (
@@ -660,13 +635,13 @@ function PullRequestFileDiffCard({
             </div>
           )}
 
-          {unanchoredThreads.length > 0 ? (
+          {prepared.unanchoredThreads.length > 0 ? (
             <div className="border-border border-t px-4 py-4">
               <p className="text-foreground-muted mb-3 text-xs font-semibold tracking-wider uppercase">
                 Other comments
               </p>
               <div className="flex flex-col gap-3">
-                {unanchoredThreads.map((thread) => (
+                {prepared.unanchoredThreads.map((thread) => (
                   <div key={`unanchored-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
                     <ReviewThreadCard
                       thread={thread}
@@ -689,15 +664,8 @@ function PullRequestFileDiffCard({
 }
 
 // ────────────────────────────────────────────────────────────
-// Hunk gap computation
+// Shared diff types + helpers
 // ────────────────────────────────────────────────────────────
-
-interface HunkGap {
-  key: string
-  hiddenCount: number
-  afterNewLine: number // new-side line where the gap starts
-  beforeNewLine: number // new-side line where the next hunk begins
-}
 
 interface ExpandedContextLines {
   startLine: number
@@ -705,125 +673,8 @@ interface ExpandedContextLines {
   tokens: HighlightedToken[][] | null
 }
 
-type AlignedPair = { left: ParsedDiffLine | null; right: ParsedDiffLine | null }
-
-interface DiffShape {
-  parsed: ParsedPullRequestFileDiff
-  hunkGaps: HunkGap[]
-  beforeFirstGap: HunkGap | null
-  gapAfterByStartLine: Map<number, HunkGap>
-  pairsByHunkId: Map<string, AlignedPair[]>
-}
-
-function buildDiffShape(file: PullRequestFile): DiffShape {
-  const parsed = parsePullRequestFileDiff(file)
-  const hunkGaps = computeHunkGaps(parsed.hunks)
-
-  let beforeFirstGap: HunkGap | null = null
-  const gapAfterByStartLine = new Map<number, HunkGap>()
-  for (const gap of hunkGaps) {
-    if (gap.afterNewLine === 1) beforeFirstGap = gap
-    else gapAfterByStartLine.set(gap.afterNewLine, gap)
-  }
-
-  const pairsByHunkId = new Map<string, AlignedPair[]>()
-  for (const hunk of parsed.hunks) {
-    pairsByHunkId.set(hunk.id, computeSplitPairs(hunk.lines))
-  }
-
-  return { parsed, hunkGaps, beforeFirstGap, gapAfterByStartLine, pairsByHunkId }
-}
-
-function computeHunkGaps(hunks: ParsedDiffHunk[]): HunkGap[] {
-  const gaps: HunkGap[] = []
-
-  for (let i = 0; i < hunks.length; i++) {
-    const hunk = hunks[i]
-    const lines = hunk.lines
-
-    // Gap before the first hunk
-    if (i === 0 && lines.length > 0) {
-      const firstLine = lines[0]
-      const firstNewLine = firstLine.newLineNumber ?? firstLine.oldLineNumber ?? 1
-      if (firstNewLine > 1) {
-        gaps.push({
-          key: `gap-1-${firstNewLine}`,
-          hiddenCount: firstNewLine - 1,
-          afterNewLine: 1,
-          beforeNewLine: firstNewLine
-        })
-      }
-    }
-
-    // Gap between this hunk and the next
-    if (i < hunks.length - 1) {
-      const lastLine = lines[lines.length - 1]
-      const nextHunk = hunks[i + 1]
-      const nextFirstLine = nextHunk.lines[0]
-
-      if (lastLine && nextFirstLine) {
-        const lastNewLine = (lastLine.newLineNumber ?? lastLine.oldLineNumber ?? 0) + 1
-        const nextNewLine = nextFirstLine.newLineNumber ?? nextFirstLine.oldLineNumber ?? 0
-
-        if (nextNewLine > lastNewLine) {
-          gaps.push({
-            key: `gap-${lastNewLine}-${nextNewLine}`,
-            hiddenCount: nextNewLine - lastNewLine,
-            afterNewLine: lastNewLine,
-            beforeNewLine: nextNewLine
-          })
-        }
-      }
-    }
-  }
-
-  return gaps
-}
-
-function getGapAfterHunk(gapAfterByStartLine: Map<number, HunkGap>, prevHunk: ParsedDiffHunk): HunkGap | null {
-  const lastLine = prevHunk.lines[prevHunk.lines.length - 1]
-  if (!lastLine) return null
-  const afterNewLine = (lastLine.newLineNumber ?? lastLine.oldLineNumber ?? 0) + 1
-  return gapAfterByStartLine.get(afterNewLine) ?? null
-}
-
-function computeSplitPairs(lines: ParsedDiffLine[]): AlignedPair[] {
-  const pairs: AlignedPair[] = []
-  let i = 0
-  while (i < lines.length) {
-    const line = lines[i]
-    if (line.kind === 'context' || line.kind === 'meta' || line.kind === 'hunk') {
-      pairs.push({ left: line, right: line })
-      i++
-      continue
-    }
-    const deletions: ParsedDiffLine[] = []
-    const additions: ParsedDiffLine[] = []
-    while (i < lines.length && lines[i].kind === 'deletion') {
-      deletions.push(lines[i])
-      i++
-    }
-    while (i < lines.length && lines[i].kind === 'addition') {
-      additions.push(lines[i])
-      i++
-    }
-    const maxLen = Math.max(deletions.length, additions.length)
-    for (let j = 0; j < maxLen; j++) {
-      pairs.push({
-        left: j < deletions.length ? deletions[j] : null,
-        right: j < additions.length ? additions[j] : null
-      })
-    }
-  }
-  return pairs
-}
-
-// ────────────────────────────────────────────────────────────
-// Shared diff types + helpers
-// ────────────────────────────────────────────────────────────
-
 interface HunkDiffProps {
-  hunks: ParsedDiffHunk[]
+  prepared: PreparedFileDiff
   tokenMap: Map<string, HighlightedToken[]>
   filename: string
   owner: string
@@ -831,8 +682,6 @@ interface HunkDiffProps {
   number: number
   commitId: string
   auth: AuthData | null | undefined
-  threadsByKey: Map<string, PullRequestReviewThread[]>
-  draftCommentsByKey: Map<string, Array<{ comment: PullRequestReviewDraftComment; index: number }>>
   openCommentKey: string | null
   onOpenComment: (value: string | null) => void
   onAskClaude?: (
@@ -844,7 +693,6 @@ interface HunkDiffProps {
   ) => Promise<void>
   onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
   agentSessions: AgentSession[]
-  sessionsByLineNumber: Map<number, AgentSession[]>
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent?: (sessionId: string) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void
@@ -853,10 +701,6 @@ interface HunkDiffProps {
   onInlineCommentPosted: () => Promise<void>
   replyTarget: { owner: string; repo: string; number: number }
   threadRef: (commentId: number, element: HTMLElement | null) => void
-  hunkGaps: HunkGap[]
-  beforeFirstGap: HunkGap | null
-  gapAfterByStartLine: Map<number, HunkGap>
-  pairsByHunkId: Map<string, AlignedPair[]>
   expandedGaps: Set<string>
   expandedLines: Map<string, ExpandedContextLines>
   onExpandGap: (gapKey: string) => void
@@ -971,7 +815,7 @@ function getFileDiffPrefix(kind: ParsedDiffLine['kind']): string {
 
 function UnifiedHunkDiff(props: HunkDiffProps) {
   const {
-    hunks,
+    prepared,
     tokenMap,
     filename,
     owner,
@@ -979,14 +823,11 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
     number,
     commitId,
     auth,
-    threadsByKey,
-    draftCommentsByKey,
     openCommentKey,
     onOpenComment,
     onAskClaude,
     onFixWithClaude,
     agentSessions,
-    sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
     onPromoteAgent,
@@ -995,34 +836,30 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
     onInlineCommentPosted,
     replyTarget,
     threadRef,
-    beforeFirstGap,
-    gapAfterByStartLine,
     expandedGaps,
     expandedLines,
     onExpandGap
   } = props
 
-  const beforeGap = beforeFirstGap
-
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full border-collapse text-sm">
         <tbody>
-          {beforeGap ? (
+          {prepared.beforeFirstGap ? (
             <>
               <ExpandSeparator
-                gap={beforeGap}
-                isExpanded={expandedGaps.has(beforeGap.key)}
-                onExpand={() => onExpandGap(beforeGap.key)}
+                gap={prepared.beforeFirstGap}
+                isExpanded={expandedGaps.has(prepared.beforeFirstGap.key)}
+                onExpand={() => onExpandGap(prepared.beforeFirstGap!.key)}
                 colSpan={3}
               />
-              {expandedGaps.has(beforeGap.key) ? (
-                <ExpandedContextRows gapKey={beforeGap.key} expandedLines={expandedLines} colSpan={3} />
+              {expandedGaps.has(prepared.beforeFirstGap.key) ? (
+                <ExpandedContextRows gapKey={prepared.beforeFirstGap.key} expandedLines={expandedLines} colSpan={3} />
               ) : null}
             </>
           ) : null}
 
-          {hunks.map((hunk, hunkIndex) => (
+          {prepared.hunks.map((hunk) => (
             <Fragment key={hunk.id}>
               {hunk.header ? (
                 <tr className="bg-interactive">
@@ -1032,14 +869,9 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                 </tr>
               ) : null}
 
-              {hunk.lines.map((line) => {
-                const rowKey =
-                  line.commentSide && line.commentLine
-                    ? getDiffThreadKey(filename, line.commentSide, line.commentLine)
-                    : null
-                const rowThreads = rowKey ? (threadsByKey.get(rowKey) ?? []) : []
-                const draftComments = rowKey ? (draftCommentsByKey.get(rowKey) ?? []) : []
-                const isComposerOpen = rowKey != null && openCommentKey === rowKey
+              {hunk.rows.map((row) => {
+                const { line, rowKey, threads, drafts, sessions } = row
+                const isComposerOpen = rowKey !== null && openCommentKey === rowKey
 
                 return (
                   <Fragment key={line.id}>
@@ -1078,7 +910,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                       </td>
                     </tr>
 
-                    {rowThreads.map((thread) => (
+                    {threads.map((thread) => (
                       <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
@@ -1096,7 +928,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                       </tr>
                     ))}
 
-                    {draftComments.map(({ comment, index }) => (
+                    {drafts.map(({ comment, index }) => (
                       <tr key={`draft-${rowKey}-${index}`}>
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
@@ -1133,46 +965,38 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                       </tr>
                     ) : null}
 
-                    {line.commentLine
-                      ? (sessionsByLineNumber.get(line.commentLine) ?? []).map((session) => (
-                          <tr key={`agent-${session.id}`}>
-                            <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
-                            <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
-                            <td className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
-                              <InlineAgentResponseCard
-                                session={session}
-                                onStop={() => onStopAgent?.(session.id)}
-                                onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
-                                onOpenInChat={() => onPromoteAgent?.(session.id)}
-                              />
-                            </td>
-                          </tr>
-                        ))
-                      : null}
+                    {sessions.map((session) => (
+                      <tr key={`agent-${session.id}`}>
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
+                        <td className={cn('px-3 py-3', getFileDiffRowClassName(line.kind))}>
+                          <InlineAgentResponseCard
+                            session={session}
+                            onStop={() => onStopAgent?.(session.id)}
+                            onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                            onOpenInChat={() => onPromoteAgent?.(session.id)}
+                          />
+                        </td>
+                      </tr>
+                    ))}
                   </Fragment>
                 )
               })}
 
               {/* Expand separator between this hunk and the next */}
-              {hunkIndex < hunks.length - 1
-                ? (() => {
-                    const gap = getGapAfterHunk(gapAfterByStartLine, hunk)
-                    if (!gap) return null
-                    return (
-                      <>
-                        <ExpandSeparator
-                          gap={gap}
-                          isExpanded={expandedGaps.has(gap.key)}
-                          onExpand={() => onExpandGap(gap.key)}
-                          colSpan={3}
-                        />
-                        {expandedGaps.has(gap.key) ? (
-                          <ExpandedContextRows gapKey={gap.key} expandedLines={expandedLines} colSpan={3} />
-                        ) : null}
-                      </>
-                    )
-                  })()
-                : null}
+              {hunk.gapAfter ? (
+                <>
+                  <ExpandSeparator
+                    gap={hunk.gapAfter}
+                    isExpanded={expandedGaps.has(hunk.gapAfter.key)}
+                    onExpand={() => onExpandGap(hunk.gapAfter!.key)}
+                    colSpan={3}
+                  />
+                  {expandedGaps.has(hunk.gapAfter.key) ? (
+                    <ExpandedContextRows gapKey={hunk.gapAfter.key} expandedLines={expandedLines} colSpan={3} />
+                  ) : null}
+                </>
+              ) : null}
             </Fragment>
           ))}
         </tbody>
@@ -1187,7 +1011,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
 function SplitHunkDiff(props: HunkDiffProps) {
   const {
-    hunks,
+    prepared,
     tokenMap,
     filename,
     owner,
@@ -1195,14 +1019,11 @@ function SplitHunkDiff(props: HunkDiffProps) {
     number,
     commitId,
     auth,
-    threadsByKey,
-    draftCommentsByKey,
     openCommentKey,
     onOpenComment,
     onAskClaude,
     onFixWithClaude,
     agentSessions,
-    sessionsByLineNumber,
     onContinueAgent,
     onStopAgent,
     onPromoteAgent,
@@ -1211,15 +1032,10 @@ function SplitHunkDiff(props: HunkDiffProps) {
     onInlineCommentPosted,
     replyTarget,
     threadRef,
-    beforeFirstGap,
-    gapAfterByStartLine,
-    pairsByHunkId,
     expandedGaps,
     expandedLines,
     onExpandGap
   } = props
-
-  const beforeGap = beforeFirstGap
 
   return (
     <div className="overflow-hidden">
@@ -1231,314 +1047,308 @@ function SplitHunkDiff(props: HunkDiffProps) {
           <col className="w-1/2" />
         </colgroup>
         <tbody>
-          {beforeGap ? (
+          {prepared.beforeFirstGap ? (
             <>
               <ExpandSeparator
-                gap={beforeGap}
-                isExpanded={expandedGaps.has(beforeGap.key)}
-                onExpand={() => onExpandGap(beforeGap.key)}
+                gap={prepared.beforeFirstGap}
+                isExpanded={expandedGaps.has(prepared.beforeFirstGap.key)}
+                onExpand={() => onExpandGap(prepared.beforeFirstGap!.key)}
                 colSpan={4}
               />
-              {expandedGaps.has(beforeGap.key) ? (
-                <SplitExpandedContextRows gapKey={beforeGap.key} expandedLines={expandedLines} />
+              {expandedGaps.has(prepared.beforeFirstGap.key) ? (
+                <SplitExpandedContextRows gapKey={prepared.beforeFirstGap.key} expandedLines={expandedLines} />
               ) : null}
             </>
           ) : null}
 
-          {hunks.map((hunk, hunkIndex) => {
-            const pairs = pairsByHunkId.get(hunk.id) ?? []
+          {prepared.hunks.map((hunk) => (
+            <Fragment key={hunk.id}>
+              {hunk.header ? (
+                <tr className="bg-interactive">
+                  <td colSpan={4} className="text-foreground-muted px-3 py-1.5 font-mono text-[13px]">
+                    {hunk.header}
+                  </td>
+                </tr>
+              ) : null}
 
-            return (
-              <Fragment key={hunk.id}>
-                {hunk.header ? (
-                  <tr className="bg-interactive">
-                    <td colSpan={4} className="text-foreground-muted px-3 py-1.5 font-mono text-[13px]">
-                      {hunk.header}
-                    </td>
-                  </tr>
-                ) : null}
+              {hunk.pairs.map((pair, idx) => {
+                // For context rows pair.left === pair.right; the ref-equality check
+                // de-dupes threads/drafts/sessions so we don't render them twice.
+                const leftRow = pair.left
+                const rightRow = pair.right
+                const isSameRow = leftRow !== null && leftRow === rightRow
+                const leftKey = leftRow?.rowKey ?? null
+                const rightKey = !isSameRow ? (rightRow?.rowKey ?? null) : null
 
-                {pairs.map((pair, idx) => {
-                  const leftKey =
-                    pair.left?.commentSide && pair.left.commentLine
-                      ? getDiffThreadKey(filename, pair.left.commentSide, pair.left.commentLine)
-                      : null
-                  const rightKey =
-                    pair.right?.commentSide && pair.right.commentLine
-                      ? getDiffThreadKey(filename, pair.right.commentSide, pair.right.commentLine)
-                      : null
+                const leftThreads = leftRow?.threads ?? EMPTY_THREADS
+                const rightThreads = rightRow && !isSameRow ? rightRow.threads : EMPTY_THREADS
+                const combinedThreads =
+                  leftThreads.length === 0
+                    ? rightThreads
+                    : rightThreads.length === 0
+                      ? leftThreads
+                      : [...leftThreads, ...rightThreads]
 
-                  const leftThreads = leftKey ? (threadsByKey.get(leftKey) ?? []) : []
-                  const rightThreads = rightKey && rightKey !== leftKey ? (threadsByKey.get(rightKey) ?? []) : []
-                  const rowThreads = [...leftThreads, ...rightThreads]
+                const leftDrafts = leftRow?.drafts ?? EMPTY_DRAFTS
+                const rightDrafts = rightRow && !isSameRow ? rightRow.drafts : EMPTY_DRAFTS
 
-                  const leftDrafts = leftKey ? (draftCommentsByKey.get(leftKey) ?? []) : []
-                  const rightDrafts = rightKey && rightKey !== leftKey ? (draftCommentsByKey.get(rightKey) ?? []) : []
+                const leftSessions = leftRow?.sessions ?? EMPTY_SESSIONS
+                const rightSessions = rightRow && !isSameRow ? rightRow.sessions : EMPTY_SESSIONS
+                const combinedSessions =
+                  leftSessions.length === 0
+                    ? rightSessions
+                    : rightSessions.length === 0
+                      ? leftSessions
+                      : [...leftSessions, ...rightSessions]
 
-                  const isLeftComposerOpen = leftKey != null && openCommentKey === leftKey
-                  const isRightComposerOpen = rightKey != null && openCommentKey === rightKey
+                const isLeftComposerOpen = leftKey !== null && openCommentKey === leftKey
+                const isRightComposerOpen = rightKey !== null && openCommentKey === rightKey
 
-                  return (
-                    <Fragment key={`${hunk.id}-pair-${idx}`}>
-                      <tr>
-                        <td
-                          className={cn(
-                            'group/left text-foreground-subtle relative px-2 py-0 text-center font-mono text-xs',
-                            pair.left?.kind === 'deletion' ? 'bg-danger/20' : 'bg-background'
-                          )}
-                        >
-                          {leftKey && pair.left ? (
-                            <button
-                              type="button"
-                              onClick={() => onOpenComment(isLeftComposerOpen ? null : leftKey)}
-                              className="bg-accent text-accent-foreground absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded group-hover/left:inline-flex"
-                              aria-label="Add line comment"
-                            >
-                              <Plus size={12} />
-                            </button>
-                          ) : null}
-                          {pair.left?.oldLineNumber ?? ''}
-                        </td>
-                        <td
-                          className={cn(
-                            'border-border overflow-hidden border-r px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap',
-                            pair.left?.kind === 'deletion'
-                              ? 'bg-danger/10 text-foreground'
-                              : pair.left
-                                ? 'bg-background text-foreground'
-                                : 'bg-surface'
-                          )}
-                        >
-                          {pair.left ? (
-                            <DiffLineContent tokens={tokenMap.get(pair.left.id)} fallback={pair.left.content} />
+                return (
+                  <Fragment key={`${hunk.id}-pair-${idx}`}>
+                    <tr>
+                      <td
+                        className={cn(
+                          'group/left text-foreground-subtle relative px-2 py-0 text-center font-mono text-xs',
+                          leftRow?.line.kind === 'deletion' ? 'bg-danger/20' : 'bg-background'
+                        )}
+                      >
+                        {leftKey && leftRow ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenComment(isLeftComposerOpen ? null : leftKey)}
+                            className="bg-accent text-accent-foreground absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded group-hover/left:inline-flex"
+                            aria-label="Add line comment"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        ) : null}
+                        {leftRow?.line.oldLineNumber ?? ''}
+                      </td>
+                      <td
+                        className={cn(
+                          'border-border overflow-hidden border-r px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap',
+                          leftRow?.line.kind === 'deletion'
+                            ? 'bg-danger/10 text-foreground'
+                            : leftRow
+                              ? 'bg-background text-foreground'
+                              : 'bg-surface'
+                        )}
+                      >
+                        {leftRow ? (
+                          <DiffLineContent tokens={tokenMap.get(leftRow.line.id)} fallback={leftRow.line.content} />
+                        ) : (
+                          '\u00A0'
+                        )}
+                      </td>
+                      <td
+                        className={cn(
+                          'group/right text-foreground-subtle relative px-1 py-0 text-center font-mono text-xs',
+                          rightRow?.line.kind === 'addition' ? 'bg-success/20' : 'bg-background'
+                        )}
+                      >
+                        {rightKey && rightRow ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenComment(isRightComposerOpen ? null : rightKey)}
+                            className="bg-accent text-accent-foreground absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded group-hover/right:inline-flex"
+                            aria-label="Add line comment"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        ) : null}
+                        {rightRow?.line.newLineNumber ?? ''}
+                      </td>
+                      <td
+                        className={cn(
+                          'overflow-hidden px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap',
+                          rightRow?.line.kind === 'addition'
+                            ? 'bg-success/10 text-foreground'
+                            : rightRow
+                              ? 'bg-background text-foreground'
+                              : 'bg-surface'
+                        )}
+                      >
+                        {rightRow ? (
+                          <DiffLineContent tokens={tokenMap.get(rightRow.line.id)} fallback={rightRow.line.content} />
+                        ) : (
+                          '\u00A0'
+                        )}
+                      </td>
+                    </tr>
+
+                    {combinedThreads.map((thread) => {
+                      const isLeft = thread.side === 'LEFT'
+                      return (
+                        <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
+                          {isLeft ? (
+                            <>
+                              <td className="bg-danger/20" />
+                              <td className="border-border bg-danger/10 border-r p-1.5 align-top">
+                                <InlineDiffThread
+                                  thread={thread}
+                                  replyTarget={replyTarget}
+                                  onFixWithClaude={onFixWithClaude}
+                                  agentSessions={agentSessions}
+                                  onStopAgent={onStopAgent}
+                                  onContinueAgent={onContinueAgent}
+                                  onPromoteAgent={onPromoteAgent}
+                                />
+                              </td>
+                              <td className="bg-success/20" />
+                              <td className="bg-success/10" />
+                            </>
                           ) : (
-                            '\u00A0'
+                            <>
+                              <td className="bg-danger/20" />
+                              <td className="border-border bg-danger/10 border-r" />
+                              <td className="bg-success/20" />
+                              <td className="bg-success/10 px-3 py-2 align-top">
+                                <InlineDiffThread
+                                  thread={thread}
+                                  replyTarget={replyTarget}
+                                  onFixWithClaude={onFixWithClaude}
+                                  agentSessions={agentSessions}
+                                  onStopAgent={onStopAgent}
+                                  onContinueAgent={onContinueAgent}
+                                  onPromoteAgent={onPromoteAgent}
+                                />
+                              </td>
+                            </>
                           )}
+                        </tr>
+                      )
+                    })}
+
+                    {leftDrafts.map(({ comment, index }) => (
+                      <tr key={`draft-left-${index}`}>
+                        <td className="bg-danger/20" />
+                        <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
+                          <DraftCommentCard
+                            comment={comment}
+                            auth={auth}
+                            onRemove={() => onRemoveDraftComment(index)}
+                          />
                         </td>
-                        <td
-                          className={cn(
-                            'group/right text-foreground-subtle relative px-1 py-0 text-center font-mono text-xs',
-                            pair.right?.kind === 'addition' ? 'bg-success/20' : 'bg-background'
-                          )}
-                        >
-                          {rightKey && pair.right ? (
-                            <button
-                              type="button"
-                              onClick={() => onOpenComment(isRightComposerOpen ? null : rightKey)}
-                              className="bg-accent text-accent-foreground absolute top-1/2 right-0 z-10 mr-[-10px] hidden size-5 -translate-y-1/2 items-center justify-center rounded group-hover/right:inline-flex"
-                              aria-label="Add line comment"
-                            >
-                              <Plus size={12} />
-                            </button>
-                          ) : null}
-                          {pair.right?.newLineNumber ?? ''}
-                        </td>
-                        <td
-                          className={cn(
-                            'overflow-hidden px-3 py-0 font-mono text-[13px] break-all whitespace-pre-wrap',
-                            pair.right?.kind === 'addition'
-                              ? 'bg-success/10 text-foreground'
-                              : pair.right
-                                ? 'bg-background text-foreground'
-                                : 'bg-surface'
-                          )}
-                        >
-                          {pair.right ? (
-                            <DiffLineContent tokens={tokenMap.get(pair.right.id)} fallback={pair.right.content} />
-                          ) : (
-                            '\u00A0'
-                          )}
+                        <td className="bg-success/20" />
+                        <td className="bg-success/10" />
+                      </tr>
+                    ))}
+                    {rightDrafts.map(({ comment, index }) => (
+                      <tr key={`draft-right-${index}`}>
+                        <td className="bg-danger/20" />
+                        <td className="border-border bg-danger/10 border-r" />
+                        <td className="bg-success/20" />
+                        <td className="bg-success/10 px-3 py-3 align-top">
+                          <DraftCommentCard
+                            comment={comment}
+                            auth={auth}
+                            onRemove={() => onRemoveDraftComment(index)}
+                          />
                         </td>
                       </tr>
+                    ))}
 
-                      {rowThreads.map((thread) => {
-                        const isLeft = thread.side === 'LEFT'
-                        return (
-                          <tr key={`thread-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                            {isLeft ? (
-                              <>
-                                <td className="bg-danger/20" />
-                                <td className="border-border bg-danger/10 border-r p-1.5 align-top">
-                                  <InlineDiffThread
-                                    thread={thread}
-                                    replyTarget={replyTarget}
-                                    onFixWithClaude={onFixWithClaude}
-                                    agentSessions={agentSessions}
-                                    onStopAgent={onStopAgent}
-                                    onContinueAgent={onContinueAgent}
-                                    onPromoteAgent={onPromoteAgent}
-                                  />
-                                </td>
-                                <td className="bg-success/20" />
-                                <td className="bg-success/10" />
-                              </>
-                            ) : (
-                              <>
-                                <td className="bg-danger/20" />
-                                <td className="border-border bg-danger/10 border-r" />
-                                <td className="bg-success/20" />
-                                <td className="bg-success/10 px-3 py-2 align-top">
-                                  <InlineDiffThread
-                                    thread={thread}
-                                    replyTarget={replyTarget}
-                                    onFixWithClaude={onFixWithClaude}
-                                    agentSessions={agentSessions}
-                                    onStopAgent={onStopAgent}
-                                    onContinueAgent={onContinueAgent}
-                                    onPromoteAgent={onPromoteAgent}
-                                  />
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        )
-                      })}
-
-                      {leftDrafts.map(({ comment, index }) => (
-                        <tr key={`draft-left-${index}`}>
-                          <td className="bg-danger/20" />
-                          <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
-                            <DraftCommentCard
-                              comment={comment}
-                              auth={auth}
-                              onRemove={() => onRemoveDraftComment(index)}
-                            />
-                          </td>
-                          <td className="bg-success/20" />
-                          <td className="bg-success/10" />
-                        </tr>
-                      ))}
-                      {rightDrafts.map(({ comment, index }) => (
-                        <tr key={`draft-right-${index}`}>
-                          <td className="bg-danger/20" />
-                          <td className="border-border bg-danger/10 border-r" />
-                          <td className="bg-success/20" />
-                          <td className="bg-success/10 px-3 py-3 align-top">
-                            <DraftCommentCard
-                              comment={comment}
-                              auth={auth}
-                              onRemove={() => onRemoveDraftComment(index)}
-                            />
-                          </td>
-                        </tr>
-                      ))}
-
-                      {isLeftComposerOpen && leftKey && pair.left?.commentSide && pair.left.commentLine ? (
-                        <tr>
-                          <td className="bg-danger/20" />
-                          <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
-                            <InlineDiffCommentComposer
-                              owner={owner}
-                              repo={repo}
-                              number={number}
-                              commitId={commitId}
-                              path={filename}
-                              line={pair.left.commentLine}
-                              lineContent={pair.left.content}
-                              side={pair.left.commentSide}
-                              onCancel={() => onOpenComment(null)}
-                              onAddDraftComment={onAddDraftComment}
-                              onInlineCommentPosted={onInlineCommentPosted}
-                              onAskClaude={onAskClaude}
-                            />
-                          </td>
-                          <td className="bg-success/20" />
-                          <td className="bg-success/10" />
-                        </tr>
-                      ) : null}
-
-                      {isRightComposerOpen && rightKey && pair.right?.commentSide && pair.right.commentLine ? (
-                        <tr>
-                          <td className="bg-danger/20" />
-                          <td className="border-border bg-danger/10 border-r" />
-                          <td className="bg-success/20" />
-                          <td className="bg-success/10 px-3 py-3 align-top">
-                            <InlineDiffCommentComposer
-                              owner={owner}
-                              repo={repo}
-                              number={number}
-                              commitId={commitId}
-                              path={filename}
-                              line={pair.right.commentLine}
-                              lineContent={pair.right.content}
-                              side={pair.right.commentSide}
-                              onCancel={() => onOpenComment(null)}
-                              onAddDraftComment={onAddDraftComment}
-                              onInlineCommentPosted={onInlineCommentPosted}
-                              onAskClaude={onAskClaude}
-                            />
-                          </td>
-                        </tr>
-                      ) : null}
-
-                      {(() => {
-                        const leftLine = pair.left?.commentLine
-                        const rightLine = pair.right?.commentLine
-                        const leftSessions = leftLine != null ? (sessionsByLineNumber.get(leftLine) ?? []) : []
-                        const rightSessions =
-                          rightLine != null && rightLine !== leftLine ? (sessionsByLineNumber.get(rightLine) ?? []) : []
-                        const pairSessions =
-                          leftSessions.length === 0 ? rightSessions : leftSessions.concat(rightSessions)
-                        return pairSessions.map((session) => (
-                          <tr key={`agent-${session.id}`}>
-                            {session.context?.side === 'RIGHT' ? (
-                              <>
-                                <td className="bg-danger/20" />
-                                <td className="border-border bg-danger/10 border-r" />
-                                <td className="bg-success/20" />
-                                <td className="bg-success/10 px-3 py-3 align-top">
-                                  <InlineAgentResponseCard
-                                    session={session}
-                                    onStop={() => onStopAgent?.(session.id)}
-                                    onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
-                                    onOpenInChat={() => onPromoteAgent?.(session.id)}
-                                  />
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="bg-danger/20" />
-                                <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
-                                  <InlineAgentResponseCard
-                                    session={session}
-                                    onStop={() => onStopAgent?.(session.id)}
-                                    onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
-                                    onOpenInChat={() => onPromoteAgent?.(session.id)}
-                                  />
-                                </td>
-                                <td className="bg-success/20" />
-                                <td className="bg-success/10" />
-                              </>
-                            )}
-                          </tr>
-                        ))
-                      })()}
-                    </Fragment>
-                  )
-                })}
-
-                {hunkIndex < hunks.length - 1
-                  ? (() => {
-                      const gap = getGapAfterHunk(gapAfterByStartLine, hunk)
-                      if (!gap) return null
-                      return (
-                        <>
-                          <ExpandSeparator
-                            gap={gap}
-                            isExpanded={expandedGaps.has(gap.key)}
-                            onExpand={() => onExpandGap(gap.key)}
-                            colSpan={4}
+                    {isLeftComposerOpen && leftKey && leftRow?.line.commentSide && leftRow.line.commentLine ? (
+                      <tr>
+                        <td className="bg-danger/20" />
+                        <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
+                          <InlineDiffCommentComposer
+                            owner={owner}
+                            repo={repo}
+                            number={number}
+                            commitId={commitId}
+                            path={filename}
+                            line={leftRow.line.commentLine}
+                            lineContent={leftRow.line.content}
+                            side={leftRow.line.commentSide}
+                            onCancel={() => onOpenComment(null)}
+                            onAddDraftComment={onAddDraftComment}
+                            onInlineCommentPosted={onInlineCommentPosted}
+                            onAskClaude={onAskClaude}
                           />
-                          {expandedGaps.has(gap.key) ? (
-                            <SplitExpandedContextRows gapKey={gap.key} expandedLines={expandedLines} />
-                          ) : null}
-                        </>
-                      )
-                    })()
-                  : null}
-              </Fragment>
-            )
-          })}
+                        </td>
+                        <td className="bg-success/20" />
+                        <td className="bg-success/10" />
+                      </tr>
+                    ) : null}
+
+                    {isRightComposerOpen && rightKey && rightRow?.line.commentSide && rightRow.line.commentLine ? (
+                      <tr>
+                        <td className="bg-danger/20" />
+                        <td className="border-border bg-danger/10 border-r" />
+                        <td className="bg-success/20" />
+                        <td className="bg-success/10 px-3 py-3 align-top">
+                          <InlineDiffCommentComposer
+                            owner={owner}
+                            repo={repo}
+                            number={number}
+                            commitId={commitId}
+                            path={filename}
+                            line={rightRow.line.commentLine}
+                            lineContent={rightRow.line.content}
+                            side={rightRow.line.commentSide}
+                            onCancel={() => onOpenComment(null)}
+                            onAddDraftComment={onAddDraftComment}
+                            onInlineCommentPosted={onInlineCommentPosted}
+                            onAskClaude={onAskClaude}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {combinedSessions.map((session) => (
+                      <tr key={`agent-${session.id}`}>
+                        {session.context?.side === 'RIGHT' ? (
+                          <>
+                            <td className="bg-danger/20" />
+                            <td className="border-border bg-danger/10 border-r" />
+                            <td className="bg-success/20" />
+                            <td className="bg-success/10 px-3 py-3 align-top">
+                              <InlineAgentResponseCard
+                                session={session}
+                                onStop={() => onStopAgent?.(session.id)}
+                                onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                                onOpenInChat={() => onPromoteAgent?.(session.id)}
+                              />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="bg-danger/20" />
+                            <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
+                              <InlineAgentResponseCard
+                                session={session}
+                                onStop={() => onStopAgent?.(session.id)}
+                                onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+                                onOpenInChat={() => onPromoteAgent?.(session.id)}
+                              />
+                            </td>
+                            <td className="bg-success/20" />
+                            <td className="bg-success/10" />
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </Fragment>
+                )
+              })}
+
+              {hunk.gapAfter ? (
+                <>
+                  <ExpandSeparator
+                    gap={hunk.gapAfter}
+                    isExpanded={expandedGaps.has(hunk.gapAfter.key)}
+                    onExpand={() => onExpandGap(hunk.gapAfter!.key)}
+                    colSpan={4}
+                  />
+                  {expandedGaps.has(hunk.gapAfter.key) ? (
+                    <SplitExpandedContextRows gapKey={hunk.gapAfter.key} expandedLines={expandedLines} />
+                  ) : null}
+                </>
+              ) : null}
+            </Fragment>
+          ))}
         </tbody>
       </table>
     </div>
