@@ -127,13 +127,9 @@ The shadow is comprised of three layers. The first acts as a 1px border ring, th
 ```css
 :root {
   --shadow-border:
-    0px 0px 0px 1px rgba(0, 0, 0, 0.06),
-    0px 1px 2px -1px rgba(0, 0, 0, 0.06),
-    0px 2px 4px 0px rgba(0, 0, 0, 0.04);
+    0px 0px 0px 1px rgba(0, 0, 0, 0.06), 0px 1px 2px -1px rgba(0, 0, 0, 0.06), 0px 2px 4px 0px rgba(0, 0, 0, 0.04);
   --shadow-border-hover:
-    0px 0px 0px 1px rgba(0, 0, 0, 0.08),
-    0px 1px 2px -1px rgba(0, 0, 0, 0.08),
-    0px 2px 4px 0px rgba(0, 0, 0, 0.06);
+    0px 0px 0px 1px rgba(0, 0, 0, 0.08), 0px 1px 2px -1px rgba(0, 0, 0, 0.08), 0px 2px 4px 0px rgba(0, 0, 0, 0.06);
 }
 ```
 
@@ -167,13 +163,13 @@ Apply the variable and add `transition-[box-shadow]` for a smooth hover:
 
 ### When to Use Shadows vs. Borders
 
-| Use shadows | Use borders |
-| --- | --- |
-| Cards, containers with depth | Dividers between list items |
-| Buttons with bordered styles | Table cell boundaries |
+| Use shadows                           | Use borders                             |
+| ------------------------------------- | --------------------------------------- |
+| Cards, containers with depth          | Dividers between list items             |
+| Buttons with bordered styles          | Table cell boundaries                   |
 | Elevated elements (dropdowns, modals) | Form input outlines (for accessibility) |
-| Elements on varied backgrounds | Hairline separators in dense UI |
-| Hover/focus states for lift effect | |
+| Elements on varied backgrounds        | Hairline separators in dense UI         |
+| Hover/focus states for lift effect    |                                         |
 
 ## Image Outlines
 
@@ -207,11 +203,7 @@ img {
 ### Tailwind with Dark Mode
 
 ```tsx
-<img
-  className="outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
-  src={src}
-  alt={alt}
-/>
+<img className="outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10" src={src} alt={alt} />
 ```
 
 Use `outline-black/10` and `outline-white/10` specifically — not `outline-slate-*`, `outline-zinc-*`, `outline-neutral-*`, or any tinted scale.
@@ -233,7 +225,7 @@ Interactive elements should have a minimum hit area of 44×44px (WCAG) or at lea
 }
 
 .checkbox::after {
-  content: "";
+  content: '';
   position: absolute;
   top: 50%;
   left: 50%;
