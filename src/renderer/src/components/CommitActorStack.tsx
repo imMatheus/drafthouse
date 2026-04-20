@@ -1,6 +1,6 @@
 import { GitCommit } from 'lucide-react'
 import { cn } from '../lib/cn'
-import type { PullRequestCommit, PullRequestCommitAuthors } from '../../../shared/types'
+import type { GitHubCommit, PullRequestCommit, PullRequestCommitAuthors } from '../../../shared/types'
 
 export interface CommitActor {
   name: string
@@ -57,7 +57,10 @@ export default function CommitActorStack({ actors, size = 'md', max = 2, classNa
   )
 }
 
-export function getCommitActors(commit: PullRequestCommit, resolved?: PullRequestCommitAuthors): CommitActor[] {
+export function getCommitActors(
+  commit: PullRequestCommit | GitHubCommit,
+  resolved?: PullRequestCommitAuthors
+): CommitActor[] {
   const graphqlAuthors = resolved?.[commit.sha]
   if (graphqlAuthors && graphqlAuthors.length > 0) {
     return graphqlAuthors.map((a) => ({

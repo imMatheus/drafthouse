@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
@@ -138,10 +138,14 @@ export default function PRFilesTab({
   })
 
   const allFiles = files ?? EMPTY_FILES
-  const trimmedFilter = filterValue.trim().toLowerCase()
-  const filteredFiles =
-    trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
-  const fileTree = buildFileTree(filteredFiles)
+  const deferredFilterValue = useDeferredValue(filterValue)
+  const trimmedFilter = deferredFilterValue.trim().toLowerCase()
+  const filteredFiles = useMemo(
+    () =>
+      trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter)),
+    [allFiles, trimmedFilter]
+  )
+  const fileTree = useMemo(() => buildFileTree(filteredFiles), [filteredFiles])
 
   const reviewThreads = useMemo(
     () => buildPullRequestReviewThreads(reviewComments ?? [], reviewThreadSummaries),
@@ -353,8 +357,8 @@ export default function PRFilesTab({
           ) : null}
           {isLoading ? <p className="text-foreground-muted text-sm">Loading changed files...</p> : null}
           <div className="flex flex-col gap-5">
-            {filteredFiles.map((file) => (
-              <PullRequestFileDiffCard
+            {filteredFiles.map((file, index) => (
+              <ChangedFileDiffCard
                 key={file.filename}
                 owner={owner}
                 repo={repo}
@@ -376,6 +380,9 @@ export default function PRFilesTab({
                 onAddDraftComment={handleAddDraftComment}
                 onRemoveDraftComment={handleRemoveDraftComment}
                 onInlineCommentPosted={handleInlineCommentPosted}
+                allowCommenting
+                isActive={activeFilePath === file.filename}
+                initiallyVisible={index < 3}
                 sectionRef={(element) => {
                   if (element) fileSectionRefs.current.set(file.filename, element)
                   else fileSectionRefs.current.delete(file.filename)
@@ -415,7 +422,7 @@ export default function PRFilesTab({
 // PullRequestFileDiffCard — patch-based hunk rendering
 // ────────────────────────────────────────────────────────────
 
-function PullRequestFileDiffCard({
+export function ChangedFileDiffCard({
   owner,
   repo,
   number,
@@ -436,6 +443,9 @@ function PullRequestFileDiffCard({
   onAddDraftComment,
   onRemoveDraftComment,
   onInlineCommentPosted,
+  allowCommenting = true,
+  isActive = false,
+  initiallyVisible = false,
   sectionRef,
   threadRef
 }: {
@@ -465,6 +475,9 @@ function PullRequestFileDiffCard({
   onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
   onRemoveDraftComment: (index: number) => void
   onInlineCommentPosted: () => Promise<void>
+  allowCommenting?: boolean
+  isActive?: boolean
+  initiallyVisible?: boolean
   sectionRef: (element: HTMLElement | null) => void
   threadRef: (commentId: number, element: HTMLElement | null) => void
 }) {
@@ -488,6 +501,18 @@ function PullRequestFileDiffCard({
   const [expandedLines, setExpandedLines] = useState<Map<string, ExpandedContextLines>>(new Map())
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [pathCopied, setPathCopied] = useState(false)
+  const [hasRenderedDiffBody, setHasRenderedDiffBody] = useState(initiallyVisible)
+  const diffBodyObserverRef = useRef<IntersectionObserver | null>(null)
+
+  useEffect(() => {
+    if (isActive || initiallyVisible) {
+      setHasRenderedDiffBody(true)
+    }
+  }, [initiallyVisible, isActive])
+
+  useEffect(() => {
+    return () => diffBodyObserverRef.current?.disconnect()
+  }, [])
 
   const handleCopyPath = (): void => {
     navigator.clipboard.writeText(file.filename).catch(() => {})
@@ -495,16 +520,20 @@ function PullRequestFileDiffCard({
     setTimeout(() => setPathCopied(false), 1500)
   }
 
+  const shouldRenderDiffBody = hasRenderedDiffBody && !isCollapsed
+
   useEffect(() => {
+    if (!shouldRenderDiffBody || !prepared.hasRenderablePatch) return
+
     const lang = getLanguageFromPath(file.filename)
     tokenizeDiffHunks(parsedDiff.hunks, lang, theme).then(setTokenMap)
-  }, [parsedDiff, theme])
+  }, [file.filename, parsedDiff.hunks, prepared.hasRenderablePatch, shouldRenderDiffBody, theme])
 
   // Lazily fetch full file content for expanding gaps
   const { data: fullFileContent } = useQuery<string, Error>({
     queryKey: ['pr-file-content', owner, repo, commitId, file.filename],
     queryFn: () => window.api.github.repos.getContent(owner, repo, file.filename, commitId),
-    enabled: expandedGaps.size > 0,
+    enabled: shouldRenderDiffBody && expandedGaps.size > 0,
     retry: false
   })
 
@@ -575,19 +604,46 @@ function PullRequestFileDiffCard({
     threadRef,
     expandedGaps,
     expandedLines,
-    onExpandGap: handleExpandGap
+    onExpandGap: handleExpandGap,
+    allowCommenting
   }
 
   return (
     <section
-      ref={sectionRef}
+      ref={(element) => {
+        sectionRef(element)
+
+        diffBodyObserverRef.current?.disconnect()
+
+        if (!element || hasRenderedDiffBody) {
+          return
+        }
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) {
+              setHasRenderedDiffBody(true)
+              observer.disconnect()
+            }
+          },
+          { rootMargin: '900px 0px' }
+        )
+
+        observer.observe(element)
+        diffBodyObserverRef.current = observer
+      }}
       data-file-path={file.filename}
       className="border-border bg-surface overflow-hidden rounded-xl border"
     >
       <header className={cn('flex items-center gap-2 px-3 py-1.5', !isCollapsed && 'border-border border-b')}>
         <button
           type="button"
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={() => {
+            if (isCollapsed) {
+              setHasRenderedDiffBody(true)
+            }
+            setIsCollapsed(!isCollapsed)
+          }}
           className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
           aria-label={isCollapsed ? 'Expand file' : 'Collapse file'}
         >
@@ -623,7 +679,9 @@ function PullRequestFileDiffCard({
 
       {isCollapsed ? null : (
         <>
-          {prepared.hasRenderablePatch ? (
+          {!hasRenderedDiffBody ? (
+            <div className="text-foreground-muted px-4 py-6 text-sm">Rendering diff…</div>
+          ) : prepared.hasRenderablePatch ? (
             settings.diffViewMode === 'split' ? (
               <SplitHunkDiff {...diffProps} />
             ) : (
@@ -704,6 +762,7 @@ interface HunkDiffProps {
   expandedGaps: Set<string>
   expandedLines: Map<string, ExpandedContextLines>
   onExpandGap: (gapKey: string) => void
+  allowCommenting: boolean
 }
 
 function DiffLineContent({ tokens, fallback }: { tokens: HighlightedToken[] | undefined; fallback: string }) {
@@ -838,7 +897,8 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
     threadRef,
     expandedGaps,
     expandedLines,
-    onExpandGap
+    onExpandGap,
+    allowCommenting
   } = props
 
   return (
@@ -871,7 +931,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
 
               {hunk.rows.map((row) => {
                 const { line, rowKey, threads, drafts, sessions } = row
-                const isComposerOpen = rowKey !== null && openCommentKey === rowKey
+                const isComposerOpen = allowCommenting && rowKey !== null && openCommentKey === rowKey
 
                 return (
                   <Fragment key={line.id}>
@@ -890,7 +950,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                           getFileDiffLineNumClassName(line.kind)
                         )}
                       >
-                        {rowKey ? (
+                        {allowCommenting && rowKey ? (
                           <button
                             type="button"
                             onClick={() => onOpenComment(isComposerOpen ? null : rowKey)}
@@ -942,7 +1002,7 @@ function UnifiedHunkDiff(props: HunkDiffProps) {
                       </tr>
                     ))}
 
-                    {isComposerOpen && rowKey && line.commentSide && line.commentLine ? (
+                    {allowCommenting && isComposerOpen && rowKey && line.commentSide && line.commentLine ? (
                       <tr>
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
                         <td className={cn('w-12', getFileDiffLineNumClassName(line.kind))} />
@@ -1034,7 +1094,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
     threadRef,
     expandedGaps,
     expandedLines,
-    onExpandGap
+    onExpandGap,
+    allowCommenting
   } = props
 
   return (
@@ -1101,8 +1162,8 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       ? leftSessions
                       : [...leftSessions, ...rightSessions]
 
-                const isLeftComposerOpen = leftKey !== null && openCommentKey === leftKey
-                const isRightComposerOpen = rightKey !== null && openCommentKey === rightKey
+                const isLeftComposerOpen = allowCommenting && leftKey !== null && openCommentKey === leftKey
+                const isRightComposerOpen = allowCommenting && rightKey !== null && openCommentKey === rightKey
 
                 return (
                   <Fragment key={`${hunk.id}-pair-${idx}`}>
@@ -1113,7 +1174,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                           leftRow?.line.kind === 'deletion' ? 'bg-danger/20' : 'bg-background'
                         )}
                       >
-                        {leftKey && leftRow ? (
+                        {allowCommenting && leftKey && leftRow ? (
                           <button
                             type="button"
                             onClick={() => onOpenComment(isLeftComposerOpen ? null : leftKey)}
@@ -1147,7 +1208,7 @@ function SplitHunkDiff(props: HunkDiffProps) {
                           rightRow?.line.kind === 'addition' ? 'bg-success/20' : 'bg-background'
                         )}
                       >
-                        {rightKey && rightRow ? (
+                        {allowCommenting && rightKey && rightRow ? (
                           <button
                             type="button"
                             onClick={() => onOpenComment(isRightComposerOpen ? null : rightKey)}
@@ -1249,7 +1310,11 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       </tr>
                     ))}
 
-                    {isLeftComposerOpen && leftKey && leftRow?.line.commentSide && leftRow.line.commentLine ? (
+                    {allowCommenting &&
+                    isLeftComposerOpen &&
+                    leftKey &&
+                    leftRow?.line.commentSide &&
+                    leftRow.line.commentLine ? (
                       <tr>
                         <td className="bg-danger/20" />
                         <td className="border-border bg-danger/10 border-r px-3 py-3 align-top">
@@ -1273,7 +1338,11 @@ function SplitHunkDiff(props: HunkDiffProps) {
                       </tr>
                     ) : null}
 
-                    {isRightComposerOpen && rightKey && rightRow?.line.commentSide && rightRow.line.commentLine ? (
+                    {allowCommenting &&
+                    isRightComposerOpen &&
+                    rightKey &&
+                    rightRow?.line.commentSide &&
+                    rightRow.line.commentLine ? (
                       <tr>
                         <td className="bg-danger/20" />
                         <td className="border-border bg-danger/10 border-r" />

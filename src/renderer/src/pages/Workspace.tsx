@@ -16,6 +16,7 @@ import WorkspaceTopBar from '../components/WorkspaceTopBar'
 import type { WorkspaceSession } from '../lib/workspaceSession'
 import {
   createAgentTab,
+  createCommitTab,
   createDiffTab,
   createFileTab,
   createPullRequestTab,
@@ -28,6 +29,7 @@ import DiffView from './workspace/DiffView'
 import FilesView from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
 import PullRequestDetailView from './workspace/PullRequestDetailView'
+import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
 
@@ -230,6 +232,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const handleOpenPullRequest = (number: number): void => {
     openOrFocusTab(createPullRequestTab(number))
+  }
+
+  const handleOpenCommit = (sha: string, title?: string): void => {
+    openOrFocusTab(createCommitTab(sha, title))
   }
 
   const handleToggleSidebar = (panel: 'explorer' | 'source-control' | 'pull-requests' | 'agent'): void => {
@@ -482,6 +488,19 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
+  const handleCommitTitleChange = (tabId: WorkspaceTab['id'], title: string): void => {
+    const currentTab = tabs.find((tab) => tab.id === tabId)
+
+    if (!currentTab || currentTab.kind !== 'commit' || currentTab.title === title) {
+      return
+    }
+
+    onUpdateSession({
+      ...session,
+      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'commit' ? { ...tab, title } : tab))
+    })
+  }
+
   const handlePromoteAgentSession = (sessionId: string): void => {
     const target = agentSessions.find((s) => s.id === sessionId)
     if (!target) return
@@ -625,13 +644,15 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                   isLoadingGitInfo,
                   agentSessions,
                   onOpenFile: handleOpenFile,
+                  onOpenCommit: handleOpenCommit,
                   onStartAgent: handleStartAgent,
                   onContinueAgent: handleContinueAgent,
                   onStopAgent: handleStopAgent,
                   onPromoteAgent: handlePromoteAgentSession,
                   onPullRequestSubviewChange: handlePullRequestSubviewChange,
                   onPullRequestTitleChange: handlePullRequestTitleChange,
-                  onPullRequestStateChange: handlePullRequestStateChange
+                  onPullRequestStateChange: handlePullRequestStateChange,
+                  onCommitTitleChange: handleCommitTitleChange
                 })}
               </main>
             </div>
@@ -660,13 +681,15 @@ function renderWorkspaceTabContent({
   isLoadingGitInfo,
   agentSessions,
   onOpenFile,
+  onOpenCommit,
   onStartAgent,
   onContinueAgent,
   onStopAgent,
   onPromoteAgent,
   onPullRequestSubviewChange,
   onPullRequestTitleChange,
-  onPullRequestStateChange
+  onPullRequestStateChange,
+  onCommitTitleChange
 }: {
   activeTab: WorkspaceTab | null
   folderPath: string
@@ -674,6 +697,7 @@ function renderWorkspaceTabContent({
   isLoadingGitInfo: boolean
   agentSessions: AgentSession[]
   onOpenFile: (path: string) => void
+  onOpenCommit: (sha: string, title?: string) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueAgent: (sessionId: string, prompt: string, files?: string[], cliPrompt?: string) => Promise<void>
   onStopAgent: (sessionId: string) => Promise<void>
@@ -681,6 +705,7 @@ function renderWorkspaceTabContent({
   onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void
   onPullRequestTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
   onPullRequestStateChange: (tabId: WorkspaceTab['id'], prState: 'open' | 'closed' | 'merged' | 'draft') => void
+  onCommitTitleChange: (tabId: WorkspaceTab['id'], title: string) => void
 }): ReactNode {
   if (!activeTab) {
     return (
@@ -717,6 +742,7 @@ function renderWorkspaceTabContent({
           onSubviewChange={(subview) => onPullRequestSubviewChange(activeTab.id, subview)}
           onTitleChange={(title) => onPullRequestTitleChange(activeTab.id, title)}
           onStateChange={(prState) => onPullRequestStateChange(activeTab.id, prState)}
+          onOpenCommit={onOpenCommit}
           onStartAgent={onStartAgent}
           onContinueAgent={onContinueAgent}
           onStopAgent={onStopAgent}
@@ -724,6 +750,21 @@ function renderWorkspaceTabContent({
         />
       ) : (
         <PlaceholderView title="Pull Request" description="Repository metadata is not available." />
+      )
+    case 'commit':
+      if (isLoadingGitInfo) {
+        return <p className="text-foreground-muted text-sm">Checking repository metadata...</p>
+      }
+
+      return gitInfo ? (
+        <CommitDetailView
+          owner={gitInfo.owner}
+          repo={gitInfo.repo}
+          commitSha={activeTab.sha}
+          onTitleChange={(title) => onCommitTitleChange(activeTab.id, title)}
+        />
+      ) : (
+        <PlaceholderView title="Commit" description="Repository metadata is not available." />
       )
     case 'agent': {
       const agentSession = agentSessions.find((s) => s.id === activeTab.sessionId) ?? null

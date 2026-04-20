@@ -1,5 +1,14 @@
 import { type ReactNode, useState } from 'react'
-import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Home, Terminal, X } from 'lucide-react'
+import {
+  GitCommit,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  Home,
+  Terminal,
+  X
+} from 'lucide-react'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
@@ -168,6 +177,11 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
       return {
         icon: <PrStateBadge prState={tab.prState} />,
         label: tab.title ?? `PR #${tab.number}`
+      }
+    case 'commit':
+      return {
+        icon: <GitCommit size={14} strokeWidth={1.8} className="text-accent" />,
+        label: tab.title ?? `Commit ${tab.sha.slice(0, 7)}`
       }
   }
 }

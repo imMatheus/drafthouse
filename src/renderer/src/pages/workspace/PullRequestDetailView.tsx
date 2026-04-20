@@ -76,6 +76,7 @@ interface PullRequestDetailViewProps {
   onSubviewChange: (subview: PullRequestSubview) => void
   onTitleChange?: (title: string) => void
   onStateChange?: (prState: 'open' | 'closed' | 'merged' | 'draft') => void
+  onOpenCommit: (sha: string, title?: string) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent: (sessionId: string) => Promise<void>
@@ -92,6 +93,7 @@ export default function PullRequestDetailView({
   onSubviewChange,
   onTitleChange,
   onStateChange,
+  onOpenCommit,
   onStartAgent,
   onContinueAgent,
   onStopAgent,
@@ -272,6 +274,7 @@ export default function PullRequestDetailView({
                 owner={owner}
                 repo={repo}
                 agentSessions={agentSessions}
+                onOpenCommit={onOpenCommit}
                 onViewReviewThread={(thread) => {
                   onSubviewChange('files')
                   setThreadJumpTarget({
@@ -301,7 +304,13 @@ export default function PullRequestDetailView({
         ) : null}
 
         {subview === 'commits' ? (
-          <PRCommitsTab owner={owner} repo={repo} number={pr.number} totalCommits={pr.commits} />
+          <PRCommitsTab
+            owner={owner}
+            repo={repo}
+            number={pr.number}
+            totalCommits={pr.commits}
+            onOpenCommit={onOpenCommit}
+          />
         ) : null}
 
         {subview === 'files' ? (
@@ -371,6 +380,7 @@ function PRConversationTab({
   owner,
   repo,
   agentSessions,
+  onOpenCommit,
   onViewReviewThread,
   onStartAgent,
   onContinueAgent,
@@ -382,6 +392,7 @@ function PRConversationTab({
   owner: string
   repo: string
   agentSessions: AgentSession[]
+  onOpenCommit: (sha: string, title?: string) => void
   onViewReviewThread: (thread: PullRequestReviewThread) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
@@ -503,6 +514,7 @@ function PRConversationTab({
           prNumber={pr.number}
           resolvedAuthors={resolvedAuthors}
           agentSessions={agentSessions}
+          onOpenCommit={onOpenCommit}
           onViewReviewThread={onViewReviewThread}
           onQuoteReply={handleQuoteReply}
           onFixWithClaude={onFixWithClaude}
@@ -630,6 +642,7 @@ function PullRequestTimelineCard({
   prNumber,
   resolvedAuthors,
   agentSessions,
+  onOpenCommit,
   onViewReviewThread,
   onQuoteReply,
   onFixWithClaude,
@@ -643,6 +656,7 @@ function PullRequestTimelineCard({
   prNumber: number
   resolvedAuthors: PullRequestCommitAuthors | undefined
   agentSessions: AgentSession[]
+  onOpenCommit: (sha: string, title?: string) => void
   onViewReviewThread: (thread: PullRequestReviewThread) => void
   onQuoteReply: (quoted: string) => void
   onFixWithClaude: (input: FixWithClaudeInput) => Promise<void>
@@ -668,7 +682,7 @@ function PullRequestTimelineCard({
   }
 
   if (item.type === 'commit') {
-    return <CommitTimelineRow commit={item.commit} resolvedAuthors={resolvedAuthors} />
+    return <CommitTimelineRow commit={item.commit} resolvedAuthors={resolvedAuthors} onOpenCommit={onOpenCommit} />
   }
 
   return (
@@ -741,10 +755,12 @@ function getReviewStateText(state: string): string {
 
 function CommitTimelineRow({
   commit,
-  resolvedAuthors
+  resolvedAuthors,
+  onOpenCommit
 }: {
   commit: PullRequestCommit
   resolvedAuthors: PullRequestCommitAuthors | undefined
+  onOpenCommit: (sha: string, title?: string) => void
 }) {
   const subject = commit.commit.message.split('\n')[0]?.trim() || 'Untitled commit'
   const actors = getCommitActors(commit, resolvedAuthors)
@@ -770,9 +786,14 @@ function CommitTimelineRow({
 
       <div className="flex min-h-8 min-w-0 items-center gap-2">
         <CommitActorStack actors={actors} size="sm" />
-        <span className="text-foreground min-w-0 truncate text-xs font-medium" title={subject}>
+        <button
+          type="button"
+          onClick={() => onOpenCommit(commit.sha, subject)}
+          className="text-foreground hover:text-accent min-w-0 flex-1 truncate text-left text-xs font-medium transition-colors"
+          title={subject}
+        >
           {subject}
-        </span>
+        </button>
         <div className="ml-auto flex shrink-0 items-center gap-1">
           <span className="text-foreground-muted font-mono text-xs">{commit.sha.slice(0, 7)}</span>
           <Tooltip label={isCopied ? 'Copied' : 'Copy SHA'} side="top">

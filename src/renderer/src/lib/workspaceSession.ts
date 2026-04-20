@@ -1,4 +1,5 @@
 import {
+  createCommitTab,
   createDiffTab,
   createFileTab,
   createInitialWorkspaceSession,
@@ -154,6 +155,11 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
       return typeof tab.path === 'string' && tab.path.length > 0
         ? createDiffTab(tab.path, typeof tab.staged === 'boolean' ? tab.staged : false)
         : null
+    case 'commit':
+      if (typeof tab.sha !== 'string' || tab.sha.length === 0) {
+        return null
+      }
+      return createCommitTab(tab.sha, typeof tab.title === 'string' && tab.title.length > 0 ? tab.title : undefined)
     case 'agent':
       // Agent tabs are ephemeral — don't restore from session
       return null

@@ -25,6 +25,12 @@ export type WorkspaceTab =
       prState?: 'open' | 'closed' | 'merged' | 'draft'
     }
   | {
+      id: `commit:${string}`
+      kind: 'commit'
+      sha: string
+      title?: string
+    }
+  | {
       id: `agent:${string}`
       kind: 'agent'
       sessionId: string
@@ -93,6 +99,19 @@ export function getFileTabId(path: string): `file:${string}` {
 
 export function getPullRequestTabId(number: number): `pull-request:${number}` {
   return `pull-request:${number}`
+}
+
+export function createCommitTab(sha: string, title?: string): WorkspaceTab {
+  return {
+    id: getCommitTabId(sha),
+    kind: 'commit',
+    sha,
+    title
+  }
+}
+
+export function getCommitTabId(sha: string): `commit:${string}` {
+  return `commit:${sha}`
 }
 
 export function createDiffTab(path: string, staged: boolean): WorkspaceTab {

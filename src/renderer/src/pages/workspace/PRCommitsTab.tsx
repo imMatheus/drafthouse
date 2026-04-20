@@ -20,12 +20,14 @@ export default function PRCommitsTab({
   owner,
   repo,
   number,
-  totalCommits
+  totalCommits,
+  onOpenCommit
 }: {
   owner: string
   repo: string
   number: number
   totalCommits: number
+  onOpenCommit: (sha: string, title?: string) => void
 }) {
   const [page, setPage] = useState(1)
   const queryClient = useQueryClient()
@@ -86,7 +88,12 @@ export default function PRCommitsTab({
       {items.length > 0 ? (
         <div className="flex flex-col gap-6">
           {commitGroups.map((group) => (
-            <CommitDayGroup key={group.dateKey} group={group} resolvedAuthors={resolvedAuthors} />
+            <CommitDayGroup
+              key={group.dateKey}
+              group={group}
+              resolvedAuthors={resolvedAuthors}
+              onOpenCommit={onOpenCommit}
+            />
           ))}
         </div>
       ) : null}
@@ -129,10 +136,12 @@ export default function PRCommitsTab({
 
 function CommitDayGroup({
   group,
-  resolvedAuthors
+  resolvedAuthors,
+  onOpenCommit
 }: {
   group: CommitDayGroupData
   resolvedAuthors: PullRequestCommitAuthors | undefined
+  onOpenCommit: (sha: string, title?: string) => void
 }) {
   return (
     <section className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3">
@@ -158,6 +167,7 @@ function CommitDayGroup({
               commit={commit}
               isLast={index === group.items.length - 1}
               resolvedAuthors={resolvedAuthors}
+              onOpenCommit={onOpenCommit}
             />
           ))}
         </div>
@@ -200,11 +210,13 @@ function PRCommitsPagination({
 function CommitRow({
   commit,
   isLast,
-  resolvedAuthors
+  resolvedAuthors,
+  onOpenCommit
 }: {
   commit: PullRequestCommit
   isLast: boolean
   resolvedAuthors: PullRequestCommitAuthors | undefined
+  onOpenCommit: (sha: string, title?: string) => void
 }) {
   const subject = getCommitSubject(commit.commit.message)
   const body = getCommitBody(commit.commit.message)
@@ -230,7 +242,13 @@ function CommitRow({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="text-foreground truncate text-[15px] font-semibold">{subject}</p>
+            <button
+              type="button"
+              onClick={() => onOpenCommit(commit.sha, subject)}
+              className="text-foreground hover:text-accent min-w-0 flex-1 truncate text-left text-[15px] font-semibold transition-colors"
+            >
+              {subject}
+            </button>
             {isMergeCommit ? (
               <span className="bg-purple/10 text-purple rounded-full px-2 py-0.5 text-[11px] font-medium">Merge</span>
             ) : null}
