@@ -31,7 +31,7 @@ export function UserBubble({ text, markdown, compact }: { text: string; markdown
     <div className="mt-2 mb-3 flex justify-end">
       <div
         className={cn(
-          'bg-interactive text-foreground max-w-[80%] rounded-2xl px-3 py-2',
+          'bg-accent-bg text-accent max-w-[80%] rounded-2xl px-3 py-2',
           compact ? 'text-xs' : 'text-sm'
         )}
       >

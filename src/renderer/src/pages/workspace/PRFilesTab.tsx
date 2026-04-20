@@ -340,7 +340,7 @@ export default function PRFilesTab({
                 <button
                   type="button"
                   onClick={() => setIsSubmitReviewOpen(true)}
-                  className="bg-accent text-foreground hover:bg-accent-hover w-full rounded-md px-3 py-1.5 text-xs font-medium tabular-nums transition-[background-color,color,transform] active:scale-[0.96]"
+                  className="bg-accent text-accent-foreground hover:bg-accent-hover w-full rounded-md px-3 py-1.5 text-xs font-medium tabular-nums transition-[background-color,color,transform] active:scale-[0.96]"
                 >
                   Submit review ({draftReviewComments.length})
                 </button>
@@ -1686,7 +1686,7 @@ function InlineDiffThread({
               type="button"
               onClick={handleReply}
               disabled={isSubmitting}
-              className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40"
+              className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40"
             >
               {isSubmitting ? 'Replying...' : 'Reply'}
             </button>
@@ -1811,7 +1811,7 @@ function InlineDiffCommentComposer({
             type="button"
             onClick={handleAddSingleComment}
             disabled={!body.trim() || isSubmitting}
-            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Adding...' : claudeMention ? 'Ask Claude' : 'Add comment'}
           </button>
