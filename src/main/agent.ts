@@ -78,6 +78,9 @@ function buildPromptWithFiles(prompt: string, files?: string[]): string {
   return `${fileRefs}\n\n${prompt}`
 }
 
+const BASELINE_SYSTEM_PROMPT =
+  'UI rendering: whenever you mention a GitHub pull request in your response, include its full URL (e.g. `https://github.com/{owner}/{repo}/pull/{number}`) inline with the mention. The chat UI parses these URLs and renders them as interactive PR pills showing the number, title, and state. Prefer the URL form over bare `#N` references.'
+
 function buildCliArgs(options: { prompt: string; resumeSessionId?: string; appendSystemPrompt?: string }): string[] {
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions']
 
@@ -85,9 +88,10 @@ function buildCliArgs(options: { prompt: string; resumeSessionId?: string; appen
     args.push('--resume', options.resumeSessionId)
   }
 
-  if (options.appendSystemPrompt) {
-    args.push('--append-system-prompt', options.appendSystemPrompt)
-  }
+  const combinedSystemPrompt = options.appendSystemPrompt
+    ? `${BASELINE_SYSTEM_PROMPT}\n\n${options.appendSystemPrompt}`
+    : BASELINE_SYSTEM_PROMPT
+  args.push('--append-system-prompt', combinedSystemPrompt)
 
   args.push(options.prompt)
   return args

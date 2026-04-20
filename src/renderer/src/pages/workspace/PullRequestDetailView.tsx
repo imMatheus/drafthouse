@@ -194,7 +194,7 @@ export default function PullRequestDetailView({
     <div>
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-foreground text-xl font-semibold text-balance">
-          {pr.title} <span className="text-foreground-subtle tabular-nums font-normal">#{pr.number}</span>
+          {pr.title} <span className="text-foreground-subtle font-normal tabular-nums">#{pr.number}</span>
         </h1>
         <a
           href={pr.html_url}
@@ -1140,14 +1140,14 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
           <button
             onClick={handleCancel}
             disabled={isSaving}
-            className="bg-interactive text-foreground hover:bg-surface-hover rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:opacity-40"
+            className="bg-interactive text-foreground hover:bg-surface-hover rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
           >
             Cancel
           </button>
           <button
             onClick={() => void handleSave()}
             disabled={isSaving}
-            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:opacity-40"
+            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
@@ -1423,7 +1423,7 @@ function CommentBox({
           <button
             onClick={handleSubmit}
             disabled={!body.trim() || isSubmitting}
-            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
           >
             {isSubmitting ? 'Commenting...' : claudeMention ? 'Ask Claude' : 'Comment'}
           </button>
@@ -1554,7 +1554,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
               <button
                 onClick={handleMerge}
                 disabled={isSubmitting || pr.mergeable === null || mergeDisabledReason !== null}
-                className="bg-success text-foreground hover:bg-success/80 rounded-l-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="bg-success text-foreground hover:bg-success/80 rounded-l-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <GitMerge size={14} />
@@ -1568,7 +1568,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
               <button
                 onClick={() => setIsMergeMethodOpen(!isMergeMethodOpen)}
                 disabled={isSubmitting}
-                className="border-success/30 bg-success text-foreground hover:bg-success/80 rounded-r-md border-l px-2 py-2 transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="border-success/30 bg-success text-foreground hover:bg-success/80 rounded-r-md border-l px-2 py-2 transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               >
                 <ChevronDown size={14} />
               </button>
@@ -1603,7 +1603,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleClose}
               disabled={isSubmitting}
-              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
             >
               {isSubmitting ? 'Closing...' : 'Close pull request'}
             </button>
@@ -1611,7 +1611,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleConvertToDraft}
               disabled={isSubmitting}
-              className="text-foreground-muted hover:text-foreground rounded-md px-4 py-2 text-xs font-medium transition-[color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="text-foreground-muted hover:text-foreground rounded-md px-4 py-2 text-xs font-medium transition-[color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
             >
               Convert to draft
             </button>
@@ -1623,7 +1623,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleMarkReady}
               disabled={isSubmitting}
-              className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
             >
               {isSubmitting ? 'Marking ready...' : 'Ready for review'}
             </button>
@@ -1631,7 +1631,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleClose}
               disabled={isSubmitting}
-              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
             >
               {isSubmitting ? 'Closing...' : 'Close pull request'}
             </button>
@@ -1642,7 +1642,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
           <button
             onClick={handleReopen}
             disabled={isSubmitting}
-            className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
           >
             {isSubmitting ? 'Reopening...' : 'Reopen pull request'}
           </button>

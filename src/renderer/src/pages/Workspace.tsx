@@ -32,6 +32,7 @@ import PullRequestDetailView from './workspace/PullRequestDetailView'
 import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
+import { WorkspaceContextProvider } from '../contexts/WorkspaceContext'
 
 interface WorkspaceProps {
   session: WorkspaceSession
@@ -568,109 +569,115 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const projectName = getPathBasename(folderPath)
 
   return (
-    <div className="bg-background flex w-screen flex-1 flex-col">
-      <WorkspaceTopBar
-        projectName={projectName}
-        onToggleSidebar={handleToggleSidebarVisibility}
-        canGoBack={canGoBack}
-        canGoForward={canGoForward}
-        onGoBack={handleGoBack}
-        onGoForward={handleGoForward}
-      />
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <ActivityBar
-          items={activityItems}
-          onSettingsClick={handleToggleSettings}
-          settingsActive={activeView === 'settings'}
+    <WorkspaceContextProvider value={{ gitInfo: gitInfo ?? null, onOpenPullRequest: handleOpenPullRequest }}>
+      <div className="bg-background flex w-screen flex-1 flex-col">
+        <WorkspaceTopBar
+          projectName={projectName}
+          onToggleSidebar={handleToggleSidebarVisibility}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          onGoBack={handleGoBack}
+          onGoForward={handleGoForward}
         />
 
-        {activeView === 'settings' ? (
-          <SettingsView />
-        ) : (
-          <>
-            {sidebar.visible && sidebar.activePanel === 'explorer' ? (
-              <ExplorerPanel folderPath={folderPath} selectedFilePath={activeFilePath} onSelectFile={handleOpenFile} />
-            ) : null}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <ActivityBar
+            items={activityItems}
+            onSettingsClick={handleToggleSettings}
+            settingsActive={activeView === 'settings'}
+          />
 
-            {sidebar.visible && sidebar.activePanel === 'source-control' ? (
-              <SourceControlPanel
-                folderPath={folderPath}
-                gitInfo={gitInfo}
-                onOpenDiff={handleOpenDiff}
-                onOpenPullRequest={handleOpenPullRequest}
-              />
-            ) : null}
+          {activeView === 'settings' ? (
+            <SettingsView />
+          ) : (
+            <>
+              {sidebar.visible && sidebar.activePanel === 'explorer' ? (
+                <ExplorerPanel
+                  folderPath={folderPath}
+                  selectedFilePath={activeFilePath}
+                  onSelectFile={handleOpenFile}
+                />
+              ) : null}
 
-            {sidebar.visible && sidebar.activePanel === 'pull-requests' ? (
-              <PullRequestsPanel
-                gitInfo={gitInfo}
-                isLoadingGitInfo={isLoadingGitInfo}
-                onOpenPullRequest={handleOpenPullRequest}
-                activePRNumber={activeTab?.kind === 'pull-request' ? activeTab.number : null}
-              />
-            ) : null}
+              {sidebar.visible && sidebar.activePanel === 'source-control' ? (
+                <SourceControlPanel
+                  folderPath={folderPath}
+                  gitInfo={gitInfo}
+                  onOpenDiff={handleOpenDiff}
+                  onOpenPullRequest={handleOpenPullRequest}
+                />
+              ) : null}
 
-            {sidebar.visible && sidebar.activePanel === 'agent' ? (
-              <AgentPanel
-                sessions={agentSessions}
-                activeSessionId={activeAgentSessionId}
-                onSelectSession={handleSelectAgentSession}
-                onNewSession={handleNewAgentSession}
-              />
-            ) : null}
+              {sidebar.visible && sidebar.activePanel === 'pull-requests' ? (
+                <PullRequestsPanel
+                  gitInfo={gitInfo}
+                  isLoadingGitInfo={isLoadingGitInfo}
+                  onOpenPullRequest={handleOpenPullRequest}
+                  activePRNumber={activeTab?.kind === 'pull-request' ? activeTab.number : null}
+                />
+              ) : null}
 
-            <div className="flex min-w-0 flex-1 flex-col">
-              <WorkspaceTabBar
-                tabs={tabs}
-                activeTabId={activeTabId}
-                onSelectTab={handleSelectTab}
-                onCloseTab={handleCloseTab}
-                onReorderTabs={handleReorderTabs}
-              />
+              {sidebar.visible && sidebar.activePanel === 'agent' ? (
+                <AgentPanel
+                  sessions={agentSessions}
+                  activeSessionId={activeAgentSessionId}
+                  onSelectSession={handleSelectAgentSession}
+                  onNewSession={handleNewAgentSession}
+                />
+              ) : null}
 
-              <main
-                className={cn(
-                  'min-h-0 flex-1',
-                  activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent'
-                    ? 'overflow-hidden'
-                    : 'overflow-y-auto p-5'
-                )}
-              >
-                {renderWorkspaceTabContent({
-                  activeTab,
-                  folderPath,
-                  gitInfo,
-                  isLoadingGitInfo,
-                  agentSessions,
-                  onOpenFile: handleOpenFile,
-                  onOpenCommit: handleOpenCommit,
-                  onStartAgent: handleStartAgent,
-                  onContinueAgent: handleContinueAgent,
-                  onStopAgent: handleStopAgent,
-                  onPromoteAgent: handlePromoteAgentSession,
-                  onPullRequestSubviewChange: handlePullRequestSubviewChange,
-                  onPullRequestTitleChange: handlePullRequestTitleChange,
-                  onPullRequestStateChange: handlePullRequestStateChange,
-                  onCommitTitleChange: handleCommitTitleChange
-                })}
-              </main>
-            </div>
-          </>
-        )}
+              <div className="flex min-w-0 flex-1 flex-col">
+                <WorkspaceTabBar
+                  tabs={tabs}
+                  activeTabId={activeTabId}
+                  onSelectTab={handleSelectTab}
+                  onCloseTab={handleCloseTab}
+                  onReorderTabs={handleReorderTabs}
+                />
+
+                <main
+                  className={cn(
+                    'min-h-0 flex-1',
+                    activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent'
+                      ? 'overflow-hidden'
+                      : 'overflow-y-auto p-5'
+                  )}
+                >
+                  {renderWorkspaceTabContent({
+                    activeTab,
+                    folderPath,
+                    gitInfo,
+                    isLoadingGitInfo,
+                    agentSessions,
+                    onOpenFile: handleOpenFile,
+                    onOpenCommit: handleOpenCommit,
+                    onStartAgent: handleStartAgent,
+                    onContinueAgent: handleContinueAgent,
+                    onStopAgent: handleStopAgent,
+                    onPromoteAgent: handlePromoteAgentSession,
+                    onPullRequestSubviewChange: handlePullRequestSubviewChange,
+                    onPullRequestTitleChange: handlePullRequestTitleChange,
+                    onPullRequestStateChange: handlePullRequestStateChange,
+                    onCommitTitleChange: handleCommitTitleChange
+                  })}
+                </main>
+              </div>
+            </>
+          )}
+        </div>
+
+        <CommandPalette
+          open={commandPaletteOpen}
+          onOpenChange={setCommandPaletteOpen}
+          folderPath={folderPath}
+          gitInfo={gitInfo}
+          agentSessions={agentSessions}
+          onOpenFile={handleOpenFile}
+          onOpenPullRequest={handleOpenPullRequest}
+          onSelectAgentSession={handleSelectAgentSession}
+        />
       </div>
-
-      <CommandPalette
-        open={commandPaletteOpen}
-        onOpenChange={setCommandPaletteOpen}
-        folderPath={folderPath}
-        gitInfo={gitInfo}
-        agentSessions={agentSessions}
-        onOpenFile={handleOpenFile}
-        onOpenPullRequest={handleOpenPullRequest}
-        onSelectAgentSession={handleSelectAgentSession}
-      />
-    </div>
+    </WorkspaceContextProvider>
   )
 }
 

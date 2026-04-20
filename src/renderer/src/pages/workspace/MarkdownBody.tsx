@@ -4,6 +4,8 @@ import remarkGfm from 'remark-gfm'
 import { cn } from '../../lib/cn'
 import { tokenizeCode, type HighlightedToken } from '../../lib/shiki'
 import { useTheme } from '../../hooks/useTheme'
+import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
+import PRPill, { parsePRUrl } from '../../components/PRPill'
 
 interface MarkdownBodyProps {
   children: string
@@ -57,6 +59,28 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
 
 const remarkPlugins = [remarkGfm]
 
+function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
+  const ctx = useWorkspaceContext()
+  const pr = parsePRUrl(href)
+  if (pr && href) {
+    const matchesRepo = ctx?.gitInfo && ctx.gitInfo.owner === pr.owner && ctx.gitInfo.repo === pr.repo
+    return (
+      <PRPill
+        owner={pr.owner}
+        repo={pr.repo}
+        number={pr.number}
+        href={href}
+        onClick={matchesRepo && ctx ? () => ctx.onOpenPullRequest(pr.number) : undefined}
+      />
+    )
+  }
+  return (
+    <a href={href} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  )
+}
+
 const markdownComponents = {
   pre({ children }: { children?: ReactNode }) {
     return <>{children}</>
@@ -71,7 +95,8 @@ const markdownComponents = {
         {children}
       </code>
     )
-  }
+  },
+  a: MarkdownLink
 }
 
 export default function MarkdownBody({ children, className }: MarkdownBodyProps) {
