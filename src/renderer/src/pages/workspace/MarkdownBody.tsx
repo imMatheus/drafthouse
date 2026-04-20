@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import { cn } from '../../lib/cn'
 import { tokenizeCode, type HighlightedToken } from '../../lib/shiki'
 import { useTheme } from '../../hooks/useTheme'
@@ -59,6 +60,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
 }
 
 const remarkPlugins = [remarkGfm]
+const rehypePlugins = [rehypeRaw]
 
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
   const ctx = useWorkspaceContext()
@@ -111,7 +113,7 @@ export default function MarkdownBody({ children, className, compact }: MarkdownB
         className
       )}
     >
-      <Markdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+      <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={markdownComponents}>
         {children}
       </Markdown>
     </div>
