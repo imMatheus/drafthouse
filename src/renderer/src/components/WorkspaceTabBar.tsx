@@ -52,7 +52,7 @@ export default function WorkspaceTabBar({
 
   return (
     <div className="border-border bg-background border-b">
-      <div className="flex min-h-10 items-stretch overflow-x-auto px-2 pt-1.5">
+      <div className="flex min-h-9 items-stretch gap-1 overflow-x-auto px-2 pt-1">
         {tabs.map((tab) => {
           const { icon, label } = getWorkspaceTabPresentation(tab)
           const isActive = tab.id === activeTabId
@@ -82,16 +82,16 @@ export default function WorkspaceTabBar({
                 setDropTargetId(null)
               }}
               className={cn(
-                'group mr-1.5 flex max-w-60 min-w-0 shrink-0 cursor-pointer items-stretch rounded-t-lg border border-b-0 transition-colors',
-                isActive ? 'border-border bg-surface' : 'bg-background hover:bg-surface-hover/60 border-transparent',
+                'group flex max-w-52 min-w-0 shrink-0 cursor-pointer items-stretch rounded-t-md border border-b-0 transition-colors',
+                isActive ? 'border-border bg-surface' : 'hover:bg-surface-hover border-transparent',
                 isDropTarget && 'border-l-accent border-l-2'
               )}
             >
               <button
                 onClick={() => onSelectTab(tab.id)}
-                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left"
+                className="flex min-w-0 flex-1 items-center gap-1.5 pr-1.5 pl-2.5 text-left"
               >
-                {icon}
+                <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
                 <span
                   className={cn('truncate text-xs font-medium', isActive ? 'text-foreground' : 'text-foreground-muted')}
                 >
@@ -102,10 +102,13 @@ export default function WorkspaceTabBar({
               <Tooltip label={`Close ${label}`} side="bottom">
                 <button
                   onClick={() => onCloseTab(tab.id)}
-                  className="text-foreground-subtle hover:text-foreground flex items-center justify-center rounded-md px-2 transition-colors"
+                  className={cn(
+                    'text-foreground-subtle hover:bg-interactive hover:text-foreground my-1 mr-1 flex items-center justify-center rounded px-1 transition-[opacity,background-color,color]',
+                    isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  )}
                   aria-label={`Close ${label}`}
                 >
-                  <X size={14} />
+                  <X size={12} />
                 </button>
               </Tooltip>
             </div>
@@ -116,38 +119,23 @@ export default function WorkspaceTabBar({
   )
 }
 
-function PrStateBadge({ prState }: { prState: string | undefined }): React.JSX.Element {
+const TAB_ICON_SIZE = 14
+const TAB_ICON_STROKE = 1.8
+
+function PrStateIcon({ prState }: { prState: string | undefined }): React.JSX.Element {
   switch (prState) {
     case 'merged':
-      return (
-        <span className="bg-purple/15 inline-flex size-5 items-center justify-center rounded-full">
-          <GitMerge size={12} strokeWidth={2} className="text-purple" />
-        </span>
-      )
+      return <GitMerge size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-purple" />
     case 'closed':
-      return (
-        <span className="bg-danger/15 inline-flex size-5 items-center justify-center rounded-full">
-          <GitPullRequestClosed size={12} strokeWidth={2} className="text-danger" />
-        </span>
-      )
+      return <GitPullRequestClosed size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-danger" />
     case 'draft':
       return (
-        <span className="bg-foreground-muted/15 inline-flex size-5 items-center justify-center rounded-full">
-          <GitPullRequestDraft size={12} strokeWidth={2} className="text-foreground-muted" />
-        </span>
+        <GitPullRequestDraft size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-foreground-muted" />
       )
     case 'open':
-      return (
-        <span className="bg-success/15 inline-flex size-5 items-center justify-center rounded-full">
-          <GitPullRequest size={12} strokeWidth={2} className="text-success" />
-        </span>
-      )
+      return <GitPullRequest size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-success" />
     default:
-      return (
-        <span className="bg-foreground-subtle/15 inline-flex size-5 items-center justify-center rounded-full">
-          <GitPullRequest size={12} strokeWidth={2} className="text-foreground-subtle" />
-        </span>
-      )
+      return <GitPullRequest size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-foreground-subtle" />
   }
 }
 
@@ -155,32 +143,32 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
   switch (tab.kind) {
     case 'welcome':
       return {
-        icon: <Home size={14} strokeWidth={1.8} className="text-foreground-subtle" />,
+        icon: <Home size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-foreground-subtle" />,
         label: 'Welcome'
       }
     case 'file':
       return {
-        icon: <FileIcon name={getPathBasename(tab.path)} size={14} />,
+        icon: <FileIcon name={getPathBasename(tab.path)} size={TAB_ICON_SIZE} />,
         label: getPathBasename(tab.path)
       }
     case 'diff':
       return {
-        icon: <FileIcon name={getPathBasename(tab.path)} size={14} />,
+        icon: <FileIcon name={getPathBasename(tab.path)} size={TAB_ICON_SIZE} />,
         label: `${getPathBasename(tab.path)} (${tab.staged ? 'index' : 'working tree'})`
       }
     case 'agent':
       return {
-        icon: <Terminal size={14} strokeWidth={1.8} className="text-accent" />,
+        icon: <Terminal size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-accent" />,
         label: tab.title
       }
     case 'pull-request':
       return {
-        icon: <PrStateBadge prState={tab.prState} />,
+        icon: <PrStateIcon prState={tab.prState} />,
         label: tab.title ?? `PR #${tab.number}`
       }
     case 'commit':
       return {
-        icon: <GitCommit size={14} strokeWidth={1.8} className="text-accent" />,
+        icon: <GitCommit size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-accent" />,
         label: tab.title ?? `Commit ${tab.sha.slice(0, 7)}`
       }
   }
