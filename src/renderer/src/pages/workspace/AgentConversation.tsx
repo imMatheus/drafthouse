@@ -145,8 +145,8 @@ export default function AgentConversation({ session }: AgentConversationProps) {
             </div>
           )}
           {session.prompt && (
-            <div className="bg-surface max-w-[80%] rounded-2xl px-4 py-2.5">
-              <p className="text-foreground text-sm whitespace-pre-wrap">
+            <div className="bg-accent-bg text-accent max-w-[80%] rounded-2xl px-3 py-2">
+              <p className="text-sm whitespace-pre-wrap">
                 <HighlightedMentionText text={session.prompt} />
               </p>
             </div>
