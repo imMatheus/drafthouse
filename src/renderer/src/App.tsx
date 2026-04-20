@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
 import RepoSidebar from './components/RepoSidebar'
+import { LoadingView } from './components/Loading'
 import { SettingsProvider } from './hooks/useSettings'
 import { ThemeProvider } from './hooks/useTheme'
 import Home from './pages/Home'
@@ -71,8 +72,8 @@ function AppContent(): React.JSX.Element {
 
   if (loading) {
     return (
-      <div className="bg-background flex h-screen items-center justify-center">
-        <p className="text-foreground-muted">Loading...</p>
+      <div className="bg-background h-screen">
+        <LoadingView />
       </div>
     )
   }

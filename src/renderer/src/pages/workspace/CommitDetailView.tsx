@@ -22,6 +22,7 @@ import type {
 import CommitActorStack, { formatCommitActorNames, getCommitActors } from '../../components/CommitActorStack'
 import { FolderIcon } from '../../components/FileIcon'
 import Tooltip from '../../components/Tooltip'
+import { LoadingView } from '../../components/Loading'
 import { cn } from '../../lib/cn'
 import { ChangedFileDiffCard } from './PRFilesTab'
 import PlaceholderView from './PlaceholderView'
@@ -134,7 +135,7 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
   }
 
   if (isLoading) {
-    return <p className="text-foreground-muted text-sm">Loading commit...</p>
+    return <LoadingView label="Loading commit..." />
   }
 
   if (error) {

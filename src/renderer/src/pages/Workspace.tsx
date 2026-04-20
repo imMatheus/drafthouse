@@ -33,6 +33,7 @@ import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
 import { WorkspaceContextProvider } from '../contexts/WorkspaceContext'
+import { LoadingView } from '../components/Loading'
 import { appendOrReplaceAssistant, mergePartialMessage } from '../lib/agentStream'
 
 interface WorkspaceProps {
@@ -744,7 +745,7 @@ function renderWorkspaceTabContent({
       )
     case 'pull-request':
       if (isLoadingGitInfo) {
-        return <p className="text-foreground-muted text-sm">Checking repository metadata...</p>
+        return <LoadingView label="Checking repository metadata..." />
       }
 
       return gitInfo ? (
@@ -769,7 +770,7 @@ function renderWorkspaceTabContent({
       )
     case 'commit':
       if (isLoadingGitInfo) {
-        return <p className="text-foreground-muted text-sm">Checking repository metadata...</p>
+        return <LoadingView label="Checking repository metadata..." />
       }
 
       return gitInfo ? (

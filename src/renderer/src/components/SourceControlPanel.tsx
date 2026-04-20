@@ -26,6 +26,7 @@ import { cn } from '../lib/cn'
 import Tooltip from './Tooltip'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
+import Loading from './Loading'
 
 interface SourceControlPanelProps {
   folderPath: string
@@ -554,7 +555,7 @@ function CreatePullRequestDialog({
           </div>
           <span className="text-foreground-subtle text-xs">into</span>
           {isLoadingBranches ? (
-            <span className="text-foreground-muted text-xs">Loading branches...</span>
+            <Loading size="sm" label="Loading branches..." />
           ) : branchError ? (
             <span className="text-danger text-xs">{branchError}</span>
           ) : (

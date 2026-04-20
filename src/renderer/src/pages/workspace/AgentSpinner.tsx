@@ -1,16 +1,5 @@
-import { useEffect, useState } from 'react'
-
-const FRAMES = ['✶', '✸', '✹', '✺', '✹', '✷']
+import { LoadingIndicator } from '../../components/Loading'
 
 export default function AgentSpinner() {
-  const [frame, setFrame] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFrame((prev) => (prev + 1) % FRAMES.length)
-    }, 150)
-    return () => clearInterval(interval)
-  }, [])
-
-  return <span className="w-2 text-sm">{FRAMES[frame]}</span>
+  return <LoadingIndicator />
 }

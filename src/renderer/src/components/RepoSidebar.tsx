@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { cn } from '../lib/cn'
 import { useTheme } from '../hooks/useTheme'
 import Tooltip from './Tooltip'
+import Loading from './Loading'
 
 export default function RepoSidebar() {
   const { user, logout } = useAuth()
@@ -99,7 +100,9 @@ export default function RepoSidebar() {
         <>
           <nav className="flex-1 overflow-y-auto px-2">
             {isLoading ? (
-              <p className="text-foreground-subtle px-2 text-xs">Loading...</p>
+              <div className="px-2">
+                <Loading size="sm" />
+              </div>
             ) : !repos || repos.length === 0 ? (
               <p className="text-foreground-subtle px-2 text-xs">
                 {query ? 'No results found' : 'No repositories found'}

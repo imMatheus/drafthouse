@@ -49,6 +49,7 @@ import { cn } from '../../lib/cn'
 import type { PullRequestSubview } from '../../lib/workspaceTabs'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
+import Loading, { LoadingView } from '../../components/Loading'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
@@ -167,7 +168,7 @@ export default function PullRequestDetailView({
     void queryClient.invalidateQueries({ queryKey: ['pull-request-review-threads', owner, repo, number] })
   }, [agentSessions, owner, repo, number, queryClient])
 
-  if (isLoading) return <p className="text-foreground-muted text-sm">Loading pull request...</p>
+  if (isLoading) return <LoadingView label="Loading pull request..." />
 
   if (error) {
     return (
@@ -503,7 +504,7 @@ function PRConversationTab({
         </div>
       ) : null}
 
-      {isLoadingConversation ? <p className="text-foreground-muted text-sm">Loading conversation...</p> : null}
+      {isLoadingConversation ? <Loading label="Loading conversation..." /> : null}
 
       {timelineItems.map((item) => (
         <PullRequestTimelineCard

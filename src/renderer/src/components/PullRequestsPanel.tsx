@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Check, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Search, X } from 'lucide-react'
 import { cn } from '../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../shared/types'
+import Loading from './Loading'
 
 interface PullRequestsPanelProps {
   gitInfo: GitRepoInfo | null | undefined
@@ -98,11 +99,15 @@ export default function PullRequestsPanel({
       {/* PR list */}
       <div className="flex-1 overflow-y-auto">
         {isLoadingGitInfo ? (
-          <p className="text-foreground-subtle px-4 py-4 text-xs">Loading...</p>
+          <div className="px-4 py-4">
+            <Loading size="sm" />
+          </div>
         ) : !gitInfo ? (
           <p className="text-foreground-subtle px-4 py-4 text-xs">No GitHub repo detected</p>
         ) : isLoading ? (
-          <p className="text-foreground-subtle px-4 py-4 text-xs">Loading pull requests...</p>
+          <div className="px-4 py-4">
+            <Loading size="sm" label="Loading pull requests..." />
+          </div>
         ) : error ? (
           <p className="text-foreground-subtle px-4 py-4 text-xs">{error.message}</p>
         ) : filtered.length === 0 ? (

@@ -5,6 +5,7 @@ import { cn } from '../../lib/cn'
 import type { PaginatedPullRequestCommits, PullRequestCommit, PullRequestCommitAuthors } from '../../../../shared/types'
 import PlaceholderView from './PlaceholderView'
 import Tooltip from '../../components/Tooltip'
+import Loading from '../../components/Loading'
 import CommitActorStack, { formatCommitActorNames, getCommitActors } from '../../components/CommitActorStack'
 import { formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
 
@@ -83,7 +84,7 @@ export default function PRCommitsTab({
         </div>
       ) : null}
 
-      {isLoading ? <p className="text-foreground-muted text-sm">Loading commits...</p> : null}
+      {isLoading ? <Loading label="Loading commits..." /> : null}
 
       {items.length > 0 ? (
         <div className="flex flex-col gap-6">

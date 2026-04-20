@@ -30,6 +30,7 @@ import type {
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import { FolderIcon } from '../../components/FileIcon'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
+import Loading from '../../components/Loading'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
@@ -355,7 +356,7 @@ export default function PRFilesTab({
               <p className="text-foreground-muted text-sm">{filesErrorMessage.message}</p>
             </div>
           ) : null}
-          {isLoading ? <p className="text-foreground-muted text-sm">Loading changed files...</p> : null}
+          {isLoading ? <Loading label="Loading changed files..." /> : null}
           <div className="flex flex-col gap-5">
             {filteredFiles.map((file, index) => (
               <ChangedFileDiffCard

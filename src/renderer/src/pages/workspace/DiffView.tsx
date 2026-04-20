@@ -4,6 +4,7 @@ import { DiffEditor } from '@monaco-editor/react'
 import { useTheme } from '../../hooks/useTheme'
 import { useSettings } from '../../hooks/useSettings'
 import { getMonacoTheme, getMonacoLanguage, BASE_DIFF_OPTIONS } from '../../lib/monaco'
+import { LoadingView } from '../../components/Loading'
 
 interface DiffViewProps {
   filePath: string
@@ -36,11 +37,7 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
   const isLoading = isOriginalLoading || isModifiedLoading
 
   if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-foreground-muted text-sm">Loading diff...</p>
-      </div>
-    )
+    return <LoadingView label="Loading diff..." />
   }
 
   return (

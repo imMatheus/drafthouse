@@ -15,6 +15,7 @@ import { cn } from '../../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../../shared/types'
 import { formatRelativeTime } from './pullRequestShared'
 import PlaceholderView from './PlaceholderView'
+import Loading from '../../components/Loading'
 
 type PrStateFilter = 'open' | 'closed'
 type SortKey = 'newest' | 'oldest' | 'recently-updated' | 'least-recently-updated'
@@ -50,7 +51,7 @@ export default function PullRequestsView({
   })
 
   if (isLoadingGitInfo) {
-    return <p className="text-foreground-muted text-sm">Checking repository metadata...</p>
+    return <Loading label="Checking repository metadata..." />
   }
 
   if (gitInfoError) {
@@ -164,7 +165,9 @@ export default function PullRequestsView({
         </div>
 
         {isLoading ? (
-          <div className="text-foreground-muted px-4 py-8 text-center text-sm">Loading pull requests...</div>
+          <div className="flex justify-center px-4 py-8">
+            <Loading label="Loading pull requests..." />
+          </div>
         ) : error ? (
           <div className="text-foreground-muted px-4 py-8 text-center text-sm">{error.message}</div>
         ) : filtered.length === 0 ? (
