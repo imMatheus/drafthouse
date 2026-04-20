@@ -11,7 +11,13 @@ interface AgentViewProps {
   activeSessionId: string | null
   onSelectSession: (id: string | null) => void
   onStartSession: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
-  onContinueSession: (sessionId: string, prompt: string, files?: string[], cliPrompt?: string) => Promise<void>
+  onContinueSession: (
+    sessionId: string,
+    prompt: string,
+    files?: string[],
+    cliPrompt?: string,
+    mentionedPRs?: PullRequestDetail[]
+  ) => Promise<void>
   onStopSession: (sessionId: string) => Promise<void>
   gitInfo?: GitRepoInfo | null
 }
@@ -37,7 +43,7 @@ export default function AgentView({
       const contextBlock =
         mentionedPRs && gitInfo ? buildMentionedPRContextBlock(gitInfo.owner, gitInfo.repo, mentionedPRs) : null
       const cliPrompt = contextBlock ? `${contextBlock}\n\n---\n\n${prompt}` : undefined
-      await onContinueSession(activeSession.id, prompt, files, cliPrompt)
+      await onContinueSession(activeSession.id, prompt, files, cliPrompt, mentionedPRs)
     } else {
       const context =
         mentionedPRs && gitInfo

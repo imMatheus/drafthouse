@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Files, GitBranch, GitGraph, Terminal } from 'lucide-react'
-import type { AgentContext, AgentSession, GitChangedFile, GitRepoInfo } from '../../../shared/types'
+import type { AgentContext, AgentSession, GitChangedFile, GitRepoInfo, PullRequestDetail } from '../../../shared/types'
+import { prStateLabel } from '../lib/prMentions'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import ActivityBar from '../components/ActivityBar'
@@ -35,6 +36,39 @@ import AsciiArt from '../components/AsciiArt'
 import { WorkspaceContextProvider } from '../contexts/WorkspaceContext'
 import { LoadingView } from '../components/Loading'
 import { appendOrReplaceAssistant, mergePartialMessage } from '../lib/agentStream'
+
+function mergePRsIntoContext(
+  existing: AgentContext | undefined,
+  newPRs: PullRequestDetail[] | undefined
+): AgentContext | undefined {
+  if (!newPRs || newPRs.length === 0) return existing
+  const incoming = newPRs.map((pr) => ({ number: pr.number, title: pr.title, state: prStateLabel(pr) }))
+  if (!existing) {
+    return {
+      source: 'pull-request',
+      systemPromptSuffix: '',
+      label: incoming.length === 1 ? `PR #${incoming[0].number}` : `${incoming.length} PRs`,
+      prs: incoming
+    }
+  }
+  // Seed `prs` from the existing single-PR fields when it wasn't populated
+  // (e.g. sessions started from the PR detail view).
+  const base =
+    existing.prs && existing.prs.length > 0
+      ? existing.prs
+      : existing.prNumber != null && existing.prTitle != null
+        ? [{ number: existing.prNumber, title: existing.prTitle, state: existing.prState ?? 'open' }]
+        : []
+  const seen = new Set(base.map((p) => p.number))
+  const merged = [...base]
+  for (const pr of incoming) {
+    if (!seen.has(pr.number)) {
+      merged.push(pr)
+      seen.add(pr.number)
+    }
+  }
+  return { ...existing, prs: merged }
+}
 
 interface WorkspaceProps {
   session: WorkspaceSession
@@ -368,7 +402,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     agentSessionId: string,
     prompt: string,
     files?: string[],
-    cliPrompt?: string
+    cliPrompt?: string,
+    mentionedPRs?: PullRequestDetail[]
   ): Promise<void> => {
     const existingSession = agentSessions.find((s) => s.id === agentSessionId)
     if (!existingSession?.cliSessionId) return
@@ -385,25 +420,25 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     // The UI always shows the clean `prompt`; `cliPrompt` (when set) carries
     // extra metadata like injected PR context that shouldn't clutter the bubble.
     setAgentSessions((prev) =>
-      prev.map((s) =>
-        s.id === agentSessionId
-          ? {
-              ...s,
-              status: 'running' as const,
-              events: [
-                ...s.events,
-                {
-                  type: 'user' as const,
-                  message: {
-                    role: 'user' as const,
-                    content: [{ type: 'text' as const, text: prompt }]
-                  },
-                  session_id: s.cliSessionId!
-                }
-              ]
+      prev.map((s) => {
+        if (s.id !== agentSessionId) return s
+        return {
+          ...s,
+          status: 'running' as const,
+          context: mergePRsIntoContext(s.context, mentionedPRs),
+          events: [
+            ...s.events,
+            {
+              type: 'user' as const,
+              message: {
+                role: 'user' as const,
+                content: [{ type: 'text' as const, text: prompt }]
+              },
+              session_id: s.cliSessionId!
             }
-          : s
-      )
+          ]
+        }
+      })
     )
   }
 
@@ -716,7 +751,13 @@ function renderWorkspaceTabContent({
   onOpenFile: (path: string) => void
   onOpenCommit: (sha: string, title?: string) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
-  onContinueAgent: (sessionId: string, prompt: string, files?: string[], cliPrompt?: string) => Promise<void>
+  onContinueAgent: (
+    sessionId: string,
+    prompt: string,
+    files?: string[],
+    cliPrompt?: string,
+    mentionedPRs?: PullRequestDetail[]
+  ) => Promise<void>
   onStopAgent: (sessionId: string) => Promise<void>
   onPromoteAgent: (sessionId: string) => void
   onPullRequestSubviewChange: (tabId: WorkspaceTab['id'], subview: PullRequestSubview) => void

@@ -8,7 +8,13 @@ import AgentPromptBar, { type AgentPromptBarHandle } from './AgentPromptBar'
 interface AgentSessionTabProps {
   session: AgentSession | null
   onStartSession: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
-  onContinueSession: (sessionId: string, prompt: string, files?: string[], cliPrompt?: string) => Promise<void>
+  onContinueSession: (
+    sessionId: string,
+    prompt: string,
+    files?: string[],
+    cliPrompt?: string,
+    mentionedPRs?: PullRequestDetail[]
+  ) => Promise<void>
   onStopSession: (sessionId: string) => Promise<void>
   gitInfo?: GitRepoInfo | null
 }
@@ -39,7 +45,7 @@ export default function AgentSessionTab({
       const contextBlock =
         mentionedPRs && gitInfo ? buildMentionedPRContextBlock(gitInfo.owner, gitInfo.repo, mentionedPRs) : null
       const cliPrompt = contextBlock ? `${contextBlock}\n\n---\n\n${prompt}` : undefined
-      await onContinueSession(session.id, prompt, files, cliPrompt)
+      await onContinueSession(session.id, prompt, files, cliPrompt, mentionedPRs)
     } else {
       const context =
         mentionedPRs && gitInfo

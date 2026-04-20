@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type {
   AgentContentBlock,
+  AgentContext,
   AgentStreamAssistant,
   AgentStreamEvent,
   AgentStreamSystem,
@@ -11,6 +12,7 @@ import type {
 import AgentEditDiffBlock from './AgentEditDiffBlock'
 import MarkdownBody from './MarkdownBody'
 import HighlightedMentionText from '../../components/HighlightedMentionText'
+import MessagePRMentions from '../../components/MessagePRMentions'
 
 export const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit'])
 
@@ -26,9 +28,20 @@ export function eventHasVisibleResponse(event: AgentStreamEvent): boolean {
   return false
 }
 
-export function UserBubble({ text, markdown, compact }: { text: string; markdown?: boolean; compact?: boolean }) {
+export function UserBubble({
+  text,
+  markdown,
+  compact,
+  allMentionedPRs
+}: {
+  text: string
+  markdown?: boolean
+  compact?: boolean
+  allMentionedPRs?: AgentContext['prs']
+}) {
   return (
-    <div className="mt-2 mb-3 flex justify-end">
+    <div className="mt-2 mb-3 flex flex-col items-end">
+      <MessagePRMentions text={text} allPRs={allMentionedPRs} />
       <div
         className={cn(
           'bg-accent-bg text-accent max-w-[80%] rounded-2xl px-3 py-2',
@@ -53,14 +66,21 @@ interface AgentMessageBlockProps {
   /** When true, only render text and file-edit tool uses (Edit/Write/MultiEdit) */
   visibleOnly?: boolean
   compact?: boolean
+  allMentionedPRs?: AgentContext['prs']
 }
 
-export default function AgentMessageBlock({ event, inlineToolIds, visibleOnly, compact }: AgentMessageBlockProps) {
+export default function AgentMessageBlock({
+  event,
+  inlineToolIds,
+  visibleOnly,
+  compact,
+  allMentionedPRs
+}: AgentMessageBlockProps) {
   switch (event.type) {
     case 'assistant':
       return <AssistantMessage event={event} visibleOnly={visibleOnly} compact={compact} />
     case 'user':
-      return <UserMessage event={event} inlineToolIds={inlineToolIds} compact={compact} />
+      return <UserMessage event={event} inlineToolIds={inlineToolIds} compact={compact} allMentionedPRs={allMentionedPRs} />
     case 'system':
       return <SystemMessage event={event as AgentStreamSystem} />
     case 'result':
@@ -93,11 +113,13 @@ function AssistantMessage({
 function UserMessage({
   event,
   inlineToolIds,
-  compact
+  compact,
+  allMentionedPRs
 }: {
   event: AgentStreamUser
   inlineToolIds: Set<string>
   compact?: boolean
+  allMentionedPRs?: AgentContext['prs']
 }) {
   const textBlocks = event.message.content.filter((b) => b.type === 'text')
   const nonTextBlocks = event.message.content.filter((b) => b.type !== 'text')
@@ -105,7 +127,9 @@ function UserMessage({
   return (
     <div className="mb-4">
       {textBlocks.map((block, i) =>
-        block.type === 'text' && block.text ? <UserBubble key={i} text={block.text} compact={compact} /> : null
+        block.type === 'text' && block.text ? (
+          <UserBubble key={i} text={block.text} compact={compact} allMentionedPRs={allMentionedPRs} />
+        ) : null
       )}
       {nonTextBlocks.map((block, i) => {
         if (block.type === 'tool_result' && inlineToolIds.has(block.tool_use_id)) {

@@ -186,14 +186,14 @@ export function buildPullRequestMentionsAgentContext(params: {
     title: pr.title,
     state: prStateLabel(pr)
   }))
+  // Intentionally omit `prNumber`/`prTitle`/`prState` for mention-based
+  // sessions: those fields drive the top-of-chat context banner used by
+  // PR-view / diff-line launches, while mentions render per-message.
   return {
     source: 'pull-request',
     systemPromptSuffix: block,
     label,
     repoFullName: `${owner}/${repo}`,
-    prNumber: prs.length === 1 ? prs[0].number : undefined,
-    prTitle: prs.length === 1 ? prs[0].title : undefined,
-    prState: prs.length === 1 ? prSummaries[0].state : undefined,
     prs: prSummaries
   }
 }

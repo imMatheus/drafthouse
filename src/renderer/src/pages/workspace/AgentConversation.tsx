@@ -5,6 +5,7 @@ import AgentSpinner from './AgentSpinner'
 import type { AgentContext, AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
 import AgentMessageBlock from './AgentMessageBlock'
 import HighlightedMentionText from '../../components/HighlightedMentionText'
+import MessagePRMentions from '../../components/MessagePRMentions'
 import PRStateIcon from '../../components/PRStateIcon'
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
 
@@ -137,6 +138,7 @@ export default function AgentConversation({ session }: AgentConversationProps) {
 
         {/* Initial user prompt */}
         <div className="mb-6 flex flex-col items-end gap-2">
+          {session.prompt ? <MessagePRMentions text={session.prompt} allPRs={session.context?.prs} /> : null}
           {session.files.length > 0 && (
             <div className="flex max-w-[80%] flex-wrap gap-1.5">
               {session.files.map((filePath) => (
@@ -197,7 +199,12 @@ export default function AgentConversation({ session }: AgentConversationProps) {
 
         {/* The actual response */}
         {responseEvents.map((event, i) => (
-          <AgentMessageBlock key={`response-${i}`} event={event} inlineToolIds={inlineToolIds} />
+          <AgentMessageBlock
+            key={`response-${i}`}
+            event={event}
+            inlineToolIds={inlineToolIds}
+            allMentionedPRs={session.context?.prs}
+          />
         ))}
 
         {/* Streaming indicator when response is coming in */}
@@ -238,26 +245,7 @@ function AgentContextBox({ context }: { context: AgentContext }) {
 
   const openPR = workspace?.onOpenPullRequest
 
-  // Multi-PR mention context (from the agents view): render one row per PR.
-  if (context.prs && context.prs.length > 1) {
-    return (
-      <div className="border-border bg-surface mb-2 ml-auto flex w-max flex-col items-end gap-0.5 rounded-lg border p-1">
-        {context.prs.map((pr) => (
-          <button
-            key={pr.number}
-            type="button"
-            onClick={() => openPR?.(pr.number)}
-            className="hover:bg-surface-hover text-foreground flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors"
-          >
-            <PRStateIcon state={pr.state} size={13} />
-            <span className="font-semibold">#{pr.number}</span>
-            <span className="text-foreground-muted max-w-[200px] truncate">{pr.title}</span>
-          </button>
-        ))}
-      </div>
-    )
-  }
-
+  // Mention-based contexts (only `prs` is populated) render per-message, not here.
   if (!context.prNumber) return null
 
   const prNumber = context.prNumber
