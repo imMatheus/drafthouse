@@ -104,7 +104,7 @@ export function formatAbsoluteDate(dateStr: string): string {
 export function DiffStat({ additions, deletions }: { additions: number; deletions: number }) {
   return (
     <span
-      className="inline-flex items-center gap-2 text-xs"
+      className="inline-flex items-center gap-2 text-xs tabular-nums"
       aria-label={`${additions} additions and ${deletions} deletions`}
     >
       <span className="text-success font-semibold">+{additions}</span>

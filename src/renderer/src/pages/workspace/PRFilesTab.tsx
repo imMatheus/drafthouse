@@ -292,7 +292,7 @@ export default function PRFilesTab({
           ) : null}
           <aside
             className={cn(
-              'flex flex-col overflow-hidden transition-all duration-200',
+              'flex flex-col overflow-hidden transition-[width,opacity] duration-200',
               fileListCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'
             )}
           >
@@ -340,7 +340,7 @@ export default function PRFilesTab({
                 <button
                   type="button"
                   onClick={() => setIsSubmitReviewOpen(true)}
-                  className="bg-accent text-foreground hover:bg-accent-hover w-full rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+                  className="bg-accent text-foreground hover:bg-accent-hover w-full rounded-md px-3 py-1.5 text-xs font-medium tabular-nums transition-[background-color,color,transform] active:scale-[0.96]"
                 >
                   Submit review ({draftReviewComments.length})
                 </button>

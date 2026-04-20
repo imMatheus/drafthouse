@@ -193,14 +193,14 @@ export default function PullRequestDetailView({
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-foreground text-xl font-semibold">
-          {pr.title} <span className="text-foreground-subtle font-normal">#{pr.number}</span>
+        <h1 className="text-foreground text-xl font-semibold text-balance">
+          {pr.title} <span className="text-foreground-subtle tabular-nums font-normal">#{pr.number}</span>
         </h1>
         <a
           href={pr.html_url}
           target="_blank"
           rel="noreferrer"
-          className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors"
+          className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96]"
         >
           View on GitHub
           <ExternalLink size={13} />
@@ -215,8 +215,8 @@ export default function PullRequestDetailView({
           {statusLabel}
         </span>
         <p className="text-foreground-muted text-xs">
-          <span className="text-foreground font-medium">{pr.user.login}</span> wants to merge {pr.commits} commit
-          {pr.commits !== 1 ? 's' : ''} into{' '}
+          <span className="text-foreground font-medium">{pr.user.login}</span> wants to merge{' '}
+          <span className="tabular-nums">{pr.commits}</span> commit{pr.commits !== 1 ? 's' : ''} into{' '}
           <code className="bg-accent-bg text-accent rounded px-1.5 py-0.5 text-xs">{pr.base.ref}</code> from{' '}
           <code className="bg-accent-bg text-accent rounded px-1.5 py-0.5 text-xs">{pr.head.ref}</code>
           <Tooltip label={headBranchCopied ? 'Copied' : 'Copy branch name'} side="top">
@@ -228,7 +228,7 @@ export default function PullRequestDetailView({
                   setTimeout(() => setHeadBranchCopied(false), 1500)
                 })
               }}
-              className="text-foreground-subtle hover:bg-interactive hover:text-foreground ml-1 inline-flex size-5 items-center justify-center rounded align-middle transition-colors"
+              className="text-foreground-subtle hover:bg-interactive hover:text-foreground ml-1 inline-flex size-5 items-center justify-center rounded align-middle transition-[background-color,color,transform] active:scale-[0.96]"
               aria-label="Copy branch name"
             >
               {headBranchCopied ? <Check size={12} className="text-success" /> : <Copy size={12} />}
@@ -370,7 +370,7 @@ function PRDetailTabButton({
     >
       {icon}
       {children}
-      {typeof count === 'number' ? <span className="text-foreground-subtle">{count}</span> : null}
+      {typeof count === 'number' ? <span className="text-foreground-subtle tabular-nums">{count}</span> : null}
     </button>
   )
 }
@@ -1140,14 +1140,14 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
           <button
             onClick={handleCancel}
             disabled={isSaving}
-            className="bg-interactive text-foreground hover:bg-surface-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
+            className="bg-interactive text-foreground hover:bg-surface-hover rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:opacity-40"
           >
             Cancel
           </button>
           <button
             onClick={() => void handleSave()}
             disabled={isSaving}
-            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-colors disabled:opacity-40"
+            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:opacity-40"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
@@ -1423,7 +1423,7 @@ function CommentBox({
           <button
             onClick={handleSubmit}
             disabled={!body.trim() || isSubmitting}
-            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Commenting...' : claudeMention ? 'Ask Claude' : 'Comment'}
           </button>
@@ -1554,7 +1554,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
               <button
                 onClick={handleMerge}
                 disabled={isSubmitting || pr.mergeable === null || mergeDisabledReason !== null}
-                className="bg-success text-foreground hover:bg-success/80 rounded-l-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                className="bg-success text-foreground hover:bg-success/80 rounded-l-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <span className="inline-flex items-center gap-1.5">
                   <GitMerge size={14} />
@@ -1568,7 +1568,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
               <button
                 onClick={() => setIsMergeMethodOpen(!isMergeMethodOpen)}
                 disabled={isSubmitting}
-                className="border-success/30 bg-success text-foreground hover:bg-success/80 rounded-r-md border-l px-2 py-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                className="border-success/30 bg-success text-foreground hover:bg-success/80 rounded-r-md border-l px-2 py-2 transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronDown size={14} />
               </button>
@@ -1603,7 +1603,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleClose}
               disabled={isSubmitting}
-              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? 'Closing...' : 'Close pull request'}
             </button>
@@ -1611,7 +1611,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleConvertToDraft}
               disabled={isSubmitting}
-              className="text-foreground-muted hover:text-foreground rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="text-foreground-muted hover:text-foreground rounded-md px-4 py-2 text-xs font-medium transition-[color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Convert to draft
             </button>
@@ -1623,7 +1623,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleMarkReady}
               disabled={isSubmitting}
-              className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? 'Marking ready...' : 'Ready for review'}
             </button>
@@ -1631,7 +1631,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleClose}
               disabled={isSubmitting}
-              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-danger hover:bg-interactive-hover rounded-md border px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isSubmitting ? 'Closing...' : 'Close pull request'}
             </button>
@@ -1642,7 +1642,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
           <button
             onClick={handleReopen}
             disabled={isSubmitting}
-            className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-success text-foreground hover:bg-success/80 rounded-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isSubmitting ? 'Reopening...' : 'Reopen pull request'}
           </button>
@@ -1798,7 +1798,7 @@ function MergedBranchSwitchBanner({
           onClick={handleSwitch}
           disabled={status === 'switching' || status === 'done'}
           className={cn(
-            'text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+            'text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,transform] active:scale-[0.96] disabled:active:scale-100',
             status === 'switching' ? 'bg-success/70' : 'bg-success hover:bg-success/80'
           )}
         >

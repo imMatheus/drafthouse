@@ -118,7 +118,7 @@ export default function PRCommitsTab({
       <div className="border-border bg-surface mx-auto mt-10 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
         <div>
           <h2 className="text-foreground text-sm font-semibold">Commits</h2>
-          <p className="text-foreground-muted mt-1 text-sm">
+          <p className="text-foreground-muted mt-1 text-sm tabular-nums">
             Showing {rangeStart}-{rangeEnd} of {totalCommits} commit{totalCommits !== 1 ? 's' : ''}
             {isFetching && !isLoading ? ' \u2022 Updating\u2026' : ''}
           </p>
@@ -188,7 +188,7 @@ function PRCommitsPagination({
   onNext: () => void
 }) {
   const buttonClass =
-    'inline-flex items-center gap-1.5 rounded-lg border border-border bg-interactive px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-interactive-hover disabled:cursor-not-allowed disabled:text-foreground-subtle disabled:hover:bg-interactive'
+    'inline-flex items-center gap-1.5 rounded-lg border border-border bg-interactive px-3 py-2 text-xs font-medium text-foreground transition-[background-color,color,transform] hover:bg-interactive-hover active:scale-[0.96] disabled:cursor-not-allowed disabled:text-foreground-subtle disabled:hover:bg-interactive disabled:active:scale-100'
 
   return (
     <div className="flex items-center gap-2">
@@ -196,7 +196,7 @@ function PRCommitsPagination({
         <ChevronLeft size={14} />
         Previous
       </button>
-      <span className="text-foreground-muted min-w-20 text-center text-xs">
+      <span className="text-foreground-muted min-w-20 text-center text-xs tabular-nums">
         Page {page} of {totalPages}
       </span>
       <button type="button" onClick={onNext} disabled={page >= totalPages} className={buttonClass}>
@@ -269,12 +269,14 @@ function CommitRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <span className="text-foreground-muted rounded-md px-2 py-1 font-mono text-sm">{commit.sha.slice(0, 7)}</span>
+          <span className="text-foreground-muted rounded-md px-2 py-1 font-mono text-sm tabular-nums">
+            {commit.sha.slice(0, 7)}
+          </span>
           <Tooltip label={isCopied ? 'Copied' : 'Copy SHA'} side="top">
             <button
               type="button"
               onClick={handleCopySha}
-              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-[background-color,color,transform] active:scale-[0.96]"
               aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
             >
               {isCopied ? <CheckCheck size={16} /> : <Copy size={16} />}
@@ -285,7 +287,7 @@ function CommitRow({
               href={commit.html_url}
               target="_blank"
               rel="noreferrer"
-              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-colors"
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-[background-color,color,transform] active:scale-[0.96]"
               aria-label="Open commit on GitHub"
             >
               <ExternalLink size={16} />
