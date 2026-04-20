@@ -12,7 +12,6 @@ import type {
 import { useTheme } from '../hooks/useTheme'
 import { getMonacoTheme, BASE_EDITOR_OPTIONS, BASE_DIFF_OPTIONS } from '../lib/monaco'
 import type { PullRequestReviewThread } from '../pages/workspace/pullRequestShared'
-import { LoadingView } from './Loading'
 
 interface ViewZoneEntry {
   zoneId: string
@@ -514,7 +513,7 @@ export default function MonacoDiffWithComments({
             ...BASE_EDITOR_OPTIONS,
             readOnly: true
           }}
-          loading={<LoadingView label="Loading file..." />}
+          loading={null}
         />
       </div>
     )
@@ -534,7 +533,7 @@ export default function MonacoDiffWithComments({
           glyphMargin: true
         }}
         onMount={handleMount}
-        loading={<LoadingView label="Loading diff..." />}
+        loading={null}
       />
     </div>
   )

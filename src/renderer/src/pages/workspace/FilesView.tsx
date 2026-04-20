@@ -5,7 +5,6 @@ import Editor, { type OnMount } from '@monaco-editor/react'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
 import { getMonacoTheme, getMonacoLanguage, BASE_EDITOR_OPTIONS } from '../../lib/monaco'
-import { LoadingView } from '../../components/Loading'
 
 interface FilesViewProps {
   filePath: string
@@ -50,9 +49,7 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
       </div>
 
       <div className="bg-background min-h-0 flex-1 overflow-hidden">
-        {isLoading ? (
-          <LoadingView label="Loading file..." />
-        ) : error ? (
+        {isLoading ? null : error ? (
           <div className="px-4 py-6">
             <p className="text-foreground text-sm font-medium">File unavailable</p>
             <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>
@@ -68,7 +65,7 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
               readOnly: false
             }}
             onMount={handleEditorMount}
-            loading={<LoadingView label="Loading editor..." />}
+            loading={null}
           />
         )}
       </div>

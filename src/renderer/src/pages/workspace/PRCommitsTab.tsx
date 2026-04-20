@@ -87,7 +87,7 @@ export default function PRCommitsTab({
       {isLoading ? <Loading label="Loading commits..." /> : null}
 
       {items.length > 0 ? (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           {commitGroups.map((group) => (
             <CommitDayGroup
               key={group.dateKey}
@@ -145,17 +145,17 @@ function CommitDayGroup({
   onOpenCommit: (sha: string, title?: string) => void
 }) {
   return (
-    <section className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3">
+    <section className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
       <div className="relative flex justify-center">
-        <div className="bg-border absolute top-7 bottom-0 w-px" />
-        <div className="border-border bg-background text-foreground-muted relative z-10 mt-1 flex size-7 items-center justify-center rounded-full border">
-          <GitCommit size={14} />
+        <div className="bg-border absolute top-6 bottom-0 w-px" />
+        <div className="border-border bg-background text-foreground-muted relative z-10 mt-0.5 flex size-6 items-center justify-center rounded-full border">
+          <GitCommit size={12} />
         </div>
       </div>
 
       <div className="min-w-0">
-        <div className="mb-3 flex items-center gap-2">
-          <h3 className="text-foreground text-sm font-semibold">Commits on {group.label}</h3>
+        <div className="mb-2 flex items-center gap-2">
+          <h3 className="text-foreground text-xs font-semibold">Commits on {group.label}</h3>
           <span className="text-foreground-subtle text-xs">
             {group.items.length} commit{group.items.length !== 1 ? 's' : ''}
           </span>
@@ -239,25 +239,27 @@ function CommitRow({
   }
 
   return (
-    <div className={cn('px-5 py-4', !isLast && 'border-border border-b')}>
-      <div className="flex items-start justify-between gap-4">
+    <div className={cn('px-4 py-2.5', !isLast && 'border-border border-b')}>
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => onOpenCommit(commit.sha, subject)}
-              className="text-foreground hover:text-accent min-w-0 flex-1 truncate text-left text-[15px] font-semibold transition-colors"
+              className="text-foreground hover:text-accent min-w-0 flex-1 truncate text-left text-sm font-medium transition-colors"
             >
               {subject}
             </button>
             {isMergeCommit ? (
-              <span className="bg-purple/10 text-purple rounded-full px-2 py-0.5 text-[11px] font-medium">Merge</span>
+              <span className="bg-purple/10 text-purple rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                Merge
+              </span>
             ) : null}
           </div>
 
-          {bodyPreview ? <p className="text-foreground-muted mt-1 truncate text-sm">{bodyPreview}</p> : null}
+          {bodyPreview ? <p className="text-foreground-muted mt-0.5 truncate text-xs">{bodyPreview}</p> : null}
 
-          <div className="text-foreground-muted mt-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
+          <div className="text-foreground-muted mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
             <CommitActorStack actors={actors} />
             <span>
               <span className="text-foreground font-medium">{formatCommitActorNames(actors)}</span> committed{' '}
@@ -269,18 +271,18 @@ function CommitRow({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
-          <span className="text-foreground-muted rounded-md px-2 py-1 font-mono text-sm tabular-nums">
+        <div className="flex shrink-0 items-center gap-0.5">
+          <span className="text-foreground-muted rounded-md px-1.5 py-1 font-mono text-xs tabular-nums">
             {commit.sha.slice(0, 7)}
           </span>
           <Tooltip label={isCopied ? 'Copied' : 'Copy SHA'} side="top">
             <button
               type="button"
               onClick={handleCopySha}
-              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-[background-color,color,transform] active:scale-[0.96]"
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-7 items-center justify-center rounded-md transition-[background-color,color,transform] active:scale-[0.96]"
               aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
             >
-              {isCopied ? <CheckCheck size={16} /> : <Copy size={16} />}
+              {isCopied ? <CheckCheck size={13} /> : <Copy size={13} />}
             </button>
           </Tooltip>
           <Tooltip label="Open commit on GitHub" side="top">
@@ -288,10 +290,10 @@ function CommitRow({
               href={commit.html_url}
               target="_blank"
               rel="noreferrer"
-              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-9 items-center justify-center rounded-lg transition-[background-color,color,transform] active:scale-[0.96]"
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-7 items-center justify-center rounded-md transition-[background-color,color,transform] active:scale-[0.96]"
               aria-label="Open commit on GitHub"
             >
-              <ExternalLink size={16} />
+              <ExternalLink size={13} />
             </a>
           </Tooltip>
         </div>
