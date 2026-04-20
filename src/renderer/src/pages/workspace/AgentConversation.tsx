@@ -6,6 +6,7 @@ import type { AgentContext, AgentSession, AgentStreamEvent, AgentStreamResult } 
 import AgentMessageBlock from './AgentMessageBlock'
 import HighlightedMentionText from '../../components/HighlightedMentionText'
 import PRStateIcon from '../../components/PRStateIcon'
+import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
 
@@ -232,18 +233,26 @@ export default function AgentConversation({ session }: AgentConversationProps) {
 }
 
 function AgentContextBox({ context }: { context: AgentContext }) {
+  const workspace = useWorkspaceContext()
   if (context.source !== 'pull-request') return null
+
+  const openPR = workspace?.onOpenPullRequest
 
   // Multi-PR mention context (from the agents view): render one row per PR.
   if (context.prs && context.prs.length > 1) {
     return (
-      <div className="border-border bg-surface mb-2 ml-auto flex w-max flex-col items-end gap-1.5 rounded-lg border px-3 py-2">
+      <div className="border-border bg-surface mb-2 ml-auto flex w-max flex-col items-end gap-0.5 rounded-lg border p-1">
         {context.prs.map((pr) => (
-          <div key={pr.number} className="text-foreground flex items-center gap-1.5 text-xs">
+          <button
+            key={pr.number}
+            type="button"
+            onClick={() => openPR?.(pr.number)}
+            className="hover:bg-surface-hover text-foreground flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors"
+          >
             <PRStateIcon state={pr.state} size={13} />
             <span className="font-semibold">#{pr.number}</span>
             <span className="text-foreground-muted max-w-[200px] truncate">{pr.title}</span>
-          </div>
+          </button>
         ))}
       </div>
     )
@@ -251,18 +260,24 @@ function AgentContextBox({ context }: { context: AgentContext }) {
 
   if (!context.prNumber) return null
 
+  const prNumber = context.prNumber
+
   return (
-    <div className="border-border bg-surface mb-2 ml-auto flex w-max flex-col items-end gap-x-4 gap-y-1.5 rounded-lg border px-3 py-2">
-      <div className="text-foreground flex items-center gap-1.5 text-xs">
+    <div className="border-border bg-surface mb-2 ml-auto flex w-max flex-col items-end gap-y-1 rounded-lg border p-1">
+      <button
+        type="button"
+        onClick={() => openPR?.(prNumber)}
+        className="hover:bg-surface-hover text-foreground flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors"
+      >
         <PRStateIcon state={context.prState ?? 'open'} size={13} />
-        <span className="font-semibold">#{context.prNumber}</span>
+        <span className="font-semibold">#{prNumber}</span>
         {context.prTitle ? (
           <span className="text-foreground-muted max-w-[200px] truncate">{context.prTitle}</span>
         ) : null}
-      </div>
+      </button>
 
       {context.headBranch ? (
-        <div className="text-foreground-muted flex items-center gap-1 text-xs">
+        <div className="text-foreground-muted flex items-center gap-1 px-2 pb-1 text-xs">
           <GitBranch size={12} className="shrink-0" />
           <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.headBranch}</code>
           <span className="text-foreground-subtle">&rarr;</span>
@@ -271,7 +286,7 @@ function AgentContextBox({ context }: { context: AgentContext }) {
       ) : null}
 
       {context.filePath ? (
-        <div className="text-foreground-muted flex items-center gap-1 text-xs">
+        <div className="text-foreground-muted flex items-center gap-1 px-2 pb-1 text-xs">
           <FileCode size={12} className="shrink-0" />
           <code className="bg-interactive rounded px-1 py-0.5 text-[11px]">{context.filePath}</code>
           {context.lineNumber ? <span className="text-foreground-subtle">:{context.lineNumber}</span> : null}
