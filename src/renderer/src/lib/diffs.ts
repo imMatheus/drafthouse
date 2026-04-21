@@ -1,8 +1,8 @@
 import type { BaseCodeOptions, BaseDiffOptions, SupportedLanguages, ThemesType } from '@pierre/diffs'
 
 const DIFFS_THEMES: ThemesType = {
-  dark: 'github-dark-default',
-  light: 'github-light-default'
+  dark: 'vitesse-dark',
+  light: 'vitesse-light'
 }
 
 const EXTENSION_TO_LANG: Record<string, SupportedLanguages> = {

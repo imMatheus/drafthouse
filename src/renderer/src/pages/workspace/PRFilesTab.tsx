@@ -373,7 +373,7 @@ export default function PRFilesTab({
           ) : null}
           {isLoading ? <Loading label="Loading changed files..." /> : null}
           <Virtualizer contentClassName="flex flex-col gap-5">
-            {filteredFiles.map((file, index) => (
+            {filteredFiles.map((file) => (
               <ChangedFileDiffCard
                 key={file.filename}
                 owner={owner}
@@ -397,8 +397,6 @@ export default function PRFilesTab({
                 onRemoveDraftComment={handleRemoveDraftComment}
                 onInlineCommentPosted={handleInlineCommentPosted}
                 allowCommenting
-                isActive={activeFilePath === file.filename}
-                initiallyVisible={index < 3}
                 sectionRef={(element) => {
                   if (element) fileSectionRefs.current.set(file.filename, element)
                   else fileSectionRefs.current.delete(file.filename)
@@ -460,8 +458,6 @@ export function ChangedFileDiffCard({
   onRemoveDraftComment,
   onInlineCommentPosted,
   allowCommenting = true,
-  isActive = false,
-  initiallyVisible = false,
   sectionRef,
   threadRef
 }: {
@@ -492,8 +488,6 @@ export function ChangedFileDiffCard({
   onRemoveDraftComment: (index: number) => void
   onInlineCommentPosted: () => Promise<void>
   allowCommenting?: boolean
-  isActive?: boolean
-  initiallyVisible?: boolean
   sectionRef: (element: HTMLElement | null) => void
   threadRef: (commentId: number, element: HTMLElement | null) => void
 }) {
@@ -502,18 +496,6 @@ export function ChangedFileDiffCard({
 
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [pathCopied, setPathCopied] = useState(false)
-  const [hasRenderedDiffBody, setHasRenderedDiffBody] = useState(initiallyVisible)
-  const diffBodyObserverRef = useRef<IntersectionObserver | null>(null)
-
-  useEffect(() => {
-    if (isActive || initiallyVisible) {
-      setHasRenderedDiffBody(true)
-    }
-  }, [initiallyVisible, isActive])
-
-  useEffect(() => {
-    return () => diffBodyObserverRef.current?.disconnect()
-  }, [])
 
   const handleCopyPath = (): void => {
     navigator.clipboard.writeText(file.filename).catch(() => {})
@@ -522,7 +504,6 @@ export function ChangedFileDiffCard({
   }
 
   const hasRenderablePatch = !!file.patch
-  const shouldRenderDiffBody = hasRenderedDiffBody && !isCollapsed
 
   const replyTarget = { owner, repo, number }
 
@@ -640,40 +621,14 @@ export function ChangedFileDiffCard({
 
   return (
     <section
-      ref={(element) => {
-        sectionRef(element)
-
-        diffBodyObserverRef.current?.disconnect()
-
-        if (!element || hasRenderedDiffBody) {
-          return
-        }
-
-        const observer = new IntersectionObserver(
-          (entries) => {
-            if (entries.some((entry) => entry.isIntersecting)) {
-              setHasRenderedDiffBody(true)
-              observer.disconnect()
-            }
-          },
-          { rootMargin: '900px 0px' }
-        )
-
-        observer.observe(element)
-        diffBodyObserverRef.current = observer
-      }}
+      ref={sectionRef}
       data-file-path={file.filename}
       className="border-border bg-surface overflow-hidden rounded-xl border"
     >
       <header className={cn('flex items-center gap-2 px-3 py-1.5', !isCollapsed && 'border-border border-b')}>
         <button
           type="button"
-          onClick={() => {
-            if (isCollapsed) {
-              setHasRenderedDiffBody(true)
-            }
-            setIsCollapsed(!isCollapsed)
-          }}
+          onClick={() => setIsCollapsed(!isCollapsed)}
           className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
           aria-label={isCollapsed ? 'Expand file' : 'Collapse file'}
         >
@@ -709,9 +664,7 @@ export function ChangedFileDiffCard({
 
       {isCollapsed ? null : (
         <>
-          {!shouldRenderDiffBody ? (
-            <div className="text-foreground-muted px-4 py-6 text-sm">Rendering diff…</div>
-          ) : hasRenderablePatch ? (
+          {hasRenderablePatch ? (
             <PatchDiff<InlineAnnotationMeta>
               patch={wrapGitPatch(file.filename, file.patch!)}
               options={{

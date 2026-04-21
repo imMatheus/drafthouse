@@ -282,7 +282,7 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-5">
-              {filteredFiles.map((file, index) => (
+              {filteredFiles.map((file) => (
                 <ChangedFileDiffCard
                   key={file.filename}
                   owner={owner}
@@ -301,8 +301,6 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
                   onRemoveDraftComment={NOOP_DRAFT_REMOVE}
                   onInlineCommentPosted={NOOP_ASYNC}
                   allowCommenting={false}
-                  isActive={activeFilePath === file.filename}
-                  initiallyVisible={index < 3}
                   sectionRef={(element) => {
                     if (element) fileSectionRefs.current.set(file.filename, element)
                     else fileSectionRefs.current.delete(file.filename)
