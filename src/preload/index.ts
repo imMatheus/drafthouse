@@ -153,6 +153,11 @@ const api = {
           page?: number
         }
       ): Promise<unknown> => ipcRenderer.invoke('github:pulls:list', owner, repo, options),
+      search: (
+        owner: string,
+        repo: string,
+        options: { query: string; state?: 'open' | 'closed' | 'all'; perPage?: number }
+      ): Promise<unknown> => ipcRenderer.invoke('github:pulls:search', owner, repo, options),
       get: (owner: string, repo: string, number: number): Promise<unknown> =>
         ipcRenderer.invoke('github:pulls:get', owner, repo, number),
       create: (owner: string, repo: string, input: unknown): Promise<unknown> =>

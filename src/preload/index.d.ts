@@ -197,6 +197,11 @@ interface GitHubPullsAPI {
       page?: number
     }
   ) => Promise<PullRequest[]>
+  search: (
+    owner: string,
+    repo: string,
+    options: { query: string; state?: 'open' | 'closed' | 'all'; perPage?: number }
+  ) => Promise<PullRequest[]>
   get: (owner: string, repo: string, number: number) => Promise<PullRequestDetail>
   create: (owner: string, repo: string, input: CreatePullRequestInput) => Promise<PullRequestDetail>
   update: (owner: string, repo: string, number: number, input: UpdatePullRequestInput) => Promise<PullRequestDetail>
