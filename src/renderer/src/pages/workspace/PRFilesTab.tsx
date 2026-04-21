@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
@@ -67,20 +67,36 @@ const ANNOTATION_WRAPPER_STYLE: React.CSSProperties = {
   lineHeight: '1.5'
 }
 
+function AnnotationWrapper({
+  side,
+  elementRef,
+  children
+}: {
+  side: 'deletions' | 'additions'
+  elementRef?: (element: HTMLDivElement | null) => void
+  children: ReactNode
+}) {
+  return (
+    <div
+      ref={elementRef}
+      style={ANNOTATION_WRAPPER_STYLE}
+      className={cn('border-border border-t p-3', side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
+    >
+      {children}
+    </div>
+  )
+}
+
 type InlineAnnotationMeta =
-  | { kind: 'thread'; thread: PullRequestReviewThread; line: number; side: PullRequestReviewLineSide }
-  | { kind: 'draft'; draft: PreparedDraftEntry; line: number; side: PullRequestReviewLineSide }
-  | { kind: 'agent'; session: AgentSession; line: number; side: PullRequestReviewLineSide }
+  | { kind: 'thread'; thread: PullRequestReviewThread }
+  | { kind: 'draft'; draft: PreparedDraftEntry }
+  | { kind: 'agent'; session: AgentSession }
   | { kind: 'composer'; line: number; side: PullRequestReviewLineSide; lineContent: string }
 
 const EMPTY_FILES: PullRequestFile[] = []
 const EMPTY_THREADS: PullRequestReviewThread[] = []
 const EMPTY_DRAFTS: PreparedDraftEntry[] = []
 const EMPTY_SESSIONS: AgentSession[] = []
-
-// ────────────────────────────────────────────────────────────
-// Main PRFilesTab (unchanged from before)
-// ────────────────────────────────────────────────────────────
 
 export default function PRFilesTab({
   pr,
@@ -122,6 +138,7 @@ export default function PRFilesTab({
   const [isSubmitReviewOpen, setIsSubmitReviewOpen] = useState(false)
   const fileSectionRefs = useRef(new Map<string, HTMLElement>())
   const threadRefs = useRef(new Map<number, HTMLElement>())
+  const handledJumpNonceRef = useRef<number | null>(null)
   const queryClient = useQueryClient()
 
   const {
@@ -154,67 +171,44 @@ export default function PRFilesTab({
   })
 
   const allFiles = files ?? EMPTY_FILES
-  const deferredFilterValue = useDeferredValue(filterValue)
-  const trimmedFilter = deferredFilterValue.trim().toLowerCase()
-  const filteredFiles = useMemo(
-    () =>
-      trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter)),
-    [allFiles, trimmedFilter]
-  )
-  const fileTree = useMemo(() => buildFileTree(filteredFiles), [filteredFiles])
+  const trimmedFilter = filterValue.trim().toLowerCase()
+  const filteredFiles =
+    trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
+  const fileTree = buildFileTree(filteredFiles)
 
-  const reviewThreads = useMemo(
-    () => buildPullRequestReviewThreads(reviewComments ?? [], reviewThreadSummaries),
-    [reviewComments, reviewThreadSummaries]
-  )
+  const reviewThreads = buildPullRequestReviewThreads(reviewComments ?? [], reviewThreadSummaries)
 
-  // File-scoped groupings. Each card pulls only its own slice so a change in
-  // one file's annotations doesn't invalidate the prepared diffs of other files.
-  const threadsByFile = useMemo(() => {
-    const map = new Map<string, PullRequestReviewThread[]>()
-    for (const thread of reviewThreads) {
-      const bucket = map.get(thread.path)
-      if (bucket) bucket.push(thread)
-      else map.set(thread.path, [thread])
-    }
-    return map
-  }, [reviewThreads])
+  // File-scoped groupings so each card only sees its own threads/drafts/sessions.
+  const threadsByFile = new Map<string, PullRequestReviewThread[]>()
+  for (const thread of reviewThreads) {
+    const bucket = threadsByFile.get(thread.path)
+    if (bucket) bucket.push(thread)
+    else threadsByFile.set(thread.path, [thread])
+  }
 
-  const commentCountsByFile = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const comment of reviewComments ?? []) {
-      map.set(comment.path, (map.get(comment.path) ?? 0) + 1)
-    }
-    return map
-  }, [reviewComments])
+  const commentCountsByFile = new Map<string, number>()
+  for (const comment of reviewComments ?? []) {
+    commentCountsByFile.set(comment.path, (commentCountsByFile.get(comment.path) ?? 0) + 1)
+  }
 
-  const threadsByCommentId = useMemo(
-    () => new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread])),
-    [reviewThreads]
-  )
+  const threadsByCommentId = new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread]))
 
-  const draftsByFile = useMemo(() => {
-    const map = new Map<string, PreparedDraftEntry[]>()
-    draftReviewComments.forEach((comment, index) => {
-      const bucket = map.get(comment.path)
-      const entry: PreparedDraftEntry = { comment, index }
-      if (bucket) bucket.push(entry)
-      else map.set(comment.path, [entry])
-    })
-    return map
-  }, [draftReviewComments])
+  const draftsByFile = new Map<string, PreparedDraftEntry[]>()
+  draftReviewComments.forEach((comment, index) => {
+    const bucket = draftsByFile.get(comment.path)
+    const entry: PreparedDraftEntry = { comment, index }
+    if (bucket) bucket.push(entry)
+    else draftsByFile.set(comment.path, [entry])
+  })
 
-  const inlineSessionsByFile = useMemo(() => {
-    const map = new Map<string, AgentSession[]>()
-    for (const session of agentSessions ?? []) {
-      const ctx = session.context
-      if (!ctx || !ctx.inline || !ctx.filePath) continue
-      const bucket = map.get(ctx.filePath)
-      if (bucket) bucket.push(session)
-      else map.set(ctx.filePath, [session])
-    }
-    return map
-  }, [agentSessions])
+  const inlineSessionsByFile = new Map<string, AgentSession[]>()
+  for (const session of agentSessions ?? []) {
+    const ctx = session.context
+    if (!ctx || !ctx.inline || !ctx.filePath) continue
+    const bucket = inlineSessionsByFile.get(ctx.filePath)
+    if (bucket) bucket.push(session)
+    else inlineSessionsByFile.set(ctx.filePath, [session])
+  }
 
   const filesErrorMessage = filesError ?? reviewCommentsError
   const isLoading = isLoadingFiles || isLoadingReviewComments
@@ -250,14 +244,21 @@ export default function PRFilesTab({
     return () => observer.disconnect()
   }, [filteredFiles])
 
+  // Fires once per new jump. The `trimmedFilter` dep handles the self-heal path:
+  // if the target file isn't in the current filter, we clear the filter, which
+  // bumps trimmedFilter and re-fires this effect to complete the scroll. The
+  // nonce ref guarantees we don't re-scroll on unrelated filter changes after.
   useEffect(() => {
     if (!threadJumpTarget) return
+    if (handledJumpNonceRef.current === threadJumpTarget.nonce) return
     const thread = threadsByCommentId.get(threadJumpTarget.commentId)
     const nextPath = thread?.path ?? threadJumpTarget.path
-    if (!filteredFiles.some((file) => file.filename === nextPath)) {
+    const matchesFilter = trimmedFilter === '' || nextPath.toLowerCase().includes(trimmedFilter)
+    if (!matchesFilter) {
       setFilterValue('')
       return
     }
+    handledJumpNonceRef.current = threadJumpTarget.nonce
     setActiveFilePath(nextPath)
     requestAnimationFrame(() => {
       const threadElement = threadRefs.current.get(threadJumpTarget.commentId)
@@ -267,7 +268,7 @@ export default function PRFilesTab({
       }
       fileSectionRefs.current.get(nextPath)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
-  }, [filteredFiles, threadJumpTarget, threadsByCommentId])
+  }, [threadJumpTarget, trimmedFilter])
 
   const handleScrollToFile = (path: string): void => {
     setActiveFilePath(path)
@@ -432,10 +433,6 @@ export default function PRFilesTab({
   )
 }
 
-// ────────────────────────────────────────────────────────────
-// PullRequestFileDiffCard — patch-based hunk rendering
-// ────────────────────────────────────────────────────────────
-
 export function ChangedFileDiffCard({
   owner,
   repo,
@@ -509,14 +506,14 @@ export function ChangedFileDiffCard({
 
   // Threads that couldn't be anchored to a line (outdated or missing side/line).
   // These render below the diff in an "Other comments" section.
-  const unanchoredThreads = useMemo(
-    () => fileThreads.filter((t) => t.isOutdated || t.side == null || t.line == null),
-    [fileThreads]
-  )
+  const unanchoredThreads = fileThreads.filter((t) => t.isOutdated || t.side == null || t.line == null)
 
-  const anchoredAnnotations = useMemo(
-    () => buildAnchoredAnnotations(fileThreads, fileDrafts, fileInlineSessions, openCommentKey, file.filename),
-    [fileThreads, fileDrafts, fileInlineSessions, openCommentKey, file.filename]
+  const anchoredAnnotations = buildAnchoredAnnotations(
+    fileThreads,
+    fileDrafts,
+    fileInlineSessions,
+    openCommentKey,
+    file.filename
   )
 
   const renderAnnotation = (annotation: DiffLineAnnotation<InlineAnnotationMeta>) => {
@@ -524,11 +521,7 @@ export function ChangedFileDiffCard({
     if (!meta) return null
     if (meta.kind === 'thread') {
       return (
-        <div
-          ref={(element) => threadRef(meta.thread.id, element)}
-          style={ANNOTATION_WRAPPER_STYLE}
-          className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
-        >
+        <AnnotationWrapper side={annotation.side} elementRef={(el) => threadRef(meta.thread.id, el)}>
           <InlineDiffThread
             thread={meta.thread}
             replyTarget={replyTarget}
@@ -538,29 +531,23 @@ export function ChangedFileDiffCard({
             onContinueAgent={onContinueAgent}
             onPromoteAgent={onPromoteAgent}
           />
-        </div>
+        </AnnotationWrapper>
       )
     }
     if (meta.kind === 'draft') {
       return (
-        <div
-          style={ANNOTATION_WRAPPER_STYLE}
-          className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
-        >
+        <AnnotationWrapper side={annotation.side}>
           <DraftCommentCard
             comment={meta.draft.comment}
             auth={auth}
             onRemove={() => onRemoveDraftComment(meta.draft.index)}
           />
-        </div>
+        </AnnotationWrapper>
       )
     }
     if (meta.kind === 'agent') {
       return (
-        <div
-          style={ANNOTATION_WRAPPER_STYLE}
-          className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
-        >
+        <AnnotationWrapper side={annotation.side}>
           <InlineAgentResponseCard
             session={meta.session}
             onStop={() => onStopAgent?.(meta.session.id)}
@@ -568,15 +555,12 @@ export function ChangedFileDiffCard({
             onOpenInChat={() => onPromoteAgent?.(meta.session.id)}
             compact
           />
-        </div>
+        </AnnotationWrapper>
       )
     }
     if (meta.kind === 'composer' && allowCommenting) {
       return (
-        <div
-          style={ANNOTATION_WRAPPER_STYLE}
-          className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
-        >
+        <AnnotationWrapper side={annotation.side}>
           <InlineDiffCommentComposer
             owner={owner}
             repo={repo}
@@ -591,7 +575,7 @@ export function ChangedFileDiffCard({
             onInlineCommentPosted={onInlineCommentPosted}
             onAskClaude={onAskClaude}
           />
-        </div>
+        </AnnotationWrapper>
       )
     }
     return null
@@ -726,27 +710,25 @@ function buildAnchoredAnnotations(
     out.push({
       side: thread.side === 'LEFT' ? 'deletions' : 'additions',
       lineNumber: thread.line,
-      metadata: { kind: 'thread', thread, line: thread.line, side: thread.side }
+      metadata: { kind: 'thread', thread }
     })
   }
 
   for (const draft of drafts) {
-    const { side, line } = draft.comment
     out.push({
-      side: side === 'LEFT' ? 'deletions' : 'additions',
-      lineNumber: line,
-      metadata: { kind: 'draft', draft, line, side }
+      side: draft.comment.side === 'LEFT' ? 'deletions' : 'additions',
+      lineNumber: draft.comment.line,
+      metadata: { kind: 'draft', draft }
     })
   }
 
   for (const session of sessions) {
     const ctx = session.context
     if (!ctx || !ctx.inline || typeof ctx.lineNumber !== 'number') continue
-    const side: PullRequestReviewLineSide = ctx.side === 'LEFT' ? 'LEFT' : 'RIGHT'
     out.push({
-      side: side === 'LEFT' ? 'deletions' : 'additions',
+      side: ctx.side === 'LEFT' ? 'deletions' : 'additions',
       lineNumber: ctx.lineNumber,
-      metadata: { kind: 'agent', session, line: ctx.lineNumber, side }
+      metadata: { kind: 'agent', session }
     })
   }
 
@@ -765,10 +747,6 @@ function buildAnchoredAnnotations(
 
   return out
 }
-
-// ────────────────────────────────────────────────────────────
-// DraftCommentCard
-// ────────────────────────────────────────────────────────────
 
 function DraftCommentCard({
   comment,
@@ -806,10 +784,6 @@ function DraftCommentCard({
     </div>
   )
 }
-
-// ────────────────────────────────────────────────────────────
-// InlineDiffThread
-// ────────────────────────────────────────────────────────────
 
 function InlineDiffThread({
   thread,
@@ -1005,10 +979,6 @@ function InlineDiffThread({
   )
 }
 
-// ────────────────────────────────────────────────────────────
-// InlineDiffCommentComposer
-// ────────────────────────────────────────────────────────────
-
 function InlineDiffCommentComposer({
   owner,
   repo,
@@ -1128,10 +1098,6 @@ function InlineDiffCommentComposer({
     </div>
   )
 }
-
-// ────────────────────────────────────────────────────────────
-// SubmitReviewDialog
-// ────────────────────────────────────────────────────────────
 
 function SubmitReviewDialog({
   open,
@@ -1256,10 +1222,6 @@ function SubmitReviewDialog({
     </div>
   )
 }
-
-// ────────────────────────────────────────────────────────────
-// File tree (unchanged)
-// ────────────────────────────────────────────────────────────
 
 interface FileTreeNode {
   name: string
