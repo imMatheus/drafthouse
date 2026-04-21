@@ -11,7 +11,6 @@ import {
   FileMinus,
   FilePlus,
   MessageSquare,
-  Plus,
   Search,
   X
 } from 'lucide-react'
@@ -43,7 +42,6 @@ import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
 import { BASE_DIFF_OPTIONS, wrapGitPatch } from '../../lib/diffs'
 import MarkdownBody from './MarkdownBody'
-import ReviewThreadCard from './ReviewThreadCard'
 import {
   buildPullRequestReviewThreads,
   DiffStat,
@@ -504,17 +502,50 @@ export function ChangedFileDiffCard({
 
   const replyTarget = { owner, repo, number }
 
-  // Threads that couldn't be anchored to a line (outdated or missing side/line).
-  // These render below the diff in an "Other comments" section.
-  const unanchoredThreads = fileThreads.filter((t) => t.isOutdated || t.side == null || t.line == null)
+  // Flatten threads, drafts, sessions, and the open composer into Pierre's
+  // annotation format. Threads that can't be anchored (outdated or missing
+  // side/line) are dropped — they have nowhere to render inline.
+  const anchoredAnnotations: DiffLineAnnotation<InlineAnnotationMeta>[] = []
 
-  const anchoredAnnotations = buildAnchoredAnnotations(
-    fileThreads,
-    fileDrafts,
-    fileInlineSessions,
-    openCommentKey,
-    file.filename
-  )
+  for (const thread of fileThreads) {
+    if (thread.side == null || thread.line == null || thread.isOutdated) continue
+    anchoredAnnotations.push({
+      side: thread.side === 'LEFT' ? 'deletions' : 'additions',
+      lineNumber: thread.line,
+      metadata: { kind: 'thread', thread }
+    })
+  }
+
+  for (const draft of fileDrafts) {
+    anchoredAnnotations.push({
+      side: draft.comment.side === 'LEFT' ? 'deletions' : 'additions',
+      lineNumber: draft.comment.line,
+      metadata: { kind: 'draft', draft }
+    })
+  }
+
+  for (const session of fileInlineSessions) {
+    const ctx = session.context
+    if (!ctx || !ctx.inline || typeof ctx.lineNumber !== 'number') continue
+    anchoredAnnotations.push({
+      side: ctx.side === 'LEFT' ? 'deletions' : 'additions',
+      lineNumber: ctx.lineNumber,
+      metadata: { kind: 'agent', session }
+    })
+  }
+
+  if (openCommentKey && openCommentKey.startsWith(`${file.filename}::`)) {
+    const [, sideStr, lineStr] = openCommentKey.split('::')
+    const line = Number(lineStr)
+    if (!Number.isNaN(line)) {
+      const side: PullRequestReviewLineSide = sideStr === 'LEFT' ? 'LEFT' : 'RIGHT'
+      anchoredAnnotations.push({
+        side: side === 'LEFT' ? 'deletions' : 'additions',
+        lineNumber: line,
+        metadata: { kind: 'composer', line, side, lineContent: '' }
+      })
+    }
+  }
 
   const renderAnnotation = (annotation: DiffLineAnnotation<InlineAnnotationMeta>) => {
     const meta = annotation.metadata
@@ -581,26 +612,10 @@ export function ChangedFileDiffCard({
     return null
   }
 
-  const renderGutterUtility = (
-    getHoveredLine: () => { lineNumber: number; side: 'deletions' | 'additions' } | undefined
-  ) => {
-    if (!allowCommenting) return null
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          const hovered = getHoveredLine()
-          if (!hovered) return
-          const side: PullRequestReviewLineSide = hovered.side === 'deletions' ? 'LEFT' : 'RIGHT'
-          const rowKey = `${file.filename}::${side}::${hovered.lineNumber}`
-          onOpenComment(openCommentKey === rowKey ? null : rowKey)
-        }}
-        className="bg-accent text-accent-foreground flex size-5 items-center justify-center rounded"
-        aria-label="Add line comment"
-      >
-        <Plus size={12} />
-      </button>
-    )
+  const handleGutterClick = (range: { start: number; side?: 'deletions' | 'additions' }) => {
+    const side: PullRequestReviewLineSide = range.side === 'deletions' ? 'LEFT' : 'RIGHT'
+    const rowKey = `${file.filename}::${side}::${range.start}`
+    onOpenComment(openCommentKey === rowKey ? null : rowKey)
   }
 
   return (
@@ -656,96 +671,21 @@ export function ChangedFileDiffCard({
                 themeType: theme,
                 diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
                 disableFileHeader: true,
-                enableGutterUtility: allowCommenting
+                enableGutterUtility: allowCommenting,
+                onGutterUtilityClick: allowCommenting ? handleGutterClick : undefined
               }}
               lineAnnotations={anchoredAnnotations}
               renderAnnotation={renderAnnotation}
-              renderGutterUtility={renderGutterUtility}
             />
           ) : (
             <div className="text-foreground-muted px-4 py-6 text-sm">
               GitHub did not return a renderable patch for this file.
             </div>
           )}
-
-          {unanchoredThreads.length > 0 ? (
-            <div className="border-border border-t px-4 py-4">
-              <p className="text-foreground-muted mb-3 text-xs font-semibold tracking-wider uppercase">
-                Other comments
-              </p>
-              <div className="flex flex-col gap-3">
-                {unanchoredThreads.map((thread) => (
-                  <div key={`unanchored-${thread.id}`} ref={(element) => threadRef(thread.id, element)}>
-                    <ReviewThreadCard
-                      thread={thread}
-                      replyTarget={replyTarget}
-                      onFixWithClaude={onFixWithClaude}
-                      agentSessions={agentSessions}
-                      onStopAgent={onStopAgent}
-                      onContinueAgent={onContinueAgent}
-                      onPromoteAgent={onPromoteAgent}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </>
       )}
     </section>
   )
-}
-
-function buildAnchoredAnnotations(
-  threads: readonly PullRequestReviewThread[],
-  drafts: readonly PreparedDraftEntry[],
-  sessions: readonly AgentSession[],
-  openCommentKey: string | null,
-  filename: string
-): DiffLineAnnotation<InlineAnnotationMeta>[] {
-  const out: DiffLineAnnotation<InlineAnnotationMeta>[] = []
-
-  for (const thread of threads) {
-    if (thread.side == null || thread.line == null || thread.isOutdated) continue
-    out.push({
-      side: thread.side === 'LEFT' ? 'deletions' : 'additions',
-      lineNumber: thread.line,
-      metadata: { kind: 'thread', thread }
-    })
-  }
-
-  for (const draft of drafts) {
-    out.push({
-      side: draft.comment.side === 'LEFT' ? 'deletions' : 'additions',
-      lineNumber: draft.comment.line,
-      metadata: { kind: 'draft', draft }
-    })
-  }
-
-  for (const session of sessions) {
-    const ctx = session.context
-    if (!ctx || !ctx.inline || typeof ctx.lineNumber !== 'number') continue
-    out.push({
-      side: ctx.side === 'LEFT' ? 'deletions' : 'additions',
-      lineNumber: ctx.lineNumber,
-      metadata: { kind: 'agent', session }
-    })
-  }
-
-  if (openCommentKey && openCommentKey.startsWith(`${filename}::`)) {
-    const [, sideStr, lineStr] = openCommentKey.split('::')
-    const line = Number(lineStr)
-    const side: PullRequestReviewLineSide = sideStr === 'LEFT' ? 'LEFT' : 'RIGHT'
-    if (!Number.isNaN(line)) {
-      out.push({
-        side: side === 'LEFT' ? 'deletions' : 'additions',
-        lineNumber: line,
-        metadata: { kind: 'composer', line, side, lineContent: '' }
-      })
-    }
-  }
-
-  return out
 }
 
 function DraftCommentCard({
