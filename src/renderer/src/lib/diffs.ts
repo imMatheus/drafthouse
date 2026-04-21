@@ -1,8 +1,8 @@
 import type { BaseCodeOptions, BaseDiffOptions, SupportedLanguages, ThemesType } from '@pierre/diffs'
 
 const DIFFS_THEMES: ThemesType = {
-  dark: 'vitesse-dark',
-  light: 'vitesse-light'
+  dark: 'github-dark-default',
+  light: 'github-light-default'
 }
 
 const EXTENSION_TO_LANG: Record<string, SupportedLanguages> = {
@@ -127,7 +127,7 @@ export function syntheticFilenameForLang(lang: string): string {
 
 export const BASE_DIFF_OPTIONS: Omit<BaseDiffOptions, 'hunkSeparators'> = {
   theme: DIFFS_THEMES,
-  diffIndicators: 'bars',
+  diffIndicators: 'classic',
   overflow: 'wrap',
   expandUnchanged: true,
   lineDiffType: 'word'
