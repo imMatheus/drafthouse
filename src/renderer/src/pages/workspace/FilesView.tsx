@@ -1,10 +1,10 @@
-import { Fragment, useRef } from 'react'
+import { Fragment } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
-import Editor, { type OnMount } from '@monaco-editor/react'
+import { File, type FileContents } from '@pierre/diffs/react'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
-import { getMonacoTheme, getMonacoLanguage, BASE_EDITOR_OPTIONS } from '../../lib/monaco'
+import { BASE_CODE_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
 
 interface FilesViewProps {
   filePath: string
@@ -13,8 +13,6 @@ interface FilesViewProps {
 
 export default function FilesView({ filePath, folderPath }: FilesViewProps) {
   const { theme } = useTheme()
-  const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
-
   const {
     data: fileContents,
     isLoading,
@@ -28,11 +26,10 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
   const relativePath = getRelativePath(filePath, folderPath)
   const segments = relativePath.split('/')
 
-  const handleEditorMount: OnMount = (editor, monacoInstance) => {
-    editorRef.current = editor
-    editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS, () => {
-      window.api.fs.writeFile(filePath, editor.getValue())
-    })
+  const file: FileContents = {
+    name: filePath,
+    contents: fileContents ?? '',
+    lang: getLanguageFromPath(filePath)
   }
 
   return (
@@ -48,25 +45,14 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
         ))}
       </div>
 
-      <div className="bg-background min-h-0 flex-1 overflow-hidden">
+      <div className="bg-background min-h-0 flex-1 overflow-auto">
         {isLoading ? null : error ? (
           <div className="px-4 py-6">
             <p className="text-foreground text-sm font-medium">File unavailable</p>
             <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>
           </div>
         ) : (
-          <Editor
-            value={fileContents ?? ''}
-            language={getMonacoLanguage(filePath)}
-            theme={getMonacoTheme(theme)}
-            path={filePath}
-            options={{
-              ...BASE_EDITOR_OPTIONS,
-              readOnly: false
-            }}
-            onMount={handleEditorMount}
-            loading={null}
-          />
+          <File file={file} options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }} />
         )}
       </div>
     </div>
