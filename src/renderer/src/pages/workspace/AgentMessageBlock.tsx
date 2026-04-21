@@ -43,10 +43,7 @@ export function UserBubble({
     <div className="mt-2 mb-3 flex flex-col items-end">
       <MessagePRMentions text={text} allPRs={allMentionedPRs} />
       <div
-        className={cn(
-          'bg-accent-bg text-accent max-w-[80%] rounded-2xl px-3 py-2',
-          compact ? 'text-xs' : 'text-sm'
-        )}
+        className={cn('bg-accent-bg text-accent max-w-[80%] rounded-2xl px-3 py-2', compact ? 'text-xs' : 'text-sm')}
       >
         {markdown ? (
           <MarkdownBody compact={compact}>{text}</MarkdownBody>
@@ -80,7 +77,9 @@ export default function AgentMessageBlock({
     case 'assistant':
       return <AssistantMessage event={event} visibleOnly={visibleOnly} compact={compact} />
     case 'user':
-      return <UserMessage event={event} inlineToolIds={inlineToolIds} compact={compact} allMentionedPRs={allMentionedPRs} />
+      return (
+        <UserMessage event={event} inlineToolIds={inlineToolIds} compact={compact} allMentionedPRs={allMentionedPRs} />
+      )
     case 'system':
       return <SystemMessage event={event as AgentStreamSystem} />
     case 'result':

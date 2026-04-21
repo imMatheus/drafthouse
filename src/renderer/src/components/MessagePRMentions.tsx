@@ -10,13 +10,7 @@ import type { AgentContext } from '../../../shared/types'
  * populated both at session start and by `mergePRsIntoContext` on each
  * continuation.
  */
-export default function MessagePRMentions({
-  text,
-  allPRs
-}: {
-  text: string
-  allPRs: AgentContext['prs']
-}) {
+export default function MessagePRMentions({ text, allPRs }: { text: string; allPRs: AgentContext['prs'] }) {
   const workspace = useWorkspaceContext()
   const mentioned = extractMentionedPRNumbers(text)
   if (mentioned.length === 0) return null

@@ -40,7 +40,10 @@ export function LoadingIndicator({ size = 'md' }: { size?: LoadingSize }) {
   }, [])
 
   return (
-    <span aria-hidden className={cn('text-accent inline-flex shrink-0 justify-center leading-none', INDICATOR_SIZE[size])}>
+    <span
+      aria-hidden
+      className={cn('text-accent inline-flex shrink-0 justify-center leading-none', INDICATOR_SIZE[size])}
+    >
       {FRAMES[frame]}
     </span>
   )
@@ -48,7 +51,11 @@ export function LoadingIndicator({ size = 'md' }: { size?: LoadingSize }) {
 
 export default function Loading({ label, size = 'md', className }: LoadingProps) {
   return (
-    <div role="status" aria-live="polite" className={cn('text-foreground-subtle', LAYOUT[size], LABEL_SIZE[size], className)}>
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn('text-foreground-subtle', LAYOUT[size], LABEL_SIZE[size], className)}
+    >
       <LoadingIndicator size={size} />
       {label ? <span>{label}</span> : null}
     </div>

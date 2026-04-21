@@ -201,7 +201,13 @@ export default function InlineAgentResponseCard({
 
         {/* The actual response — text and file-edit tool uses only */}
         {responseEvents.map((event, i) => (
-          <AgentMessageBlock key={`response-${i}`} event={event} inlineToolIds={new Set()} visibleOnly compact={compact} />
+          <AgentMessageBlock
+            key={`response-${i}`}
+            event={event}
+            inlineToolIds={new Set()}
+            visibleOnly
+            compact={compact}
+          />
         ))}
 
         {/* Streaming indicator when response is coming in */}

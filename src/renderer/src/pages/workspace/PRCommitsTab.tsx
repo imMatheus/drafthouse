@@ -251,9 +251,7 @@ function CommitRow({
               {subject}
             </button>
             {isMergeCommit ? (
-              <span className="bg-purple/10 text-purple rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                Merge
-              </span>
+              <span className="bg-purple/10 text-purple rounded-full px-1.5 py-0.5 text-[10px] font-medium">Merge</span>
             ) : null}
           </div>
 

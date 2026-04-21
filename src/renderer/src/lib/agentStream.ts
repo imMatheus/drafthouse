@@ -67,4 +67,3 @@ export function appendOrReplaceAssistant(
   }
   return [...events, finalEvent]
 }
-
