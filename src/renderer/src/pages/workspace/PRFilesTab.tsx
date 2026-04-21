@@ -15,7 +15,7 @@ import {
   Search,
   X
 } from 'lucide-react'
-import { PatchDiff, type DiffLineAnnotation } from '@pierre/diffs/react'
+import { PatchDiff, Virtualizer, type DiffLineAnnotation } from '@pierre/diffs/react'
 import type {
   AgentSession,
   AuthData,
@@ -372,7 +372,7 @@ export default function PRFilesTab({
             </div>
           ) : null}
           {isLoading ? <Loading label="Loading changed files..." /> : null}
-          <div className="flex flex-col gap-5">
+          <Virtualizer contentClassName="flex flex-col gap-5">
             {filteredFiles.map((file, index) => (
               <ChangedFileDiffCard
                 key={file.filename}
@@ -409,7 +409,7 @@ export default function PRFilesTab({
                 }}
               />
             ))}
-          </div>
+          </Virtualizer>
         </div>
       </div>
 
