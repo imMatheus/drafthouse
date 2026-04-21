@@ -57,6 +57,16 @@ interface PreparedDraftEntry {
   index: number
 }
 
+// @pierre/diffs renders annotations inside its shadow DOM, where font-family
+// and font-size inherit from Pierre's monospace <pre>. Reset both at the
+// annotation wrapper so our comment cards pick up the app's sans-serif stack.
+const ANNOTATION_WRAPPER_STYLE: React.CSSProperties = {
+  fontFamily:
+    "'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  fontSize: '14px',
+  lineHeight: '1.5'
+}
+
 type InlineAnnotationMeta =
   | { kind: 'thread'; thread: PullRequestReviewThread; line: number; side: PullRequestReviewLineSide }
   | { kind: 'draft'; draft: PreparedDraftEntry; line: number; side: PullRequestReviewLineSide }
@@ -535,6 +545,7 @@ export function ChangedFileDiffCard({
       return (
         <div
           ref={(element) => threadRef(meta.thread.id, element)}
+          style={ANNOTATION_WRAPPER_STYLE}
           className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
         >
           <InlineDiffThread
@@ -552,6 +563,7 @@ export function ChangedFileDiffCard({
     if (meta.kind === 'draft') {
       return (
         <div
+          style={ANNOTATION_WRAPPER_STYLE}
           className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
         >
           <DraftCommentCard
@@ -565,6 +577,7 @@ export function ChangedFileDiffCard({
     if (meta.kind === 'agent') {
       return (
         <div
+          style={ANNOTATION_WRAPPER_STYLE}
           className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
         >
           <InlineAgentResponseCard
@@ -580,6 +593,7 @@ export function ChangedFileDiffCard({
     if (meta.kind === 'composer' && allowCommenting) {
       return (
         <div
+          style={ANNOTATION_WRAPPER_STYLE}
           className={cn('border-border border-t p-3', annotation.side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
         >
           <InlineDiffCommentComposer
