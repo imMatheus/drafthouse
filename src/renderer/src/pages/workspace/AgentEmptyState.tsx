@@ -1,10 +1,10 @@
-import { FileClock, GitPullRequest, GitCompare, ListTodo, type LucideIcon } from 'lucide-react'
+import { MessageSquare, GitPullRequest, GitCompare, ListTodo, type LucideIcon } from 'lucide-react'
 import AsciiArt from '../../components/AsciiArt'
 import { cn } from '../../lib/cn'
 
 const SUGGESTED_PROMPTS: Array<{ prompt: string; icon: LucideIcon; iconClassName: string }> = [
   {
-    prompt: 'Summarize the open pull requests and flag anything that looks risky',
+    prompt: 'Summarize the current status of all my open pull requests',
     icon: GitPullRequest,
     iconClassName: 'text-success'
   },
@@ -14,8 +14,8 @@ const SUGGESTED_PROMPTS: Array<{ prompt: string; icon: LucideIcon; iconClassName
     iconClassName: 'text-accent'
   },
   {
-    prompt: 'Find recently changed files and explain what they do',
-    icon: FileClock,
+    prompt: 'Find the top 5 highest priority unanswered comments on my PRs',
+    icon: MessageSquare,
     iconClassName: 'text-purple'
   },
   {

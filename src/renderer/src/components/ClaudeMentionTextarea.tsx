@@ -28,10 +28,11 @@ export default function ClaudeMentionTextarea({
 }: ClaudeMentionTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const hasClaudePrefix = enabled && /^@claude/i.test(value.trimStart())
+  const hasClaudePrefix = enabled && /^@claude(?:\s|$)/i.test(value.trim())
 
   const mentionMatch = enabled ? value.trimStart().match(/^@(\w*)$/) : null
-  const showMentionMenu = mentionMatch !== null && 'claude'.startsWith(mentionMatch[1].toLowerCase())
+  const showMentionMenu =
+    mentionMatch !== null && 'claude'.startsWith(mentionMatch[1].toLowerCase()) && !hasClaudePrefix
 
   const acceptMention = (): void => {
     onChange('@claude ')
@@ -105,12 +106,12 @@ export default function ClaudeMentionTextarea({
   )
 }
 
-/** Returns true when body starts with "@claude " followed by content */
+/** Returns true when body starts with "@claude" (optionally followed by more content) */
 export function isClaudeMention(text: string): boolean {
-  return /^@claude\s+/i.test(text.trim())
+  return /^@claude(?:\s|$)/i.test(text.trim())
 }
 
-/** Strips the "@claude " prefix and returns the prompt */
+/** Strips the "@claude" prefix (and any following whitespace) and returns the prompt */
 export function extractClaudePrompt(text: string): string {
-  return text.trim().replace(/^@claude\s+/i, '')
+  return text.trim().replace(/^@claude\s*/i, '')
 }
