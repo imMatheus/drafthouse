@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { AgentContext, AgentSession, GitRepoInfo, PullRequestDetail } from '../../../../shared/types'
+import type { AgentContext, AgentSessionMeta, GitRepoInfo, PullRequestDetail } from '../../../../shared/types'
 import { buildMentionedPRContextBlock, buildPullRequestMentionsAgentContext } from '../../lib/prMentions'
 import AgentSessionList from './AgentSessionList'
 import AgentConversation from './AgentConversation'
@@ -7,7 +7,7 @@ import AgentEmptyState from './AgentEmptyState'
 import AgentPromptBar, { type AgentPromptBarHandle } from './AgentPromptBar'
 
 interface AgentViewProps {
-  sessions: AgentSession[]
+  sessions: AgentSessionMeta[]
   activeSessionId: string | null
   onSelectSession: (id: string | null) => void
   onStartSession: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>

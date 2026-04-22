@@ -12,7 +12,7 @@ import CommentBodyEditor from '../../components/CommentBodyEditor'
 import FixWithClaudeButton from '../../components/FixWithClaudeButton'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ResolveThreadButton from '../../components/ResolveThreadButton'
-import type { AgentSession } from '../../../../shared/types'
+import type { AgentSessionMeta } from '../../../../shared/types'
 import type { FixWithClaudeInput } from '../../lib/agentContext'
 import { cn } from '../../lib/cn'
 import MarkdownBody from './MarkdownBody'
@@ -40,7 +40,7 @@ export default function ReviewThreadCard({
   replyTarget?: { owner: string; repo: string; number: number }
   onQuoteReply?: (quoted: string) => void
   onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
-  agentSessions?: AgentSession[]
+  agentSessions?: AgentSessionMeta[]
   onStopAgent?: (sessionId: string) => Promise<void>
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void

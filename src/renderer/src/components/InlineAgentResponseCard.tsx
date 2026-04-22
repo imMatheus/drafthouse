@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowUp, ChevronRight, ExternalLink, Square } from 'lucide-react'
-import type { AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../shared/types'
+import type { AgentSessionMeta, AgentStreamEvent, AgentStreamResult } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import claudeLogoUrl from '../assets/claude.png'
 import AgentMessageBlock, {
@@ -10,6 +10,7 @@ import AgentMessageBlock, {
 } from '../pages/workspace/AgentMessageBlock'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
 import Tooltip from './Tooltip'
+import { useAgentSessionEvents } from '../contexts/AgentSessionsContext'
 
 function getThinkingStepLabel(name: string, input: Record<string, unknown>): string {
   switch (name) {
@@ -38,7 +39,7 @@ export default function InlineAgentResponseCard({
   variant = 'standalone',
   compact = false
 }: {
-  session: AgentSession
+  session: AgentSessionMeta
   onStop: () => void
   onContinue: (prompt: string) => void
   onOpenInChat: () => void
@@ -51,10 +52,11 @@ export default function InlineAgentResponseCard({
   const followUpRef = useRef<HTMLTextAreaElement>(null)
   const isRunning = session.status === 'running'
   const canContinue = !isRunning && session.cliSessionId !== null
+  const events = useAgentSessionEvents(session.id)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [session.events.length])
+  }, [events.length])
 
   // Separate thinking steps from the response. File-edit tool uses (Edit/Write/MultiEdit)
   // are rendered inline in the response area; other tool uses stay in the collapsible
@@ -65,7 +67,7 @@ export default function InlineAgentResponseCard({
   let thinkingStepCount = 0
   let latestThinkingLabel = ''
 
-  for (const event of session.events) {
+  for (const event of events) {
     if (event.type === 'assistant') {
       const hasVisible = eventHasVisibleResponse(event)
       let hasHiddenToolUse = false
@@ -107,8 +109,8 @@ export default function InlineAgentResponseCard({
   }
 
   let lastResultEvent: AgentStreamResult | null = null
-  for (let i = session.events.length - 1; i >= 0; i--) {
-    const e = session.events[i]
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i]
     if (e.type === 'result') {
       lastResultEvent = e
       break

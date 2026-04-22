@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronRight, FileCode, FileText, GitBranch } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import AgentSpinner from './AgentSpinner'
-import type { AgentContext, AgentSession, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
+import type { AgentContext, AgentSessionMeta, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
 import AgentMessageBlock from './AgentMessageBlock'
 import HighlightedMentionText from '../../components/HighlightedMentionText'
 import MessagePRMentions from '../../components/MessagePRMentions'
 import PRStateIcon from '../../components/PRStateIcon'
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
+import { useAgentSessionEvents } from '../../contexts/AgentSessionsContext'
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
 
@@ -34,17 +35,18 @@ function getThinkingStepLabel(name: string, input: Record<string, unknown>): str
 }
 
 interface AgentConversationProps {
-  session: AgentSession
+  session: AgentSessionMeta
 }
 
 export default function AgentConversation({ session }: AgentConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const isRunning = session.status === 'running'
+  const events = useAgentSessionEvents(session.id)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [session.events.length])
+  }, [events.length])
 
   // Separate thinking steps from the final response
   const thinkingEvents: AgentStreamEvent[] = []
@@ -52,7 +54,7 @@ export default function AgentConversation({ session }: AgentConversationProps) {
   let thinkingStepCount = 0
   let latestThinkingLabel = ''
 
-  for (const event of session.events) {
+  for (const event of events) {
     if (event.type === 'assistant') {
       const hasVisibleToolUse = event.message.content.some(
         (b) => b.type === 'tool_use' && VISIBLE_TOOL_NAMES.has(b.name)
@@ -109,7 +111,7 @@ export default function AgentConversation({ session }: AgentConversationProps) {
   // - Read/Glob/Grep (shown as inline label; noisy result text suppressed)
   // - Visible tools like Edit (the diff block is the signal; tool_result is just confirmation)
   const inlineToolIds = new Set<string>()
-  for (const event of session.events) {
+  for (const event of events) {
     if (event.type === 'assistant') {
       for (const b of event.message.content) {
         if (
@@ -123,8 +125,8 @@ export default function AgentConversation({ session }: AgentConversationProps) {
   }
 
   let lastResultEvent: AgentStreamResult | null = null
-  for (let i = session.events.length - 1; i >= 0; i--) {
-    const e = session.events[i]
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i]
     if (e.type === 'result') {
       lastResultEvent = e
       break

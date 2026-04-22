@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { PatchDiff, Virtualizer, type DiffLineAnnotation } from '@pierre/diffs/react'
 import type {
-  AgentSession,
+  AgentSessionMeta,
   AuthData,
   PullRequestDetail,
   PullRequestFile,
@@ -88,13 +88,120 @@ function AnnotationWrapper({
 type InlineAnnotationMeta =
   | { kind: 'thread'; thread: PullRequestReviewThread }
   | { kind: 'draft'; draft: PreparedDraftEntry }
-  | { kind: 'agent'; session: AgentSession }
+  | { kind: 'agent'; session: AgentSessionMeta }
   | { kind: 'composer'; line: number; side: PullRequestReviewLineSide; lineContent: string }
 
 const EMPTY_FILES: PullRequestFile[] = []
 const EMPTY_THREADS: PullRequestReviewThread[] = []
 const EMPTY_DRAFTS: PreparedDraftEntry[] = []
-const EMPTY_SESSIONS: AgentSession[] = []
+const EMPTY_SESSIONS: AgentSessionMeta[] = []
+
+interface GroupingsCache {
+  deps: {
+    reviewComments: unknown
+    reviewThreadSummaries: unknown
+    draftReviewComments: unknown
+    agentSessions: unknown
+  }
+  reviewThreads: PullRequestReviewThread[]
+  threadsByFile: Map<string, PullRequestReviewThread[]>
+  commentCountsByFile: Map<string, number>
+  threadsByCommentId: Map<number, PullRequestReviewThread>
+  draftsByFile: Map<string, PreparedDraftEntry[]>
+  inlineSessionsByFile: Map<string, AgentSessionMeta[]>
+}
+
+const EMPTY_GROUPINGS_CACHE: GroupingsCache = {
+  deps: {
+    reviewComments: undefined,
+    reviewThreadSummaries: undefined,
+    draftReviewComments: undefined,
+    agentSessions: undefined
+  },
+  reviewThreads: [],
+  threadsByFile: new Map(),
+  commentCountsByFile: new Map(),
+  threadsByCommentId: new Map(),
+  draftsByFile: new Map(),
+  inlineSessionsByFile: new Map()
+}
+
+function getStableGroupings(
+  ref: React.MutableRefObject<GroupingsCache>,
+  inputs: {
+    reviewComments: PullRequestReviewComment[] | undefined
+    reviewThreadSummaries: PullRequestReviewThreadSummary[] | undefined
+    draftReviewComments: PullRequestReviewDraftComment[]
+    agentSessions: AgentSessionMeta[] | undefined
+  }
+): GroupingsCache {
+  const { deps } = ref.current
+  if (
+    deps.reviewComments === inputs.reviewComments &&
+    deps.reviewThreadSummaries === inputs.reviewThreadSummaries &&
+    deps.draftReviewComments === inputs.draftReviewComments &&
+    deps.agentSessions === inputs.agentSessions
+  ) {
+    return ref.current
+  }
+
+  const reviewThreads = buildPullRequestReviewThreads(inputs.reviewComments ?? [], inputs.reviewThreadSummaries)
+  const threadsByFile = new Map<string, PullRequestReviewThread[]>()
+  for (const thread of reviewThreads) {
+    const bucket = threadsByFile.get(thread.path)
+    if (bucket) bucket.push(thread)
+    else threadsByFile.set(thread.path, [thread])
+  }
+  const commentCountsByFile = new Map<string, number>()
+  for (const comment of inputs.reviewComments ?? []) {
+    commentCountsByFile.set(comment.path, (commentCountsByFile.get(comment.path) ?? 0) + 1)
+  }
+  const threadsByCommentId = new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread]))
+  const draftsByFile = new Map<string, PreparedDraftEntry[]>()
+  inputs.draftReviewComments.forEach((comment, index) => {
+    const bucket = draftsByFile.get(comment.path)
+    const entry: PreparedDraftEntry = { comment, index }
+    if (bucket) bucket.push(entry)
+    else draftsByFile.set(comment.path, [entry])
+  })
+  const inlineSessionsByFile = new Map<string, AgentSessionMeta[]>()
+  for (const session of inputs.agentSessions ?? []) {
+    const ctx = session.context
+    if (!ctx || !ctx.inline || !ctx.filePath) continue
+    const bucket = inlineSessionsByFile.get(ctx.filePath)
+    if (bucket) bucket.push(session)
+    else inlineSessionsByFile.set(ctx.filePath, [session])
+  }
+
+  ref.current = {
+    deps: {
+      reviewComments: inputs.reviewComments,
+      reviewThreadSummaries: inputs.reviewThreadSummaries,
+      draftReviewComments: inputs.draftReviewComments,
+      agentSessions: inputs.agentSessions
+    },
+    reviewThreads,
+    threadsByFile,
+    commentCountsByFile,
+    threadsByCommentId,
+    draftsByFile,
+    inlineSessionsByFile
+  }
+  return ref.current
+}
+
+interface FileTreeCache {
+  input: unknown
+  tree: FileTreeNode[]
+}
+
+const EMPTY_FILE_TREE_CACHE: FileTreeCache = { input: undefined, tree: [] }
+
+function getStableFileTree(ref: React.MutableRefObject<FileTreeCache>, files: PullRequestFile[]): FileTreeNode[] {
+  if (ref.current.input === files) return ref.current.tree
+  ref.current = { input: files, tree: buildFileTree(files) }
+  return ref.current.tree
+}
 
 export default function PRFilesTab({
   pr,
@@ -116,7 +223,7 @@ export default function PRFilesTab({
   draftReviewComments: PullRequestReviewDraftComment[]
   onDraftReviewCommentsChange: (comments: PullRequestReviewDraftComment[]) => void
   threadJumpTarget: { path: string; commentId: number; nonce: number } | null
-  agentSessions?: AgentSession[]
+  agentSessions?: AgentSessionMeta[]
   onAskClaude?: (
     prompt: string,
     filePath: string,
@@ -134,10 +241,138 @@ export default function PRFilesTab({
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
   const [openCommentKey, setOpenCommentKey] = useState<string | null>(null)
   const [isSubmitReviewOpen, setIsSubmitReviewOpen] = useState(false)
+  // Cards that have ever entered the mount window. Once a card mounts we never
+  // unmount it — Pierre diffs lose their collapse/scroll state if remounted,
+  // and the DOM cost of keeping ~600 hidden cards behind `content-visibility`
+  // is small compared to the jank of re-mounting on every viewport flip.
+  const [mountedFiles, setMountedFiles] = useState<Set<string>>(() => new Set())
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set())
   const fileSectionRefs = useRef(new Map<string, HTMLElement>())
   const threadRefs = useRef(new Map<number, HTMLElement>())
   const handledJumpNonceRef = useRef<number | null>(null)
+  const groupingsRef = useRef<GroupingsCache>(EMPTY_GROUPINGS_CACHE)
+  const fileTreeRef = useRef<FileTreeCache>(EMPTY_FILE_TREE_CACHE)
   const queryClient = useQueryClient()
+
+  // Stable callback wrappers. Parents recreate their arrow-function props on
+  // every render, which would defeat React.memo on ChangedFileDiffCard. We
+  // keep the latest closure values in a ref and expose identity-stable
+  // wrappers — memo short-circuits, but invocations always run with the
+  // latest values so we never hold stale state.
+  const latestPropsRef = useRef({
+    onAskClaude,
+    onFixWithClaude,
+    onContinueAgent,
+    onStopAgent,
+    onPromoteAgent,
+    onDraftReviewCommentsChange,
+    draftReviewComments,
+    queryClient,
+    owner,
+    repo,
+    prNumber: pr.number
+  })
+  latestPropsRef.current = {
+    onAskClaude,
+    onFixWithClaude,
+    onContinueAgent,
+    onStopAgent,
+    onPromoteAgent,
+    onDraftReviewCommentsChange,
+    draftReviewComments,
+    queryClient,
+    owner,
+    repo,
+    prNumber: pr.number
+  }
+  const [stableHandlers] = useState<{
+    onAskClaude: NonNullable<typeof onAskClaude>
+    onFixWithClaude: NonNullable<typeof onFixWithClaude>
+    onContinueAgent: NonNullable<typeof onContinueAgent>
+    onStopAgent: NonNullable<typeof onStopAgent>
+    onPromoteAgent: NonNullable<typeof onPromoteAgent>
+    onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
+    onRemoveDraftComment: (index: number) => void
+    onInlineCommentPosted: () => Promise<void>
+  }>(() => ({
+    onAskClaude: async (prompt, filePath, lineNumber, lineContent, side) => {
+      await latestPropsRef.current.onAskClaude?.(prompt, filePath, lineNumber, lineContent, side)
+    },
+    onFixWithClaude: async (input) => {
+      await latestPropsRef.current.onFixWithClaude?.(input)
+    },
+    onContinueAgent: async (sessionId, prompt, fileList) => {
+      await latestPropsRef.current.onContinueAgent?.(sessionId, prompt, fileList)
+    },
+    onStopAgent: async (sessionId) => {
+      await latestPropsRef.current.onStopAgent?.(sessionId)
+    },
+    onPromoteAgent: (sessionId) => {
+      latestPropsRef.current.onPromoteAgent?.(sessionId)
+    },
+    onAddDraftComment: (comment) => {
+      const p = latestPropsRef.current
+      p.onDraftReviewCommentsChange([...p.draftReviewComments, comment])
+      setOpenCommentKey(null)
+    },
+    onRemoveDraftComment: (index) => {
+      const p = latestPropsRef.current
+      p.onDraftReviewCommentsChange(p.draftReviewComments.filter((_c, i) => i !== index))
+    },
+    onInlineCommentPosted: async () => {
+      const p = latestPropsRef.current
+      setOpenCommentKey(null)
+      await Promise.all([
+        p.queryClient.invalidateQueries({
+          queryKey: ['pull-request-review-comments', p.owner, p.repo, p.prNumber]
+        }),
+        p.queryClient.invalidateQueries({
+          queryKey: ['pull-request-reviews', p.owner, p.repo, p.prNumber]
+        })
+      ])
+    }
+  }))
+
+  // Stable threadRef factory — ChangedFileDiffCard calls this with (commentId, element).
+  const [stableThreadRef] = useState(() => (commentId: number, element: HTMLElement | null): void => {
+    if (element) threadRefs.current.set(commentId, element)
+    else threadRefs.current.delete(commentId)
+  })
+
+  // Shared IntersectionObserver that mounts a card once it comes within
+  // ~viewport-height of the viewport. We use a wide `rootMargin` so scrolling
+  // feels seamless — by the time a card enters the visible area, React has
+  // already mounted it and Pierre has hydrated the shadow DOM.
+  const mountObserverRef = useRef<IntersectionObserver | null>(null)
+  const [registerSectionForMount] = useState(() => (element: HTMLElement | null, filename: string): void => {
+    if (element) {
+      fileSectionRefs.current.set(filename, element)
+      if (!mountObserverRef.current) {
+        mountObserverRef.current = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting && entry.target instanceof HTMLElement) {
+                const name = entry.target.dataset.filePath
+                if (!name) continue
+                setMountedFiles((prev) => {
+                  if (prev.has(name)) return prev
+                  const next = new Set(prev)
+                  next.add(name)
+                  return next
+                })
+                mountObserverRef.current?.unobserve(entry.target)
+              }
+            }
+          },
+          { rootMargin: '2000px 0px' }
+        )
+      }
+      mountObserverRef.current.observe(element)
+    } else {
+      fileSectionRefs.current.delete(filename)
+    }
+  })
+  useEffect(() => () => mountObserverRef.current?.disconnect(), [])
 
   const {
     data: files,
@@ -172,41 +407,20 @@ export default function PRFilesTab({
   const trimmedFilter = filterValue.trim().toLowerCase()
   const filteredFiles =
     trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
-  const fileTree = buildFileTree(filteredFiles)
 
-  const reviewThreads = buildPullRequestReviewThreads(reviewComments ?? [], reviewThreadSummaries)
-
-  // File-scoped groupings so each card only sees its own threads/drafts/sessions.
-  const threadsByFile = new Map<string, PullRequestReviewThread[]>()
-  for (const thread of reviewThreads) {
-    const bucket = threadsByFile.get(thread.path)
-    if (bucket) bucket.push(thread)
-    else threadsByFile.set(thread.path, [thread])
-  }
-
-  const commentCountsByFile = new Map<string, number>()
-  for (const comment of reviewComments ?? []) {
-    commentCountsByFile.set(comment.path, (commentCountsByFile.get(comment.path) ?? 0) + 1)
-  }
-
-  const threadsByCommentId = new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread]))
-
-  const draftsByFile = new Map<string, PreparedDraftEntry[]>()
-  draftReviewComments.forEach((comment, index) => {
-    const bucket = draftsByFile.get(comment.path)
-    const entry: PreparedDraftEntry = { comment, index }
-    if (bucket) bucket.push(entry)
-    else draftsByFile.set(comment.path, [entry])
+  // All data-driven groupings share the same dependency identities — rebuild
+  // them together when any of their inputs changes, and keep the Map
+  // references stable across renders so `React.memo` on ChangedFileDiffCard
+  // can short-circuit unrelated re-renders (e.g. filter keystrokes, active
+  // file changes, scroll-driven state updates).
+  const groupings = getStableGroupings(groupingsRef, {
+    reviewComments,
+    reviewThreadSummaries,
+    draftReviewComments,
+    agentSessions
   })
-
-  const inlineSessionsByFile = new Map<string, AgentSession[]>()
-  for (const session of agentSessions ?? []) {
-    const ctx = session.context
-    if (!ctx || !ctx.inline || !ctx.filePath) continue
-    const bucket = inlineSessionsByFile.get(ctx.filePath)
-    if (bucket) bucket.push(session)
-    else inlineSessionsByFile.set(ctx.filePath, [session])
-  }
+  const fileTree = getStableFileTree(fileTreeRef, filteredFiles)
+  const { threadsByFile, commentCountsByFile, threadsByCommentId, draftsByFile, inlineSessionsByFile } = groupings
 
   const filesErrorMessage = filesError ?? reviewCommentsError
   const isLoading = isLoadingFiles || isLoadingReviewComments
@@ -258,6 +472,13 @@ export default function PRFilesTab({
     }
     handledJumpNonceRef.current = threadJumpTarget.nonce
     setActiveFilePath(nextPath)
+    // Force-mount the target card so the scroll below has something to land on.
+    setMountedFiles((prev) => {
+      if (prev.has(nextPath)) return prev
+      const next = new Set(prev)
+      next.add(nextPath)
+      return next
+    })
     requestAnimationFrame(() => {
       const threadElement = threadRefs.current.get(threadJumpTarget.commentId)
       if (threadElement) {
@@ -268,27 +489,27 @@ export default function PRFilesTab({
     })
   }, [threadJumpTarget, trimmedFilter])
 
-  const handleScrollToFile = (path: string): void => {
+  // Stable identities so memo'd file-tree rows don't re-render on every parent
+  // render. Neither callback closes over state, so no latest-ref is needed.
+  const [handleScrollToFile] = useState(() => (path: string): void => {
     setActiveFilePath(path)
+    setMountedFiles((prev) => {
+      if (prev.has(path)) return prev
+      const next = new Set(prev)
+      next.add(path)
+      return next
+    })
     fileSectionRefs.current.get(path)?.scrollIntoView({ behavior: 'instant', block: 'start' })
-  }
+  })
 
-  const handleAddDraftComment = (comment: PullRequestReviewDraftComment): void => {
-    onDraftReviewCommentsChange([...draftReviewComments, comment])
-    setOpenCommentKey(null)
-  }
-
-  const handleRemoveDraftComment = (index: number): void => {
-    onDraftReviewCommentsChange(draftReviewComments.filter((_comment, commentIndex) => commentIndex !== index))
-  }
-
-  const handleInlineCommentPosted = async (): Promise<void> => {
-    setOpenCommentKey(null)
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['pull-request-review-comments', owner, repo, pr.number] }),
-      queryClient.invalidateQueries({ queryKey: ['pull-request-reviews', owner, repo, pr.number] })
-    ])
-  }
+  const [handleToggleFolder] = useState(() => (path: string): void => {
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  })
 
   return (
     <>
@@ -346,6 +567,8 @@ export default function PRFilesTab({
                   tree={fileTree}
                   activeFilePath={activeFilePath}
                   commentCountsByFile={commentCountsByFile}
+                  collapsedFolders={collapsedFolders}
+                  onToggleFolder={handleToggleFolder}
                   onSelectFile={handleScrollToFile}
                 />
               )}
@@ -372,40 +595,41 @@ export default function PRFilesTab({
           ) : null}
           {isLoading ? <Loading label="Loading changed files..." /> : null}
           <Virtualizer contentClassName="flex flex-col gap-5">
-            {filteredFiles.map((file) => (
-              <ChangedFileDiffCard
-                key={file.filename}
-                owner={owner}
-                repo={repo}
-                number={pr.number}
-                commitId={pr.head.sha}
-                file={file}
-                auth={auth}
-                fileThreads={threadsByFile.get(file.filename) ?? EMPTY_THREADS}
-                fileDrafts={draftsByFile.get(file.filename) ?? EMPTY_DRAFTS}
-                openCommentKey={openCommentKey}
-                onOpenComment={setOpenCommentKey}
-                onAskClaude={onAskClaude}
-                onFixWithClaude={onFixWithClaude}
-                agentSessions={agentSessions ?? []}
-                fileInlineSessions={inlineSessionsByFile.get(file.filename) ?? EMPTY_SESSIONS}
-                onContinueAgent={onContinueAgent}
-                onStopAgent={onStopAgent}
-                onPromoteAgent={onPromoteAgent}
-                onAddDraftComment={handleAddDraftComment}
-                onRemoveDraftComment={handleRemoveDraftComment}
-                onInlineCommentPosted={handleInlineCommentPosted}
-                allowCommenting
-                sectionRef={(element) => {
-                  if (element) fileSectionRefs.current.set(file.filename, element)
-                  else fileSectionRefs.current.delete(file.filename)
-                }}
-                threadRef={(commentId, element) => {
-                  if (element) threadRefs.current.set(commentId, element)
-                  else threadRefs.current.delete(commentId)
-                }}
-              />
-            ))}
+            {filteredFiles.map((file) => {
+              const mounted = mountedFiles.has(file.filename)
+              return (
+                <DeferredCard key={file.filename} filename={file.filename} registerMount={registerSectionForMount}>
+                  {mounted ? (
+                    <ChangedFileDiffCard
+                      owner={owner}
+                      repo={repo}
+                      number={pr.number}
+                      commitId={pr.head.sha}
+                      file={file}
+                      auth={auth ?? null}
+                      fileThreads={threadsByFile.get(file.filename) ?? EMPTY_THREADS}
+                      fileDrafts={draftsByFile.get(file.filename) ?? EMPTY_DRAFTS}
+                      openCommentKey={openCommentKey}
+                      onOpenComment={setOpenCommentKey}
+                      onAskClaude={stableHandlers.onAskClaude}
+                      onFixWithClaude={stableHandlers.onFixWithClaude}
+                      agentSessions={agentSessions ?? EMPTY_SESSIONS}
+                      fileInlineSessions={inlineSessionsByFile.get(file.filename) ?? EMPTY_SESSIONS}
+                      onContinueAgent={stableHandlers.onContinueAgent}
+                      onStopAgent={stableHandlers.onStopAgent}
+                      onPromoteAgent={stableHandlers.onPromoteAgent}
+                      onAddDraftComment={stableHandlers.onAddDraftComment}
+                      onRemoveDraftComment={stableHandlers.onRemoveDraftComment}
+                      onInlineCommentPosted={stableHandlers.onInlineCommentPosted}
+                      allowCommenting
+                      threadRef={stableThreadRef}
+                    />
+                  ) : (
+                    <CardPlaceholder file={file} />
+                  )}
+                </DeferredCard>
+              )
+            })}
           </Virtualizer>
         </div>
       </div>
@@ -431,7 +655,90 @@ export default function PRFilesTab({
   )
 }
 
-export function ChangedFileDiffCard({
+interface ChangedFileDiffCardProps {
+  owner: string
+  repo: string
+  number: number
+  commitId: string
+  file: PullRequestFile
+  auth: AuthData | null | undefined
+  fileThreads: readonly PullRequestReviewThread[]
+  fileDrafts: readonly PreparedDraftEntry[]
+  openCommentKey: string | null
+  onOpenComment: (value: string | null) => void
+  onAskClaude?: (
+    prompt: string,
+    filePath: string,
+    lineNumber: number,
+    lineContent: string,
+    side: PullRequestReviewLineSide
+  ) => Promise<void>
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
+  agentSessions: AgentSessionMeta[]
+  fileInlineSessions: readonly AgentSessionMeta[]
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
+  onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
+  onRemoveDraftComment: (index: number) => void
+  onInlineCommentPosted: () => Promise<void>
+  allowCommenting?: boolean
+  threadRef: (commentId: number, element: HTMLElement | null) => void
+}
+
+export const ChangedFileDiffCard = memo(ChangedFileDiffCardInner)
+
+const DEFERRED_CARD_STYLE: React.CSSProperties = {
+  contentVisibility: 'auto',
+  containIntrinsicSize: '0 800px'
+}
+
+/**
+ * Wraps every changed-file row in a stable section element that always exists
+ * (so scroll-into-view + active-file tracking work before a card is mounted).
+ * The ref registers the element with a shared IntersectionObserver that flips
+ * the mount flag once the card is within ~2000px of the viewport. Combined
+ * with `content-visibility: auto`, cards scrolled far away cost neither React
+ * reconciliation nor browser paint.
+ */
+function DeferredCard({
+  filename,
+  registerMount,
+  children
+}: {
+  filename: string
+  registerMount: (element: HTMLElement | null, filename: string) => void
+  children: ReactNode
+}) {
+  return (
+    <section
+      ref={(element) => registerMount(element, filename)}
+      data-file-path={filename}
+      className="border-border bg-surface overflow-hidden rounded-xl border"
+      style={DEFERRED_CARD_STYLE}
+    >
+      {children}
+    </section>
+  )
+}
+
+/**
+ * Static header shown in place of a diff card before it's been mounted. Gives
+ * the virtualized list a stable layout and keeps the sidebar→scroll flow
+ * working (the wrapper section with `data-file-path` still exists).
+ */
+function CardPlaceholder({ file }: { file: PullRequestFile }) {
+  return (
+    <header className="flex items-center gap-2 px-3 py-1.5">
+      <span className="text-foreground min-w-0 truncate text-sm font-semibold">{file.filename}</span>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <DiffStat additions={file.additions} deletions={file.deletions} />
+      </div>
+    </header>
+  )
+}
+
+function ChangedFileDiffCardInner({
   owner,
   repo,
   number,
@@ -453,39 +760,8 @@ export function ChangedFileDiffCard({
   onRemoveDraftComment,
   onInlineCommentPosted,
   allowCommenting = true,
-  sectionRef,
   threadRef
-}: {
-  owner: string
-  repo: string
-  number: number
-  commitId: string
-  file: PullRequestFile
-  auth: AuthData | null | undefined
-  fileThreads: readonly PullRequestReviewThread[]
-  fileDrafts: readonly PreparedDraftEntry[]
-  openCommentKey: string | null
-  onOpenComment: (value: string | null) => void
-  onAskClaude?: (
-    prompt: string,
-    filePath: string,
-    lineNumber: number,
-    lineContent: string,
-    side: PullRequestReviewLineSide
-  ) => Promise<void>
-  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
-  agentSessions: AgentSession[]
-  fileInlineSessions: readonly AgentSession[]
-  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
-  onStopAgent?: (sessionId: string) => Promise<void>
-  onPromoteAgent?: (sessionId: string) => void
-  onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
-  onRemoveDraftComment: (index: number) => void
-  onInlineCommentPosted: () => Promise<void>
-  allowCommenting?: boolean
-  sectionRef: (element: HTMLElement | null) => void
-  threadRef: (commentId: number, element: HTMLElement | null) => void
-}) {
+}: ChangedFileDiffCardProps) {
   const { settings } = useSettings()
   const { theme } = useTheme()
 
@@ -612,18 +888,45 @@ export function ChangedFileDiffCard({
     return null
   }
 
-  const handleGutterClick = (range: { start: number; side?: 'deletions' | 'additions' }) => {
+  // Latest-value ref so the stable gutter click handler below always runs with
+  // the current openCommentKey/onOpenComment without invalidating the options
+  // object passed to PatchDiff. Rebuilding `options` on every render triggers
+  // Pierre's `areOptionsEqual` deep compare and, when theme/style flips,
+  // forces a full re-diff — we want that only when the *values* change.
+  const gutterRef = useRef({ filename: file.filename, openCommentKey, onOpenComment })
+  gutterRef.current = { filename: file.filename, openCommentKey, onOpenComment }
+  const [stableGutterClick] = useState(() => (range: { start: number; side?: 'deletions' | 'additions' }): void => {
     const side: PullRequestReviewLineSide = range.side === 'deletions' ? 'LEFT' : 'RIGHT'
-    const rowKey = `${file.filename}::${side}::${range.start}`
-    onOpenComment(openCommentKey === rowKey ? null : rowKey)
+    const g = gutterRef.current
+    const rowKey = `${g.filename}::${side}::${range.start}`
+    g.onOpenComment(g.openCommentKey === rowKey ? null : rowKey)
+  })
+
+  // Options identity only depends on values Pierre actually reads; keep it
+  // referentially stable across renders when those haven't changed so Pierre's
+  // shadow-DOM hydration is not invalidated on unrelated re-renders.
+  const optionsRef = useRef<{
+    key: string
+    value: React.ComponentProps<typeof PatchDiff<InlineAnnotationMeta>>['options']
+  } | null>(null)
+  const diffStyle = settings.diffViewMode === 'split' ? 'split' : 'unified'
+  const optionsKey = `${theme}|${diffStyle}|${allowCommenting ? '1' : '0'}`
+  if (!optionsRef.current || optionsRef.current.key !== optionsKey) {
+    optionsRef.current = {
+      key: optionsKey,
+      value: {
+        ...BASE_DIFF_OPTIONS,
+        themeType: theme,
+        diffStyle,
+        disableFileHeader: true,
+        enableGutterUtility: allowCommenting,
+        onGutterUtilityClick: allowCommenting ? stableGutterClick : undefined
+      }
+    }
   }
 
   return (
-    <section
-      ref={sectionRef}
-      data-file-path={file.filename}
-      className="border-border bg-surface overflow-hidden rounded-xl border"
-    >
+    <>
       <header className={cn('flex items-center gap-2 px-3 py-1.5', !isCollapsed && 'border-border border-b')}>
         <button
           type="button"
@@ -666,14 +969,7 @@ export function ChangedFileDiffCard({
           {hasRenderablePatch ? (
             <PatchDiff<InlineAnnotationMeta>
               patch={wrapGitPatch(file.filename, file.patch!)}
-              options={{
-                ...BASE_DIFF_OPTIONS,
-                themeType: theme,
-                diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
-                disableFileHeader: true,
-                enableGutterUtility: allowCommenting,
-                onGutterUtilityClick: allowCommenting ? handleGutterClick : undefined
-              }}
+              options={optionsRef.current!.value}
               lineAnnotations={anchoredAnnotations}
               renderAnnotation={renderAnnotation}
             />
@@ -684,7 +980,7 @@ export function ChangedFileDiffCard({
           )}
         </>
       )}
-    </section>
+    </>
   )
 }
 
@@ -737,7 +1033,7 @@ function InlineDiffThread({
   thread: PullRequestReviewThread
   replyTarget: { owner: string; repo: string; number: number }
   onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
-  agentSessions?: AgentSession[]
+  agentSessions?: AgentSessionMeta[]
   onStopAgent?: (sessionId: string) => Promise<void>
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void
@@ -775,7 +1071,7 @@ function InlineDiffThread({
     setReplyBody((prev) => (prev ? `${prev}\n${quoted}` : quoted))
   }
 
-  const sessionsByCommentId = (agentSessions ?? []).reduce<Map<number, AgentSession[]>>((acc, s) => {
+  const sessionsByCommentId = (agentSessions ?? []).reduce<Map<number, AgentSessionMeta[]>>((acc, s) => {
     const id = s.context?.commentId
     if (id === undefined) return acc
     const existing = acc.get(id) ?? []
@@ -1206,37 +1502,64 @@ function collapseSingleChildFolders(nodes: FileTreeNode[]): FileTreeNode[] {
   })
 }
 
+type FileTreeRow =
+  | { kind: 'folder'; depth: number; path: string; name: string }
+  | { kind: 'file'; depth: number; path: string; file: PullRequestFile }
+
+function flattenFileTree(nodes: FileTreeNode[], collapsed: Set<string>, depth: number, out: FileTreeRow[]): void {
+  for (const node of nodes) {
+    if (node.file) {
+      out.push({ kind: 'file', depth, path: node.path, file: node.file })
+      continue
+    }
+    const isCollapsed = collapsed.has(node.path)
+    out.push({ kind: 'folder', depth, path: node.path, name: node.name })
+    if (!isCollapsed) flattenFileTree(node.children, collapsed, depth + 1, out)
+  }
+}
+
+const FILE_TREE_ROW_STYLE: React.CSSProperties = {
+  contentVisibility: 'auto',
+  containIntrinsicSize: '0 22px'
+}
+
 function FileTree({
   tree,
   activeFilePath,
   commentCountsByFile,
+  collapsedFolders,
+  onToggleFolder,
   onSelectFile
 }: {
   tree: FileTreeNode[]
   activeFilePath: string | null
   commentCountsByFile: Map<string, number>
+  collapsedFolders: Set<string>
+  onToggleFolder: (path: string) => void
   onSelectFile: (path: string) => void
 }) {
+  const rows: FileTreeRow[] = []
+  flattenFileTree(tree, collapsedFolders, 0, rows)
   return (
     <div className="py-1">
-      {tree.map((node) =>
-        node.file ? (
-          <FileTreeFileButton
-            key={node.path}
-            file={node.file}
-            depth={0}
-            isActive={activeFilePath === node.path}
-            commentCount={commentCountsByFile.get(node.path) ?? 0}
-            onClick={() => onSelectFile(node.path)}
+      {rows.map((row) =>
+        row.kind === 'folder' ? (
+          <FileTreeFolderRow
+            key={`folder:${row.path}`}
+            depth={row.depth}
+            name={row.name}
+            path={row.path}
+            isOpen={!collapsedFolders.has(row.path)}
+            onToggle={onToggleFolder}
           />
         ) : (
-          <FileTreeFolder
-            key={node.path}
-            node={node}
-            depth={0}
-            activeFilePath={activeFilePath}
-            commentCountsByFile={commentCountsByFile}
-            onSelectFile={onSelectFile}
+          <FileTreeFileRow
+            key={`file:${row.path}`}
+            file={row.file}
+            depth={row.depth}
+            isActive={activeFilePath === row.path}
+            commentCount={commentCountsByFile.get(row.path) ?? 0}
+            onClick={onSelectFile}
           />
         )
       )}
@@ -1244,25 +1567,24 @@ function FileTree({
   )
 }
 
-function FileTreeFolder({
-  node,
+const FileTreeFolderRow = memo(function FileTreeFolderRow({
   depth,
-  activeFilePath,
-  commentCountsByFile,
-  onSelectFile
+  name,
+  path,
+  isOpen,
+  onToggle
 }: {
-  node: FileTreeNode
   depth: number
-  activeFilePath: string | null
-  commentCountsByFile: Map<string, number>
-  onSelectFile: (path: string) => void
+  name: string
+  path: string
+  isOpen: boolean
+  onToggle: (path: string) => void
 }) {
-  const [isOpen, setIsOpen] = useState(true)
   return (
-    <div>
+    <div style={FILE_TREE_ROW_STYLE}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => onToggle(path)}
         className="text-foreground hover:bg-surface-hover flex w-full items-center gap-1.5 py-1 text-left text-xs"
         style={{ paddingLeft: 8 + depth * 16 }}
       >
@@ -1270,39 +1592,14 @@ function FileTreeFolder({
           size={14}
           className={cn('text-foreground-subtle shrink-0 transition-transform', !isOpen && '-rotate-90')}
         />
-        <FolderIcon name={node.name} open={isOpen} />
-        <span className="truncate font-medium">{node.name}</span>
+        <FolderIcon name={name} open={isOpen} />
+        <span className="truncate font-medium">{name}</span>
       </button>
-      {isOpen ? (
-        <div>
-          {node.children.map((child) =>
-            child.file ? (
-              <FileTreeFileButton
-                key={child.path}
-                file={child.file}
-                depth={depth + 1}
-                isActive={activeFilePath === child.path}
-                commentCount={commentCountsByFile.get(child.path) ?? 0}
-                onClick={() => onSelectFile(child.path)}
-              />
-            ) : (
-              <FileTreeFolder
-                key={child.path}
-                node={child}
-                depth={depth + 1}
-                activeFilePath={activeFilePath}
-                commentCountsByFile={commentCountsByFile}
-                onSelectFile={onSelectFile}
-              />
-            )
-          )}
-        </div>
-      ) : null}
     </div>
   )
-}
+})
 
-function FileTreeFileButton({
+const FileTreeFileRow = memo(function FileTreeFileRow({
   file,
   depth,
   isActive,
@@ -1313,18 +1610,18 @@ function FileTreeFileButton({
   depth: number
   isActive: boolean
   commentCount: number
-  onClick: () => void
+  onClick: (path: string) => void
 }) {
   const name = file.filename.split('/').pop() ?? file.filename
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => onClick(file.filename)}
+      style={{ paddingLeft: 8 + depth * 16 + 20, ...FILE_TREE_ROW_STYLE }}
       className={cn(
         'flex w-full items-center gap-1.5 py-1 pr-3 text-left text-xs transition-colors',
         isActive ? 'bg-surface-hover text-foreground' : 'text-foreground hover:bg-surface-hover'
       )}
-      style={{ paddingLeft: 8 + depth * 16 + 20 }}
     >
       <FileStatusIcon status={file.status} />
       <span className="min-w-0 flex-1 truncate">{name}</span>
@@ -1336,7 +1633,7 @@ function FileTreeFileButton({
       ) : null}
     </button>
   )
-}
+})
 
 function FileStatusIcon({ status }: { status: string }) {
   switch (status) {

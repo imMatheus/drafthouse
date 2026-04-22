@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AgentContext, AgentSession, GitRepoInfo, PullRequestDetail } from '../../../../shared/types'
+import type { AgentContext, AgentSessionMeta, GitRepoInfo, PullRequestDetail } from '../../../../shared/types'
 import { buildMentionedPRContextBlock, buildPullRequestMentionsAgentContext } from '../../lib/prMentions'
 import AgentConversation from './AgentConversation'
 import AgentEmptyState from './AgentEmptyState'
 import AgentPromptBar, { type AgentPromptBarHandle } from './AgentPromptBar'
 
-interface AgentSessionTabProps {
-  session: AgentSession | null
+interface AgentSessionMetaTabProps {
+  session: AgentSessionMeta | null
   onStartSession: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueSession: (
     sessionId: string,
@@ -19,13 +19,13 @@ interface AgentSessionTabProps {
   gitInfo?: GitRepoInfo | null
 }
 
-export default function AgentSessionTab({
+export default function AgentSessionMetaTab({
   session,
   onStartSession,
   onContinueSession,
   onStopSession,
   gitInfo
-}: AgentSessionTabProps) {
+}: AgentSessionMetaTabProps) {
   const [text, setText] = useState('')
   const promptBarRef = useRef<AgentPromptBarHandle>(null)
   const isRunning = session?.status === 'running'
