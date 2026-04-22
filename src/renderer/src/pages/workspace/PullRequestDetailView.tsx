@@ -339,10 +339,6 @@ export default function PullRequestDetailView({
           />
         ) : null}
       </div>
-
-      {pr.merged && branchInfo?.name === pr.head.ref ? (
-        <MergedBranchSwitchBanner folderPath={folderPath} headBranch={pr.head.ref} baseBranch={pr.base.ref} />
-      ) : null}
     </div>
   )
 }
