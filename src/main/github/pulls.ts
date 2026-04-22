@@ -56,6 +56,37 @@ export function registerPullsHandlers(): void {
     }
   )
 
+  // Search pull requests via GitHub's search API
+  // GET /search/issues?q=repo:{owner}/{repo}+is:pr+state:{state}+{query}
+  ipcMain.handle(
+    'github:pulls:search',
+    async (
+      _event,
+      owner: string,
+      repo: string,
+      options: { query: string; state?: 'open' | 'closed' | 'all'; perPage?: number }
+    ): Promise<PullRequest[]> => {
+      const token = requireAuth()
+      const qualifiers = [`repo:${owner}/${repo}`, 'is:pr']
+      if (options.state === 'open' || options.state === 'closed') {
+        qualifiers.push(`state:${options.state}`)
+      }
+      const q = [...qualifiers, options.query].filter((part) => part.trim().length > 0).join(' ')
+      const params = new URLSearchParams({
+        q,
+        sort: 'updated',
+        order: 'desc',
+        per_page: String(options.perPage ?? 50)
+      })
+      const response = await fetchGitHubJson<SearchIssuesResponse>(
+        token,
+        `${API}/search/issues?${params}`,
+        `Search failed for ${owner}/${repo}`
+      )
+      return response.items.map(toPullRequest)
+    }
+  )
+
   // Get a pull request
   // GET /repos/{owner}/{repo}/pulls/{pull_number}
   ipcMain.handle(
@@ -356,4 +387,41 @@ export function registerPullsHandlers(): void {
       'Failed to mark PR as ready for review'
     )
   })
+}
+
+interface SearchIssuesResponse {
+  items: SearchIssueItem[]
+}
+
+interface SearchIssueItem {
+  number: number
+  title: string
+  state: string
+  draft?: boolean
+  html_url: string
+  created_at: string
+  updated_at: string
+  comments: number
+  user: { login: string; avatar_url: string }
+  labels: { name: string; color: string }[]
+  assignees: { login: string; avatar_url: string }[]
+  pull_request?: { merged_at: string | null }
+}
+
+function toPullRequest(item: SearchIssueItem): PullRequest {
+  return {
+    number: item.number,
+    title: item.title,
+    state: item.state,
+    draft: item.draft ?? false,
+    html_url: item.html_url,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    merged_at: item.pull_request?.merged_at ?? null,
+    comments: item.comments,
+    user: item.user,
+    labels: item.labels,
+    assignees: item.assignees,
+    requested_reviewers: []
+  }
 }

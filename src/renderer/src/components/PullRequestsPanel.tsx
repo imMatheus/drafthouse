@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Check, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Search, X } from 'lucide-react'
 import { cn } from '../lib/cn'
@@ -20,28 +20,47 @@ export default function PullRequestsPanel({
 }: PullRequestsPanelProps) {
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (trimmed === '') {
+      setDebouncedQuery('')
+      return
+    }
+    const timer = setTimeout(() => setDebouncedQuery(trimmed), 250)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const isSearching = debouncedQuery !== ''
 
   const {
     data: prs,
     isLoading,
+    isFetching,
     error
   } = useQuery<PullRequest[], Error>({
-    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, stateFilter],
-    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: stateFilter }),
+    queryKey: isSearching
+      ? ['pull-requests-search', gitInfo?.owner, gitInfo?.repo, stateFilter, debouncedQuery]
+      : ['pull-requests', gitInfo?.owner, gitInfo?.repo, stateFilter],
+    queryFn: () =>
+      isSearching
+        ? window.api.github.pulls.search(gitInfo!.owner, gitInfo!.repo, {
+            query: debouncedQuery,
+            state: stateFilter
+          })
+        : window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: stateFilter }),
     enabled: gitInfo != null,
     retry: false
   })
 
-  const filtered =
-    prs?.filter((pr) => {
-      if (!searchQuery.trim()) return true
-      const lower = searchQuery.toLowerCase()
-      return (
-        pr.title.toLowerCase().includes(lower) ||
-        pr.user.login.toLowerCase().includes(lower) ||
-        String(pr.number).includes(lower)
-      )
-    }) ?? []
+  // While the user is typing (searchQuery differs from debounced) or the remote
+  // search is in-flight, fall back to a cheap local filter over the last list
+  // result so the sidebar doesn't go blank.
+  const displayedPRs =
+    isSearching && searchQuery.trim() !== debouncedQuery ? localFilter(prs ?? [], searchQuery) : (prs ?? [])
+
+  const noResults = !isLoading && displayedPRs.length === 0
 
   return (
     <div className="border-border bg-surface flex min-h-0 w-60 shrink-0 flex-col border-r">
@@ -49,7 +68,6 @@ export default function PullRequestsPanel({
         <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Pull Requests</p>
       </div>
 
-      {/* Search */}
       <div className="px-3 pb-2">
         <label className="border-border bg-background flex items-center gap-1.5 rounded border px-2 py-1">
           <Search size={12} className="text-foreground-subtle shrink-0" />
@@ -70,7 +88,6 @@ export default function PullRequestsPanel({
         </label>
       </div>
 
-      {/* Open / Closed filter */}
       <div className="flex items-center gap-3 px-4 pb-2">
         <button
           onClick={() => setStateFilter('open')}
@@ -81,7 +98,9 @@ export default function PullRequestsPanel({
         >
           <GitPullRequest size={11} />
           Open
-          {stateFilter === 'open' && prs ? <span className="text-foreground-subtle">{prs.length}</span> : null}
+          {stateFilter === 'open' && !isSearching && prs ? (
+            <span className="text-foreground-subtle">{prs.length}</span>
+          ) : null}
         </button>
         <button
           onClick={() => setStateFilter('closed')}
@@ -92,11 +111,15 @@ export default function PullRequestsPanel({
         >
           <Check size={11} />
           Closed
-          {stateFilter === 'closed' && prs ? <span className="text-foreground-subtle">{prs.length}</span> : null}
+          {stateFilter === 'closed' && !isSearching && prs ? (
+            <span className="text-foreground-subtle">{prs.length}</span>
+          ) : null}
         </button>
+        {isSearching && isFetching ? (
+          <span className="text-foreground-subtle ml-auto text-[10px]">Searching…</span>
+        ) : null}
       </div>
 
-      {/* PR list */}
       <div className="flex-1 overflow-y-auto">
         {isLoadingGitInfo ? (
           <div className="px-4 py-4">
@@ -110,12 +133,12 @@ export default function PullRequestsPanel({
           </div>
         ) : error ? (
           <p className="text-foreground-subtle px-4 py-4 text-xs">{error.message}</p>
-        ) : filtered.length === 0 ? (
+        ) : noResults ? (
           <p className="text-foreground-subtle px-4 py-4 text-xs">
-            {searchQuery ? 'No matches' : `No ${stateFilter} pull requests`}
+            {isSearching ? 'No matches' : `No ${stateFilter} pull requests`}
           </p>
         ) : (
-          filtered.map((pr) => {
+          displayedPRs.map((pr) => {
             const isActive = pr.number === activePRNumber
             return (
               <button
@@ -141,6 +164,17 @@ export default function PullRequestsPanel({
         )}
       </div>
     </div>
+  )
+}
+
+function localFilter(prs: PullRequest[], query: string): PullRequest[] {
+  const lower = query.trim().toLowerCase()
+  if (!lower) return prs
+  return prs.filter(
+    (pr) =>
+      pr.title.toLowerCase().includes(lower) ||
+      pr.user.login.toLowerCase().includes(lower) ||
+      String(pr.number).includes(lower)
   )
 }
 

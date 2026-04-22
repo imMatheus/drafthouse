@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import * as RadixTooltip from '@radix-ui/react-tooltip'
 import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
 import RepoSidebar from './components/RepoSidebar'
 import { LoadingView } from './components/Loading'
@@ -119,7 +120,9 @@ function App(): React.JSX.Element {
     <ThemeProvider>
       <SettingsProvider>
         <AuthContext value={auth}>
-          <AppContent />
+          <RadixTooltip.Provider delayDuration={300} skipDelayDuration={500}>
+            <AppContent />
+          </RadixTooltip.Provider>
         </AuthContext>
       </SettingsProvider>
     </ThemeProvider>

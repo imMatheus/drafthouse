@@ -2,7 +2,14 @@ import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Files, GitBranch, GitGraph, Terminal } from 'lucide-react'
-import type { AgentContext, AgentSession, GitChangedFile, GitRepoInfo, PullRequestDetail } from '../../../shared/types'
+import type {
+  AgentContext,
+  AgentSessionMeta,
+  AgentStreamEvent,
+  GitChangedFile,
+  GitRepoInfo,
+  PullRequestDetail
+} from '../../../shared/types'
 import { prStateLabel } from '../lib/prMentions'
 import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
@@ -34,6 +41,7 @@ import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
 import { WorkspaceContextProvider } from '../contexts/WorkspaceContext'
+import { AgentSessionsProvider } from '../contexts/AgentSessionsContext'
 import { LoadingView } from '../components/Loading'
 import { appendOrReplaceAssistant, mergePartialMessage } from '../lib/agentStream'
 
@@ -81,10 +89,22 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
   const activeFilePath = activeTab?.kind === 'file' ? activeTab.path : null
 
-  // Agent state
-  const [agentSessions, setAgentSessions] = useState<AgentSession[]>([])
+  // Agent state: session metadata and per-session events are stored separately
+  // so that streaming tokens only re-render components that actually display
+  // events (via useAgentSessionEvents), never the whole tree that consumes
+  // meta (status, prompt, cliSessionId, context).
+  const [sessionMetas, setSessionMetas] = useState<AgentSessionMeta[]>([])
+  const [sessionEvents, setSessionEvents] = useState<Map<string, AgentStreamEvent[]>>(() => new Map())
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+
+  const updateSessionEvents = (sessionId: string, updater: (prev: AgentStreamEvent[]) => AgentStreamEvent[]): void => {
+    setSessionEvents((prev) => {
+      const next = new Map(prev)
+      next.set(sessionId, updater(prev.get(sessionId) ?? []))
+      return next
+    })
+  }
 
   // Tab navigation history (back/forward buttons in the top bar). Tracks visited
   // tab ids so the user can move through them like a browser. Local-only state —
@@ -165,40 +185,34 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
   }, [folderPath, onCloseWorkspace, onUpdateSession])
 
-  // Subscribe to agent events
+  // Subscribe to agent events. Token events only update the events Map.
+  // Metadata (status, cliSessionId) updates happen on init/result only, which
+  // are rare compared to the per-token stream.
   useEffect(() => {
     return window.api.agent.onEvent(({ sessionId, event }) => {
-      setAgentSessions((prev) =>
-        prev.map((s) => {
-          if (s.id !== sessionId) return s
+      updateSessionEvents(sessionId, (prev) => {
+        if (event.type === 'stream_event') return mergePartialMessage(prev, event)
+        if (event.type === 'assistant') return appendOrReplaceAssistant(prev, event)
+        return [...prev, event]
+      })
 
-          let nextStatus = s.status
-          if (event.type === 'result') {
-            nextStatus = event.is_error ? 'error' : 'completed'
-          }
-
-          let cliSessionId = s.cliSessionId
-          if (event.type === 'system' && event.subtype === 'init' && 'session_id' in event) {
-            cliSessionId = event.session_id as string
-          }
-
-          let nextEvents: typeof s.events
-          if (event.type === 'stream_event') {
-            nextEvents = mergePartialMessage(s.events, event)
-          } else if (event.type === 'assistant') {
-            nextEvents = appendOrReplaceAssistant(s.events, event)
-          } else {
-            nextEvents = [...s.events, event]
-          }
-
-          return {
-            ...s,
-            events: nextEvents,
-            status: nextStatus,
-            cliSessionId
-          }
-        })
-      )
+      if (event.type === 'result' || (event.type === 'system' && event.subtype === 'init')) {
+        setSessionMetas((prev) =>
+          prev.map((s) => {
+            if (s.id !== sessionId) return s
+            let nextStatus = s.status
+            if (event.type === 'result') {
+              nextStatus = event.is_error ? 'error' : 'completed'
+            }
+            let cliSessionId = s.cliSessionId
+            if (event.type === 'system' && event.subtype === 'init' && 'session_id' in event) {
+              cliSessionId = event.session_id as string
+            }
+            if (nextStatus === s.status && cliSessionId === s.cliSessionId) return s
+            return { ...s, status: nextStatus, cliSessionId }
+          })
+        )
+      }
     })
   }, [])
 
@@ -365,18 +379,17 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const handleStartAgent = async (prompt: string, files?: string[], context?: AgentContext): Promise<void> => {
     const { sessionId } = await window.api.agent.start(folderPath, prompt, files, context?.systemPromptSuffix)
 
-    const newSession: AgentSession = {
+    const newSession: AgentSessionMeta = {
       id: sessionId,
       prompt,
       status: 'running',
       startedAt: Date.now(),
-      events: [],
       cliSessionId: null,
       files: files ?? [],
       context
     }
 
-    setAgentSessions((prev) => [...prev, newSession])
+    setSessionMetas((prev) => [...prev, newSession])
 
     // Inline sessions (e.g. PR inline) don't open an agent tab
     if (context?.inline) return
@@ -405,7 +418,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     cliPrompt?: string,
     mentionedPRs?: PullRequestDetail[]
   ): Promise<void> => {
-    const existingSession = agentSessions.find((s) => s.id === agentSessionId)
+    const existingSession = sessionMetas.find((s) => s.id === agentSessionId)
     if (!existingSession?.cliSessionId) return
 
     await window.api.agent.continue(
@@ -419,32 +432,32 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     // Mark session as running again and add a synthetic user message.
     // The UI always shows the clean `prompt`; `cliPrompt` (when set) carries
     // extra metadata like injected PR context that shouldn't clutter the bubble.
-    setAgentSessions((prev) =>
+    setSessionMetas((prev) =>
       prev.map((s) => {
         if (s.id !== agentSessionId) return s
         return {
           ...s,
           status: 'running' as const,
-          context: mergePRsIntoContext(s.context, mentionedPRs),
-          events: [
-            ...s.events,
-            {
-              type: 'user' as const,
-              message: {
-                role: 'user' as const,
-                content: [{ type: 'text' as const, text: prompt }]
-              },
-              session_id: s.cliSessionId!
-            }
-          ]
+          context: mergePRsIntoContext(s.context, mentionedPRs)
         }
       })
     )
+    updateSessionEvents(agentSessionId, (prev) => [
+      ...prev,
+      {
+        type: 'user' as const,
+        message: {
+          role: 'user' as const,
+          content: [{ type: 'text' as const, text: prompt }]
+        },
+        session_id: existingSession.cliSessionId!
+      }
+    ])
   }
 
   const handleSelectAgentSession = (sessionId: string): void => {
     setActiveAgentSessionId(sessionId)
-    const agentSession = agentSessions.find((s) => s.id === sessionId)
+    const agentSession = sessionMetas.find((s) => s.id === sessionId)
     if (agentSession) {
       const truncatedPrompt =
         agentSession.prompt.length > 30 ? agentSession.prompt.slice(0, 30) + '...' : agentSession.prompt
@@ -495,7 +508,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const handleStopAgent = async (sessionId: string): Promise<void> => {
     await window.api.agent.stop(sessionId)
 
-    setAgentSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'cancelled' as const } : s)))
+    setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'cancelled' as const } : s)))
   }
 
   const handlePullRequestSubviewChange = (tabId: WorkspaceTab['id'], subview: PullRequestSubview): void => {
@@ -548,11 +561,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   }
 
   const handlePromoteAgentSession = (sessionId: string): void => {
-    const target = agentSessions.find((s) => s.id === sessionId)
+    const target = sessionMetas.find((s) => s.id === sessionId)
     if (!target) return
 
     // Remove inline flag so it appears in the agent panel
-    setAgentSessions((prev) =>
+    setSessionMetas((prev) =>
       prev.map((s) => (s.id === sessionId && s.context ? { ...s, context: { ...s.context, inline: false } } : s))
     )
     setActiveAgentSessionId(sessionId)
@@ -572,7 +585,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const changedFileCount = gitStatus?.length ?? 0
 
-  const runningAgentCount = agentSessions.filter((s) => s.status === 'running' && !s.context?.inline).length
+  const runningAgentCount = sessionMetas.filter((s) => s.status === 'running' && !s.context?.inline).length
 
   const activityItems = [
     {
@@ -615,113 +628,115 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   return (
     <WorkspaceContextProvider value={{ gitInfo: gitInfo ?? null, onOpenPullRequest: handleOpenPullRequest }}>
-      <div className="bg-background flex w-screen flex-1 flex-col">
-        <WorkspaceTopBar
-          projectName={projectName}
-          onToggleSidebar={handleToggleSidebarVisibility}
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          onGoBack={handleGoBack}
-          onGoForward={handleGoForward}
-        />
-
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <ActivityBar
-            items={activityItems}
-            onSettingsClick={handleToggleSettings}
-            settingsActive={activeView === 'settings'}
+      <AgentSessionsProvider eventsBySessionId={sessionEvents}>
+        <div className="bg-background flex w-screen flex-1 flex-col">
+          <WorkspaceTopBar
+            projectName={projectName}
+            onToggleSidebar={handleToggleSidebarVisibility}
+            canGoBack={canGoBack}
+            canGoForward={canGoForward}
+            onGoBack={handleGoBack}
+            onGoForward={handleGoForward}
           />
 
-          {activeView === 'settings' ? (
-            <SettingsView />
-          ) : (
-            <>
-              {sidebar.visible && sidebar.activePanel === 'explorer' ? (
-                <ExplorerPanel
-                  folderPath={folderPath}
-                  selectedFilePath={activeFilePath}
-                  onSelectFile={handleOpenFile}
-                />
-              ) : null}
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <ActivityBar
+              items={activityItems}
+              onSettingsClick={handleToggleSettings}
+              settingsActive={activeView === 'settings'}
+            />
 
-              {sidebar.visible && sidebar.activePanel === 'source-control' ? (
-                <SourceControlPanel
-                  folderPath={folderPath}
-                  gitInfo={gitInfo}
-                  onOpenDiff={handleOpenDiff}
-                  onOpenPullRequest={handleOpenPullRequest}
-                />
-              ) : null}
+            {activeView === 'settings' ? (
+              <SettingsView />
+            ) : (
+              <>
+                {sidebar.visible && sidebar.activePanel === 'explorer' ? (
+                  <ExplorerPanel
+                    folderPath={folderPath}
+                    selectedFilePath={activeFilePath}
+                    onSelectFile={handleOpenFile}
+                  />
+                ) : null}
 
-              {sidebar.visible && sidebar.activePanel === 'pull-requests' ? (
-                <PullRequestsPanel
-                  gitInfo={gitInfo}
-                  isLoadingGitInfo={isLoadingGitInfo}
-                  onOpenPullRequest={handleOpenPullRequest}
-                  activePRNumber={activeTab?.kind === 'pull-request' ? activeTab.number : null}
-                />
-              ) : null}
+                {sidebar.visible && sidebar.activePanel === 'source-control' ? (
+                  <SourceControlPanel
+                    folderPath={folderPath}
+                    gitInfo={gitInfo}
+                    onOpenDiff={handleOpenDiff}
+                    onOpenPullRequest={handleOpenPullRequest}
+                  />
+                ) : null}
 
-              {sidebar.visible && sidebar.activePanel === 'agent' ? (
-                <AgentPanel
-                  sessions={agentSessions}
-                  activeSessionId={activeAgentSessionId}
-                  onSelectSession={handleSelectAgentSession}
-                  onNewSession={handleNewAgentSession}
-                />
-              ) : null}
+                {sidebar.visible && sidebar.activePanel === 'pull-requests' ? (
+                  <PullRequestsPanel
+                    gitInfo={gitInfo}
+                    isLoadingGitInfo={isLoadingGitInfo}
+                    onOpenPullRequest={handleOpenPullRequest}
+                    activePRNumber={activeTab?.kind === 'pull-request' ? activeTab.number : null}
+                  />
+                ) : null}
 
-              <div className="flex min-w-0 flex-1 flex-col">
-                <WorkspaceTabBar
-                  tabs={tabs}
-                  activeTabId={activeTabId}
-                  onSelectTab={handleSelectTab}
-                  onCloseTab={handleCloseTab}
-                  onReorderTabs={handleReorderTabs}
-                />
+                {sidebar.visible && sidebar.activePanel === 'agent' ? (
+                  <AgentPanel
+                    sessions={sessionMetas}
+                    activeSessionId={activeAgentSessionId}
+                    onSelectSession={handleSelectAgentSession}
+                    onNewSession={handleNewAgentSession}
+                  />
+                ) : null}
 
-                <main
-                  className={cn(
-                    'min-h-0 flex-1',
-                    activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent'
-                      ? 'overflow-hidden'
-                      : 'overflow-y-auto p-5'
-                  )}
-                >
-                  {renderWorkspaceTabContent({
-                    activeTab,
-                    folderPath,
-                    gitInfo,
-                    isLoadingGitInfo,
-                    agentSessions,
-                    onOpenFile: handleOpenFile,
-                    onOpenCommit: handleOpenCommit,
-                    onStartAgent: handleStartAgent,
-                    onContinueAgent: handleContinueAgent,
-                    onStopAgent: handleStopAgent,
-                    onPromoteAgent: handlePromoteAgentSession,
-                    onPullRequestSubviewChange: handlePullRequestSubviewChange,
-                    onPullRequestTitleChange: handlePullRequestTitleChange,
-                    onPullRequestStateChange: handlePullRequestStateChange,
-                    onCommitTitleChange: handleCommitTitleChange
-                  })}
-                </main>
-              </div>
-            </>
-          )}
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <WorkspaceTabBar
+                    tabs={tabs}
+                    activeTabId={activeTabId}
+                    onSelectTab={handleSelectTab}
+                    onCloseTab={handleCloseTab}
+                    onReorderTabs={handleReorderTabs}
+                  />
+
+                  <main
+                    className={cn(
+                      'min-h-0 flex-1',
+                      activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent'
+                        ? 'overflow-hidden'
+                        : 'overflow-y-auto p-5'
+                    )}
+                  >
+                    {renderWorkspaceTabContent({
+                      activeTab,
+                      folderPath,
+                      gitInfo,
+                      isLoadingGitInfo,
+                      agentSessions: sessionMetas,
+                      onOpenFile: handleOpenFile,
+                      onOpenCommit: handleOpenCommit,
+                      onStartAgent: handleStartAgent,
+                      onContinueAgent: handleContinueAgent,
+                      onStopAgent: handleStopAgent,
+                      onPromoteAgent: handlePromoteAgentSession,
+                      onPullRequestSubviewChange: handlePullRequestSubviewChange,
+                      onPullRequestTitleChange: handlePullRequestTitleChange,
+                      onPullRequestStateChange: handlePullRequestStateChange,
+                      onCommitTitleChange: handleCommitTitleChange
+                    })}
+                  </main>
+                </div>
+              </>
+            )}
+          </div>
+
+          <CommandPalette
+            open={commandPaletteOpen}
+            onOpenChange={setCommandPaletteOpen}
+            folderPath={folderPath}
+            gitInfo={gitInfo}
+            agentSessions={sessionMetas}
+            onOpenFile={handleOpenFile}
+            onOpenPullRequest={handleOpenPullRequest}
+            onSelectAgentSession={handleSelectAgentSession}
+          />
         </div>
-
-        <CommandPalette
-          open={commandPaletteOpen}
-          onOpenChange={setCommandPaletteOpen}
-          folderPath={folderPath}
-          gitInfo={gitInfo}
-          agentSessions={agentSessions}
-          onOpenFile={handleOpenFile}
-          onOpenPullRequest={handleOpenPullRequest}
-          onSelectAgentSession={handleSelectAgentSession}
-        />
-      </div>
+      </AgentSessionsProvider>
     </WorkspaceContextProvider>
   )
 }
@@ -747,7 +762,7 @@ function renderWorkspaceTabContent({
   folderPath: string
   gitInfo: GitRepoInfo | null | undefined
   isLoadingGitInfo: boolean
-  agentSessions: AgentSession[]
+  agentSessions: AgentSessionMeta[]
   onOpenFile: (path: string) => void
   onOpenCommit: (sha: string, title?: string) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>

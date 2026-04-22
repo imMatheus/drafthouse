@@ -676,14 +676,22 @@ export interface AgentEvent {
   event: AgentStreamEvent
 }
 
-// Renderer-side agent session with accumulated events
-export interface AgentSession {
+// Session metadata — everything except the per-token events list. Event-free
+// shape is what gets prop-drilled through the app; the events stream lives in
+// the AgentSessions context so per-token updates don't re-render the tree.
+export interface AgentSessionMeta {
   id: string
   prompt: string
   status: AgentSessionStatus
   startedAt: number
-  events: AgentStreamEvent[]
   cliSessionId: string | null
   files: string[]
   context?: AgentContext
+}
+
+// Renderer-side agent session with accumulated events. Kept for components
+// that still receive a combined view (e.g. persistence); prefer AgentSessionMeta
+// + useAgentSessionEvents(id) at the boundary of re-render-sensitive trees.
+export interface AgentSession extends AgentSessionMeta {
+  events: AgentStreamEvent[]
 }

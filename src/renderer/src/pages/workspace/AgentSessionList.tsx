@@ -1,17 +1,17 @@
 import { Check, Plus, X } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import type { AgentSession } from '../../../../shared/types'
+import type { AgentSessionMeta } from '../../../../shared/types'
 import AgentSpinner from './AgentSpinner'
 import Tooltip from '../../components/Tooltip'
 
 interface AgentSessionListProps {
-  sessions: AgentSession[]
+  sessions: AgentSessionMeta[]
   activeSessionId: string | null
   onSelectSession: (id: string) => void
   onNewSession: () => void
 }
 
-function StatusIndicator({ status }: { status: AgentSession['status'] }) {
+function StatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {
   if (status === 'running') {
     return <AgentSpinner />
   }

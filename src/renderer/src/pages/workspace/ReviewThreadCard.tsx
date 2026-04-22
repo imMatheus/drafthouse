@@ -1,22 +1,21 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Reply } from 'lucide-react'
+import { PatchDiff } from '@pierre/diffs/react'
 import type { PullRequestReviewComment } from '../../../../shared/types'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
-import { DiffEditor } from '@monaco-editor/react'
-import { getMonacoTheme, getMonacoLanguage, BASE_DIFF_OPTIONS } from '../../lib/monaco'
+import { BASE_DIFF_OPTIONS, wrapGitPatch } from '../../lib/diffs'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
 import FixWithClaudeButton from '../../components/FixWithClaudeButton'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ResolveThreadButton from '../../components/ResolveThreadButton'
-import type { AgentSession } from '../../../../shared/types'
+import type { AgentSessionMeta } from '../../../../shared/types'
 import type { FixWithClaudeInput } from '../../lib/agentContext'
 import { cn } from '../../lib/cn'
 import MarkdownBody from './MarkdownBody'
-import { splitDiffHunkToContents } from './pullRequestDiff'
 import { formatRelativeTime, type PullRequestReviewThread } from './pullRequestShared'
 
 export default function ReviewThreadCard({
@@ -41,7 +40,7 @@ export default function ReviewThreadCard({
   replyTarget?: { owner: string; repo: string; number: number }
   onQuoteReply?: (quoted: string) => void
   onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
-  agentSessions?: AgentSession[]
+  agentSessions?: AgentSessionMeta[]
   onStopAgent?: (sessionId: string) => Promise<void>
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void
@@ -251,32 +250,20 @@ export default function ReviewThreadCard({
 }
 
 function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment }) {
-  const { theme } = useTheme()
   const { settings } = useSettings()
+  const { theme } = useTheme()
 
   if (!comment.diff_hunk) return null
 
-  const { original, modified } = splitDiffHunkToContents(comment.diff_hunk)
-  const lineCount = Math.max(original.split('\n').length, modified.split('\n').length, 1)
-  const height = Math.min(lineCount, 8) * 24 + 8
-
   return (
-    <div className="border-border border-b" style={{ height }}>
-      <DiffEditor
-        key={settings.diffViewMode}
-        original={original}
-        modified={modified}
-        language={getMonacoLanguage(comment.path)}
-        theme={getMonacoTheme(theme)}
+    <div className="border-border border-b">
+      <PatchDiff
+        patch={wrapGitPatch(comment.path, comment.diff_hunk)}
         options={{
           ...BASE_DIFF_OPTIONS,
-          renderSideBySide: settings.diffViewMode === 'split',
-          lineNumbers: 'off',
-          folding: false,
-          glyphMargin: false,
-          lineDecorationsWidth: 0,
-          lineNumbersMinChars: 0,
-          scrollbar: { vertical: 'hidden', horizontal: 'hidden' }
+          themeType: theme,
+          diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
+          disableFileHeader: true
         }}
       />
     </div>

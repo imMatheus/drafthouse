@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import type {
   AgentContext,
-  AgentSession,
+  AgentSessionMeta,
   AuthData,
   GitBranchInfo,
   PaginatedPullRequestCommits,
@@ -73,7 +73,7 @@ interface PullRequestDetailViewProps {
   folderPath: string
   number: number
   subview: PullRequestSubview
-  agentSessions: AgentSession[]
+  agentSessions: AgentSessionMeta[]
   onSubviewChange: (subview: PullRequestSubview) => void
   onTitleChange?: (title: string) => void
   onStateChange?: (prState: 'open' | 'closed' | 'merged' | 'draft') => void
@@ -117,10 +117,13 @@ export default function PullRequestDetailView({
     retry: false
   })
 
+  // `branchInfo` only drives the "checkout the merged branch" banner at the
+  // bottom of this view. Polling every 5 s re-renders this subtree (and every
+  // diff card beneath it) even when nothing changed — refetch on window focus
+  // is enough for the banner's use case.
   const { data: branchInfo } = useQuery<GitBranchInfo>({
     queryKey: ['git-branch-info', folderPath],
     queryFn: () => window.api.git.branchInfo(folderPath),
-    refetchInterval: 5000,
     retry: false
   })
 
@@ -159,13 +162,11 @@ export default function PullRequestDetailView({
 
     for (const session of newlyCompleted) invalidatedSessionsRef.current.add(session.id)
 
-    void queryClient.invalidateQueries({ queryKey: ['pull-request', owner, repo, number] })
+    // Narrowed from a 7-query broadside: only `files` and `commits` are
+    // affected by a PR-scoped agent push. Everything else (head PR metadata,
+    // reviews, comments, threads) refetches lazily on next mount or focus.
     void queryClient.invalidateQueries({ queryKey: ['pull-request-files', owner, repo, number] })
     void queryClient.invalidateQueries({ queryKey: ['pull-request-commits', owner, repo, number] })
-    void queryClient.invalidateQueries({ queryKey: ['pull-request-commit-authors', owner, repo, number] })
-    void queryClient.invalidateQueries({ queryKey: ['pull-request-review-comments', owner, repo, number] })
-    void queryClient.invalidateQueries({ queryKey: ['pull-request-comments', owner, repo, number] })
-    void queryClient.invalidateQueries({ queryKey: ['pull-request-review-threads', owner, repo, number] })
   }, [agentSessions, owner, repo, number, queryClient])
 
   if (isLoading) return <LoadingView label="Loading pull request..." />
@@ -392,7 +393,7 @@ function PRConversationTab({
   pr: PullRequestDetail
   owner: string
   repo: string
-  agentSessions: AgentSession[]
+  agentSessions: AgentSessionMeta[]
   onOpenCommit: (sha: string, title?: string) => void
   onViewReviewThread: (thread: PullRequestReviewThread) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
@@ -656,7 +657,7 @@ function PullRequestTimelineCard({
   repo: string
   prNumber: number
   resolvedAuthors: PullRequestCommitAuthors | undefined
-  agentSessions: AgentSession[]
+  agentSessions: AgentSessionMeta[]
   onOpenCommit: (sha: string, title?: string) => void
   onViewReviewThread: (thread: PullRequestReviewThread) => void
   onQuoteReply: (quoted: string) => void
@@ -829,7 +830,7 @@ function IssueCommentCard({
   owner: string
   repo: string
   prNumber: number
-  agentSessions: AgentSession[]
+  agentSessions: AgentSessionMeta[]
   onQuoteReply: (quoted: string) => void
   onFixWithClaude: (input: FixWithClaudeInput) => Promise<void>
   onStopAgent: (sessionId: string) => Promise<void>

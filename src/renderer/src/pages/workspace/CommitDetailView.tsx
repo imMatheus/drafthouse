@@ -14,7 +14,7 @@ import {
   X
 } from 'lucide-react'
 import type {
-  AgentSession,
+  AgentSessionMeta,
   GitHubCommit,
   PullRequestFile,
   PullRequestReviewDraftComment
@@ -29,7 +29,7 @@ import PlaceholderView from './PlaceholderView'
 import { DiffStat, formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
 
 const EMPTY_FILES: PullRequestFile[] = []
-const EMPTY_SESSIONS: AgentSession[] = []
+const EMPTY_SESSIONS: AgentSessionMeta[] = []
 const NOOP_COMMENT_TOGGLE = (_value: string | null): void => {}
 const NOOP_THREAD_REF = (_commentId: number, _element: HTMLElement | null): void => {}
 const NOOP_DRAFT_ADD = (_comment: PullRequestReviewDraftComment): void => {}
@@ -282,33 +282,36 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-5">
-              {filteredFiles.map((file, index) => (
-                <ChangedFileDiffCard
+              {filteredFiles.map((file) => (
+                <section
                   key={file.filename}
-                  owner={owner}
-                  repo={repo}
-                  number={0}
-                  commitId={commit.sha}
-                  file={file}
-                  auth={null}
-                  fileThreads={[]}
-                  fileDrafts={[]}
-                  openCommentKey={null}
-                  onOpenComment={NOOP_COMMENT_TOGGLE}
-                  agentSessions={EMPTY_SESSIONS}
-                  fileInlineSessions={EMPTY_SESSIONS}
-                  onAddDraftComment={NOOP_DRAFT_ADD}
-                  onRemoveDraftComment={NOOP_DRAFT_REMOVE}
-                  onInlineCommentPosted={NOOP_ASYNC}
-                  allowCommenting={false}
-                  isActive={activeFilePath === file.filename}
-                  initiallyVisible={index < 3}
-                  sectionRef={(element) => {
+                  ref={(element) => {
                     if (element) fileSectionRefs.current.set(file.filename, element)
                     else fileSectionRefs.current.delete(file.filename)
                   }}
-                  threadRef={NOOP_THREAD_REF}
-                />
+                  data-file-path={file.filename}
+                  className="border-border bg-surface overflow-hidden rounded-xl border"
+                >
+                  <ChangedFileDiffCard
+                    owner={owner}
+                    repo={repo}
+                    number={0}
+                    commitId={commit.sha}
+                    file={file}
+                    auth={null}
+                    fileThreads={[]}
+                    fileDrafts={[]}
+                    openCommentKey={null}
+                    onOpenComment={NOOP_COMMENT_TOGGLE}
+                    agentSessions={EMPTY_SESSIONS}
+                    fileInlineSessions={EMPTY_SESSIONS}
+                    onAddDraftComment={NOOP_DRAFT_ADD}
+                    onRemoveDraftComment={NOOP_DRAFT_REMOVE}
+                    onInlineCommentPosted={NOOP_ASYNC}
+                    allowCommenting={false}
+                    threadRef={NOOP_THREAD_REF}
+                  />
+                </section>
               ))}
             </div>
           </div>

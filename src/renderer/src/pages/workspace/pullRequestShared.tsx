@@ -3,7 +3,23 @@ import type {
   PullRequestReviewLineSide,
   PullRequestReviewThreadSummary
 } from '../../../../shared/types'
-import { getReviewCommentAnchor } from './pullRequestDiff'
+
+interface ReviewThreadAnchor {
+  side: PullRequestReviewLineSide
+  line: number
+}
+
+function getReviewCommentAnchor(comment: PullRequestReviewComment): ReviewThreadAnchor | null {
+  const rawSide = comment.side ?? comment.start_side
+  const side = rawSide === 'LEFT' || rawSide === 'RIGHT' ? rawSide : null
+  const line = comment.line ?? comment.original_line ?? comment.start_line ?? comment.original_start_line ?? null
+
+  if (!side || typeof line !== 'number' || Number.isNaN(line)) {
+    return null
+  }
+
+  return { side, line }
+}
 
 export interface PullRequestReviewThread {
   id: number

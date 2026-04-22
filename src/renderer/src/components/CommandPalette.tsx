@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Command } from 'cmdk'
 import { useQuery } from '@tanstack/react-query'
 import { FileText, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Terminal } from 'lucide-react'
-import type { AgentSession, GitRepoInfo, PullRequest } from '../../../shared/types'
+import type { AgentSessionMeta, GitRepoInfo, PullRequest } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import { getPathBasename, getPathDirname } from '../lib/path'
 import { FileIcon } from './FileIcon'
@@ -35,7 +35,7 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void
   folderPath: string
   gitInfo: GitRepoInfo | null | undefined
-  agentSessions: AgentSession[]
+  agentSessions: AgentSessionMeta[]
   onOpenFile: (path: string) => void
   onOpenPullRequest: (number: number) => void
   onSelectAgentSession: (sessionId: string) => void

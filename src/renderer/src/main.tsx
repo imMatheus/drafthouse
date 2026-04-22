@@ -3,7 +3,6 @@ import '@fontsource/inter/500.css'
 import '@fontsource/inter/600.css'
 import '@fontsource/inter/700.css'
 import './assets/main.css'
-import './lib/monaco'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
