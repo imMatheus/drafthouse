@@ -3,6 +3,7 @@ import type { GitRepoInfo } from '../../../shared/types'
 
 interface WorkspaceContextValue {
   gitInfo: GitRepoInfo | null
+  folderPath: string
   onOpenPullRequest: (number: number) => void
 }
 

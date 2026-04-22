@@ -1,11 +1,19 @@
 import { useState } from 'react'
 import { Command } from 'cmdk'
 import { useQuery } from '@tanstack/react-query'
-import { FileText, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Terminal } from 'lucide-react'
+import {
+  Check,
+  GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  Plus,
+  Terminal,
+  X
+} from 'lucide-react'
 import type { AgentSessionMeta, GitRepoInfo, PullRequest } from '../../../shared/types'
 import { cn } from '../lib/cn'
-import { getPathBasename, getPathDirname } from '../lib/path'
-import { FileIcon } from './FileIcon'
+import AgentSpinner from '../pages/workspace/AgentSpinner'
 
 function matchesQuery(text: string, query: string): boolean {
   if (!query) return true
@@ -17,28 +25,16 @@ function matchesQuery(text: string, query: string): boolean {
     .every((term) => lower.includes(term))
 }
 
-function fileMatchScore(relativePath: string, query: string): number {
-  if (!query) return 0
-  const basename = getPathBasename(relativePath).toLowerCase()
-  const q = query.toLowerCase().replace(/\s+/g, '')
-  if (basename === q) return 1000
-  if (basename.startsWith(q)) return 800
-  if (basename.includes(q)) return 600
-  if (relativePath.toLowerCase().includes(q)) return 400
-  return 100
-}
-
-type ResourceFilter = 'all' | 'files' | 'pulls' | 'agents'
+type ResourceFilter = 'all' | 'pulls' | 'agents'
 
 interface CommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  folderPath: string
   gitInfo: GitRepoInfo | null | undefined
   agentSessions: AgentSessionMeta[]
-  onOpenFile: (path: string) => void
   onOpenPullRequest: (number: number) => void
   onSelectAgentSession: (sessionId: string) => void
+  onNewAgent: () => void
 }
 
 const GROUP_HEADING_CLASSES =
@@ -50,23 +46,14 @@ const ITEM_CLASSES =
 export default function CommandPalette({
   open,
   onOpenChange,
-  folderPath,
   gitInfo,
   agentSessions,
-  onOpenFile,
   onOpenPullRequest,
-  onSelectAgentSession
+  onSelectAgentSession,
+  onNewAgent
 }: CommandPaletteProps) {
   const [filter, setFilter] = useState<ResourceFilter>('all')
   const [search, setSearch] = useState('')
-
-  const { data: files } = useQuery<string[]>({
-    queryKey: ['read-dir-recursive', folderPath],
-    queryFn: () => window.api.fs.readDirRecursive(folderPath),
-    enabled: open,
-    staleTime: 30_000,
-    retry: false
-  })
 
   const { data: prs } = useQuery<PullRequest[]>({
     queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, 'open'],
@@ -78,14 +65,9 @@ export default function CommandPalette({
 
   const sessions = agentSessions.filter((s) => !s.context?.inline).sort((a, b) => b.startedAt - a.startedAt)
 
-  const showFiles = filter === 'all' || filter === 'files'
   const showPulls = filter === 'all' || filter === 'pulls'
   const showAgents = filter === 'all' || filter === 'agents'
-
-  const matchedFiles = (files ?? [])
-    .filter((path) => matchesQuery(path, search) || matchesQuery(getPathBasename(path), search))
-    .sort((a, b) => fileMatchScore(b, search) - fileMatchScore(a, search))
-    .slice(0, search ? 100 : 50)
+  const showNewAgent = showAgents && matchesQuery('new agent', search)
 
   const matchedPrs = (prs ?? []).filter(
     (pr) => matchesQuery(pr.title, search) || matchesQuery(pr.user.login, search) || String(pr.number).includes(search)
@@ -107,13 +89,12 @@ export default function CommandPalette({
       <Command.Input
         value={search}
         onValueChange={setSearch}
-        placeholder="Search files, pull requests, sessions..."
+        placeholder="Search pull requests, sessions..."
         className="border-border text-foreground placeholder:text-foreground-subtle w-full border-b bg-transparent px-4 py-3 text-sm focus:outline-none"
       />
 
       <div className="border-border flex items-center gap-1 border-b px-3 py-2">
         <FilterChip active={filter === 'all'} onClick={() => setFilter('all')} label="All" />
-        <FilterChip active={filter === 'files'} onClick={() => setFilter('files')} icon={FileText} label="Files" />
         <FilterChip
           active={filter === 'pulls'}
           onClick={() => setFilter('pulls')}
@@ -126,23 +107,19 @@ export default function CommandPalette({
       <Command.List className="max-h-[340px] overflow-y-auto p-2">
         <Command.Empty className="text-foreground-subtle py-6 text-center text-xs">No results found.</Command.Empty>
 
-        {showFiles && matchedFiles.length > 0 ? (
-          <Command.Group heading="Files" className={GROUP_HEADING_CLASSES}>
-            {matchedFiles.map((relativePath) => (
-              <Command.Item
-                key={relativePath}
-                value={`file:${relativePath}`}
-                onSelect={() => {
-                  onOpenFile(`${folderPath}/${relativePath}`)
-                  onOpenChange(false)
-                }}
-                className={ITEM_CLASSES}
-              >
-                <FileIcon name={getPathBasename(relativePath)} size={14} />
-                <span className="text-foreground">{getPathBasename(relativePath)}</span>
-                <span className="text-foreground-subtle truncate">{getPathDirname(relativePath)}</span>
-              </Command.Item>
-            ))}
+        {showNewAgent ? (
+          <Command.Group heading="Actions" className={GROUP_HEADING_CLASSES}>
+            <Command.Item
+              value="action:new-agent"
+              onSelect={() => {
+                onNewAgent()
+                onOpenChange(false)
+              }}
+              className={ITEM_CLASSES}
+            >
+              <Plus size={14} className="text-foreground-subtle shrink-0" />
+              <span className="text-foreground min-w-0 flex-1 truncate">New Agent</span>
+            </Command.Item>
           </Command.Group>
         ) : null}
 
@@ -178,9 +155,8 @@ export default function CommandPalette({
                 }}
                 className={ITEM_CLASSES}
               >
-                <Terminal size={14} className="text-foreground-subtle shrink-0" />
+                <AgentStatusIndicator status={session.status} />
                 <span className="text-foreground min-w-0 flex-1 truncate">{session.prompt}</span>
-                <AgentStatusBadge status={session.status} />
               </Command.Item>
             ))}
           </Command.Group>
@@ -198,7 +174,7 @@ function FilterChip({
 }: {
   active: boolean
   onClick: () => void
-  icon?: typeof FileText
+  icon?: typeof GitPullRequest
   label: string
 }) {
   return (
@@ -225,16 +201,9 @@ function PrStateIcon({ state, draft, merged }: { state: string; draft: boolean; 
   return <GitPullRequest size={14} className="text-success shrink-0" />
 }
 
-function AgentStatusBadge({ status }: { status: string }) {
-  switch (status) {
-    case 'running':
-      return <span className="bg-accent size-2 shrink-0 animate-pulse rounded-full" />
-    case 'completed':
-      return <span className="bg-success size-2 shrink-0 rounded-full" />
-    case 'error':
-    case 'cancelled':
-      return <span className="bg-danger size-2 shrink-0 rounded-full" />
-    default:
-      return null
-  }
+function AgentStatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {
+  if (status === 'running') return <AgentSpinner />
+  if (status === 'completed') return <Check size={12} className="text-success shrink-0" />
+  if (status === 'error' || status === 'cancelled') return <X size={12} className="text-foreground-subtle shrink-0" />
+  return null
 }

@@ -144,30 +144,37 @@ export default function PullRequestDetailView({
     setThreadJumpTarget(null)
   }, [number, owner, repo])
 
-  // When an agent session that was scoped to this PR completes, it likely
-  // pushed a new commit to the PR branch. Refetch the PR data so the diff,
-  // commit list, and review threads reflect the new HEAD.
+  // When an agent session scoped to this PR completes, it likely pushed a
+  // new commit. Invalidate `pr-refs` so we re-resolve base/head shas — the
+  // `pr-diff` query is keyed on those shas and rekeys automatically when
+  // they change, so no explicit invalidation of the diff itself is needed.
+  // Also refresh the PR detail (head sha for posting comments) and commit
+  // list, which stay on REST.
+  //
+  // We track per-session *status transitions*, not a single-shot "has been
+  // invalidated" flag, because follow-up messages take a session back to
+  // `running` and then to `completed` again — each completion is a new
+  // commit and needs its own refresh.
   const queryClient = useQueryClient()
-  const invalidatedSessionsRef = useRef<Set<string>>(new Set())
+  const lastStatusBySessionIdRef = useRef<Map<string, string>>(new Map())
   useEffect(() => {
     const prLabel = `PR #${number}`
-    const newlyCompleted = agentSessions.filter(
-      (session) =>
-        session.status === 'completed' &&
-        session.context?.source === 'pull-request' &&
-        session.context.label === prLabel &&
-        !invalidatedSessionsRef.current.has(session.id)
-    )
-    if (newlyCompleted.length === 0) return
+    let shouldInvalidate = false
+    for (const session of agentSessions) {
+      if (session.context?.source !== 'pull-request' || session.context.label !== prLabel) continue
+      const prev = lastStatusBySessionIdRef.current.get(session.id)
+      const curr = session.status
+      lastStatusBySessionIdRef.current.set(session.id, curr)
+      if ((curr === 'completed' || curr === 'error') && prev !== curr) {
+        shouldInvalidate = true
+      }
+    }
+    if (!shouldInvalidate) return
 
-    for (const session of newlyCompleted) invalidatedSessionsRef.current.add(session.id)
-
-    // Narrowed from a 7-query broadside: only `files` and `commits` are
-    // affected by a PR-scoped agent push. Everything else (head PR metadata,
-    // reviews, comments, threads) refetches lazily on next mount or focus.
-    void queryClient.invalidateQueries({ queryKey: ['pull-request-files', owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pr-refs', folderPath, owner, repo, number] })
+    void queryClient.invalidateQueries({ queryKey: ['pull-request', owner, repo, number] })
     void queryClient.invalidateQueries({ queryKey: ['pull-request-commits', owner, repo, number] })
-  }, [agentSessions, owner, repo, number, queryClient])
+  }, [agentSessions, folderPath, owner, repo, number, queryClient])
 
   if (isLoading) return <LoadingView label="Loading pull request..." />
 

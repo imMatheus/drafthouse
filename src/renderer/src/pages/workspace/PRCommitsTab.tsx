@@ -45,9 +45,11 @@ export default function PRCommitsTab({
     }
   }, [page, safePage])
 
+  const apiPage = totalPages - safePage + 1
+
   const { data, isLoading, error, isFetching } = useQuery<PaginatedPullRequestCommits, Error>({
-    queryKey: ['pull-request-commits', owner, repo, number, safePage],
-    queryFn: () => window.api.github.pulls.listCommits(owner, repo, number, safePage, COMMITS_PER_PAGE),
+    queryKey: ['pull-request-commits', owner, repo, number, apiPage],
+    queryFn: () => window.api.github.pulls.listCommits(owner, repo, number, apiPage, COMMITS_PER_PAGE),
     retry: false,
     enabled: totalCommits > 0
   })
@@ -60,20 +62,22 @@ export default function PRCommitsTab({
 
   useEffect(() => {
     if (safePage >= totalPages) return
+    const nextApiPage = apiPage - 1
 
     void queryClient.prefetchQuery({
-      queryKey: ['pull-request-commits', owner, repo, number, safePage + 1],
-      queryFn: () => window.api.github.pulls.listCommits(owner, repo, number, safePage + 1, COMMITS_PER_PAGE)
+      queryKey: ['pull-request-commits', owner, repo, number, nextApiPage],
+      queryFn: () => window.api.github.pulls.listCommits(owner, repo, number, nextApiPage, COMMITS_PER_PAGE)
     })
-  }, [number, owner, queryClient, repo, safePage, totalPages])
+  }, [number, owner, queryClient, repo, safePage, totalPages, apiPage])
 
   if (totalCommits === 0) {
     return <PlaceholderView title="Commits" description="This pull request does not contain any commits yet." />
   }
 
-  const items = data?.items ?? []
-  const rangeStart = (safePage - 1) * COMMITS_PER_PAGE + 1
-  const rangeEnd = Math.min(totalCommits, rangeStart + Math.max(items.length - 1, 0))
+  const items = [...(data?.items ?? [])].reverse()
+  const lastApiPageSize = ((totalCommits - 1) % COMMITS_PER_PAGE) + 1
+  const rangeEnd = lastApiPageSize + (safePage - 1) * COMMITS_PER_PAGE
+  const rangeStart = Math.max(1, rangeEnd - items.length + 1)
   const commitGroups = groupCommitsByDay(items)
 
   return (

@@ -402,6 +402,52 @@ export interface PullRequestFile {
   previous_filename?: string
 }
 
+// Inputs/outputs for the local-git PR diff path. `fetchPullRequestRefs`
+// synchronizes origin refs and resolves shas; `computePullRequestDiff` runs
+// a pinned-sha `git diff` against those refs and parses the output into the
+// `PullRequestFile[]` shape the renderer already consumes.
+export interface FetchPullRequestRefsInput {
+  cwd: string
+  owner: string
+  repo: string
+  number: number
+  baseRef: string
+  headRef: string
+}
+
+export interface FetchPullRequestRefsResult {
+  baseSha: string
+  headSha: string
+  /** Whether we resolved head from the user's local branch or from refs/remotes/origin/pr/N. */
+  headRefUsed: 'local' | 'origin-pr'
+}
+
+export interface ComputePullRequestDiffInput {
+  cwd: string
+  owner: string
+  repo: string
+  number: number
+  baseSha: string
+  headSha: string
+  /** GitHub's head sha. Used only to build `blob_url` so the link works even when local is ahead of origin. */
+  blobUrlHeadSha: string
+}
+
+export type GitErrorKind =
+  | 'timeout'
+  | 'not-a-repo'
+  | 'missing-ref'
+  | 'fetch-failed'
+  | 'git-not-found'
+  | 'origin-mismatch'
+  | 'refs-unavailable'
+  | 'unknown'
+
+export interface GitErrorPayload {
+  kind: GitErrorKind
+  message: string
+}
+
 export type PullRequestMergeMethod = 'merge' | 'squash' | 'rebase'
 
 export interface PullRequestMergeResult {

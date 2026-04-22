@@ -18,6 +18,7 @@ import { PatchDiff, Virtualizer, type DiffLineAnnotation } from '@pierre/diffs/r
 import type {
   AgentSessionMeta,
   AuthData,
+  FetchPullRequestRefsResult,
   PullRequestDetail,
   PullRequestFile,
   PullRequestReviewComment,
@@ -26,6 +27,7 @@ import type {
   PullRequestReviewLineSide,
   PullRequestReviewThreadSummary
 } from '../../../../shared/types'
+import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import { FolderIcon } from '../../components/FileIcon'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
@@ -374,15 +376,65 @@ export default function PRFilesTab({
   })
   useEffect(() => () => mountObserverRef.current?.disconnect(), [])
 
-  const {
-    data: files,
-    isLoading: isLoadingFiles,
-    error: filesError
-  } = useQuery<PullRequestFile[], Error>({
-    queryKey: ['pull-request-files', owner, repo, pr.number],
-    queryFn: () => window.api.github.pulls.listFiles(owner, repo, pr.number),
+  // PR diff via local git. Split in two on purpose:
+  //   pr-refs  — resolves base/head shas (fetches origin, inspects local HEAD).
+  //              Invalidated on agent completion so Claude's fresh commit
+  //              produces fresh shas.
+  //   pr-diff  — keyed on the resolved shas, so a new commit is a brand-new
+  //              cache entry with brand-new data references. This is what
+  //              guarantees the render tree sees fresh files (no in-place
+  //              update + structural-sharing edge cases).
+  // On any hard error, fall through to REST.
+  const workspaceCtx = useWorkspaceContext()
+  const folderPath = workspaceCtx?.folderPath ?? ''
+
+  const refsQuery = useQuery<FetchPullRequestRefsResult | null, Error>({
+    queryKey: ['pr-refs', folderPath, owner, repo, pr.number],
+    queryFn: async () => {
+      try {
+        return await window.api.git.fetchPullRequestRefs({
+          cwd: folderPath,
+          owner,
+          repo,
+          number: pr.number,
+          baseRef: pr.base.ref,
+          headRef: pr.head.ref
+        })
+      } catch {
+        return null // signal: use REST fallback
+      }
+    },
+    enabled: folderPath.length > 0,
     retry: false
   })
+
+  const refs = refsQuery.data ?? null
+  const diffQuery = useQuery<PullRequestFile[], Error>({
+    queryKey: ['pr-diff', folderPath, owner, repo, pr.number, refs?.baseSha, refs?.headSha],
+    queryFn: () =>
+      window.api.git.computePullRequestDiff({
+        cwd: folderPath,
+        owner,
+        repo,
+        number: pr.number,
+        baseSha: refs!.baseSha,
+        headSha: refs!.headSha,
+        blobUrlHeadSha: pr.head.sha
+      }),
+    enabled: refs !== null,
+    retry: false
+  })
+
+  const restFallbackQuery = useQuery<PullRequestFile[], Error>({
+    queryKey: ['pull-request-files', owner, repo, pr.number],
+    queryFn: () => window.api.github.pulls.listFiles(owner, repo, pr.number),
+    enabled: refsQuery.isSuccess && refs === null,
+    retry: false
+  })
+
+  const files = refs !== null ? diffQuery.data : restFallbackQuery.data
+  const isLoadingFiles = refsQuery.isLoading || (refs !== null ? diffQuery.isLoading : restFallbackQuery.isLoading)
+  const filesError = refs !== null ? diffQuery.error : restFallbackQuery.error
   const {
     data: reviewComments,
     isLoading: isLoadingReviewComments,
@@ -686,7 +738,7 @@ interface ChangedFileDiffCardProps {
   threadRef: (commentId: number, element: HTMLElement | null) => void
 }
 
-export const ChangedFileDiffCard = memo(ChangedFileDiffCardInner)
+export const ChangedFileDiffCard = ChangedFileDiffCardInner
 
 const DEFERRED_CARD_STYLE: React.CSSProperties = {
   contentVisibility: 'auto',

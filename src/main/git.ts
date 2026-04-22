@@ -3,19 +3,101 @@ import { execFile } from 'child_process'
 import { join } from 'path'
 import { unlinkSync, statSync } from 'fs'
 import { requireAllowedDirectory } from './fs'
-import type { GitChangedFile, GitBranchInfo, GitLogEntry, GitStatusCode } from '../shared/types'
+import { computePullRequestDiff, fetchPullRequestRefs } from './prDiff'
+import type {
+  ComputePullRequestDiffInput,
+  FetchPullRequestRefsInput,
+  GitChangedFile,
+  GitBranchInfo,
+  GitLogEntry,
+  GitStatusCode
+} from '../shared/types'
 
-function git(cwd: string, args: string[]): Promise<string> {
+export type GitErrorKind =
+  | 'timeout'
+  | 'not-a-repo'
+  | 'missing-ref'
+  | 'fetch-failed'
+  | 'git-not-found'
+  | 'origin-mismatch'
+  | 'refs-unavailable'
+  | 'unknown'
+
+/**
+ * Typed error for git failures. The `kind` discriminant lets the renderer
+ * decide between silent REST fallback and surfacing a CTA to the user.
+ *
+ * Electron's IPC boundary strips custom Error properties during rejection
+ * serialization, so we also prefix the message with a `[GitError:<kind>]`
+ * sentinel and parse it back on the renderer side (see `readGitErrorKind`
+ * in PRFilesTab.tsx).
+ */
+export class GitError extends Error {
+  kind: GitErrorKind
+  constructor(kind: GitErrorKind, message: string) {
+    super(`[GitError:${kind}] ${message}`)
+    this.name = 'GitError'
+    this.kind = kind
+  }
+}
+
+interface GitOptions {
+  /** Per-invocation timeout. Default 15s. */
+  timeoutMs?: number
+  signal?: AbortSignal
+}
+
+// Hardened execFile env: prevents git from waiting on credential prompts or
+// interactive TTY features that would hang the main process indefinitely.
+const GIT_ENV = {
+  ...process.env,
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_ASKPASS: 'echo',
+  SSH_ASKPASS: 'echo'
+}
+
+export function git(cwd: string, args: string[], opts: GitOptions = {}): Promise<string> {
+  const { timeoutMs = 15_000, signal } = opts
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        const message = stderr.trim() || stdout.trim() || error.message
-        reject(new Error(message))
-        return
+    const child = execFile(
+      'git',
+      args,
+      {
+        cwd,
+        maxBuffer: 64 * 1024 * 1024,
+        timeout: timeoutMs,
+        env: GIT_ENV,
+        signal
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(toGitError(error as NodeJS.ErrnoException, stderr, stdout))
+          return
+        }
+        resolve(stdout)
       }
-      resolve(stdout)
-    })
+    )
+    // Keep a reference so Node doesn't complain about unused vars; child is
+    // managed entirely via the callback.
+    void child
   })
+}
+
+function toGitError(error: NodeJS.ErrnoException, stderr: string, stdout: string): GitError {
+  const message = (stderr || '').trim() || (stdout || '').trim() || error.message
+  if (error.code === 'ENOENT') return new GitError('git-not-found', 'git binary not found on PATH')
+  // execFile sets `killed` with SIGTERM when the timeout fires.
+  if ((error as { killed?: boolean }).killed && (error as { signal?: string }).signal === 'SIGTERM') {
+    return new GitError('timeout', message || 'git command timed out')
+  }
+  if (/not a git repository/i.test(message)) return new GitError('not-a-repo', message)
+  if (/unknown revision|bad revision|ambiguous argument|does not have any commits/i.test(message)) {
+    return new GitError('missing-ref', message)
+  }
+  if (/could not read from remote|couldn't find remote|authentication failed|permission denied/i.test(message)) {
+    return new GitError('fetch-failed', message)
+  }
+  return new GitError('unknown', message)
 }
 
 function parseStatusCode(char: string): GitStatusCode | ' ' {
@@ -319,5 +401,15 @@ export function registerGitHandlers(): void {
   ipcMain.handle('git:log', (event, cwd: string, count?: number) => {
     requireAllowedDirectory(event.sender, cwd)
     return gitLog(cwd, count ?? 20)
+  })
+
+  ipcMain.handle('git:fetch-pr-refs', (event, input: FetchPullRequestRefsInput) => {
+    requireAllowedDirectory(event.sender, input.cwd)
+    return fetchPullRequestRefs(input)
+  })
+
+  ipcMain.handle('git:compute-pr-diff', (event, input: ComputePullRequestDiffInput) => {
+    requireAllowedDirectory(event.sender, input.cwd)
+    return computePullRequestDiff(input)
   })
 }

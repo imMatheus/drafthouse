@@ -14,6 +14,7 @@ import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import ActivityBar from '../components/ActivityBar'
 import CommandPalette from '../components/CommandPalette'
+import FilePalette from '../components/FilePalette'
 import AgentPanel from '../components/AgentPanel'
 import ExplorerPanel from '../components/ExplorerPanel'
 import PullRequestsPanel from '../components/PullRequestsPanel'
@@ -98,7 +99,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   if (agentSessionsStoreRef.current === null) agentSessionsStoreRef.current = new AgentSessionsStore()
   const agentSessionsStore = agentSessionsStoreRef.current
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+  const [activePalette, setActivePalette] = useState<'command' | 'file' | null>(null)
 
   // Tab navigation history (back/forward buttons in the top bar). Tracks visited
   // tab ids so the user can move through them like a browser. Local-only state —
@@ -329,7 +330,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setCommandPaletteOpen((prev) => !prev)
+        setActivePalette((prev) => (prev === 'command' ? null : 'command'))
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
+        e.preventDefault()
+        setActivePalette((prev) => (prev === 'file' ? null : 'file'))
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '1') {
         e.preventDefault()
@@ -622,7 +627,9 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const projectName = getPathBasename(folderPath)
 
   return (
-    <WorkspaceContextProvider value={{ gitInfo: gitInfo ?? null, onOpenPullRequest: handleOpenPullRequest }}>
+    <WorkspaceContextProvider
+      value={{ gitInfo: gitInfo ?? null, folderPath, onOpenPullRequest: handleOpenPullRequest }}
+    >
       <AgentSessionsProvider store={agentSessionsStore}>
         <div className="bg-background flex w-screen flex-1 flex-col">
           <WorkspaceTopBar
@@ -721,14 +728,19 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
           </div>
 
           <CommandPalette
-            open={commandPaletteOpen}
-            onOpenChange={setCommandPaletteOpen}
-            folderPath={folderPath}
+            open={activePalette === 'command'}
+            onOpenChange={(next) => setActivePalette(next ? 'command' : null)}
             gitInfo={gitInfo}
             agentSessions={sessionMetas}
-            onOpenFile={handleOpenFile}
             onOpenPullRequest={handleOpenPullRequest}
             onSelectAgentSession={handleSelectAgentSession}
+            onNewAgent={handleAgentActivityClick}
+          />
+          <FilePalette
+            open={activePalette === 'file'}
+            onOpenChange={(next) => setActivePalette(next ? 'file' : null)}
+            folderPath={folderPath}
+            onOpenFile={handleOpenFile}
           />
         </div>
       </AgentSessionsProvider>

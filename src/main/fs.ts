@@ -1,9 +1,17 @@
 import { ipcMain, dialog, app, BrowserWindow, type WebContents } from 'electron'
 import { join, relative, resolve, isAbsolute } from 'path'
-import { readdirSync, statSync, readFileSync, writeFileSync, existsSync, realpathSync } from 'fs'
+import { readdirSync, statSync, readFileSync, writeFileSync, existsSync, realpathSync, watch, type FSWatcher } from 'fs'
 import type { FileEntry, GitRepoInfo } from '../shared/types'
 
 const allowedRoots = new Map<number, string>()
+
+interface FileWatcherEntry {
+  watcher: FSWatcher
+  refCount: number
+  debounce: NodeJS.Timeout | null
+}
+
+const fileWatchersByWebContents = new WeakMap<WebContents, Map<string, FileWatcherEntry>>()
 
 function getRecentPath(): string {
   return join(app.getPath('userData'), 'recent-folders.json')
@@ -239,6 +247,61 @@ export function registerFsHandlers(): void {
 
   ipcMain.handle('fs:write-file', (event, filePath: string, content: string) => {
     writeFileSync(requireAllowedFile(event.sender, filePath), content, 'utf-8')
+  })
+
+  // Watch a single file for changes. Each renderer keeps its own per-path
+  // watcher; on `change` we send `fs:file-changed` back so the renderer can
+  // refetch. This is the source of truth for "file content on disk has
+  // changed" — works for any editor (Claude, the user's terminal, git
+  // operations) without us having to enumerate change sources.
+  ipcMain.handle('fs:watch-file', (event, filePath: string) => {
+    const sender = event.sender
+    const resolved = requireAllowedFile(sender, filePath)
+    let map = fileWatchersByWebContents.get(sender)
+    if (!map) {
+      map = new Map()
+      fileWatchersByWebContents.set(sender, map)
+      sender.once('destroyed', () => {
+        const m = fileWatchersByWebContents.get(sender)
+        if (!m) return
+        for (const w of m.values()) w.watcher.close()
+        fileWatchersByWebContents.delete(sender)
+      })
+    }
+    const existing = map.get(resolved)
+    if (existing) {
+      existing.refCount += 1
+      return
+    }
+    const watcher = watch(resolved, (eventType) => {
+      if (eventType !== 'change') return
+      const entry = map!.get(resolved)
+      if (!entry) return
+      // Coalesce rapid bursts (some editors emit several `change` events
+      // for one save). 50 ms is below human perception but well above the
+      // typical multi-event burst.
+      if (entry.debounce !== null) clearTimeout(entry.debounce)
+      entry.debounce = setTimeout(() => {
+        entry.debounce = null
+        if (sender.isDestroyed()) return
+        sender.send('fs:file-changed', resolved)
+      }, 50)
+    })
+    map.set(resolved, { watcher, refCount: 1, debounce: null })
+  })
+
+  ipcMain.handle('fs:unwatch-file', (event, filePath: string) => {
+    const sender = event.sender
+    const resolved = requireAllowedFile(sender, filePath)
+    const map = fileWatchersByWebContents.get(sender)
+    if (!map) return
+    const entry = map.get(resolved)
+    if (!entry) return
+    entry.refCount -= 1
+    if (entry.refCount > 0) return
+    if (entry.debounce !== null) clearTimeout(entry.debounce)
+    entry.watcher.close()
+    map.delete(resolved)
   })
 
   ipcMain.handle('fs:get-recent-folders', () => {

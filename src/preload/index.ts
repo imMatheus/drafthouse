@@ -357,7 +357,9 @@ const api = {
     pull: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:pull', cwd),
     stash: (cwd: string, message?: string): Promise<unknown> => ipcRenderer.invoke('git:stash', cwd, message),
     stashPop: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:stash-pop', cwd),
-    log: (cwd: string, count?: number): Promise<unknown> => ipcRenderer.invoke('git:log', cwd, count)
+    log: (cwd: string, count?: number): Promise<unknown> => ipcRenderer.invoke('git:log', cwd, count),
+    fetchPullRequestRefs: (input: unknown): Promise<unknown> => ipcRenderer.invoke('git:fetch-pr-refs', input),
+    computePullRequestDiff: (input: unknown): Promise<unknown> => ipcRenderer.invoke('git:compute-pr-diff', input)
   },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
@@ -370,6 +372,13 @@ const api = {
     getGitInfo: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:get-git-info', path),
     pickFiles: (): Promise<unknown> => ipcRenderer.invoke('fs:pick-files'),
     readFileDataUrl: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-file-data-url', path),
+    watchFile: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:watch-file', path),
+    unwatchFile: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:unwatch-file', path),
+    onFileChanged: (callback: (path: string) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, path: string): void => callback(path)
+      ipcRenderer.on('fs:file-changed', listener)
+      return () => ipcRenderer.removeListener('fs:file-changed', listener)
+    },
     onOpenFolder: (callback: (path: string) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, path: string): void => callback(path)
       ipcRenderer.on('menu:open-folder', listener)

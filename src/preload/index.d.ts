@@ -26,6 +26,9 @@ import type {
   GitHubCommitStatus,
   CommitStatusState,
   GitHubEmojis,
+  ComputePullRequestDiffInput,
+  FetchPullRequestRefsInput,
+  FetchPullRequestRefsResult,
   PullRequest,
   PullRequestDetail,
   PullRequestCommit,
@@ -393,6 +396,8 @@ interface GitAPI {
   stash: (cwd: string, message?: string) => Promise<void>
   stashPop: (cwd: string) => Promise<void>
   log: (cwd: string, count?: number) => Promise<GitLogEntry[]>
+  fetchPullRequestRefs: (input: FetchPullRequestRefsInput) => Promise<FetchPullRequestRefsResult>
+  computePullRequestDiff: (input: ComputePullRequestDiffInput) => Promise<PullRequestFile[]>
 }
 
 // ============================================================
@@ -422,6 +427,9 @@ interface FsAPI {
   getGitInfo: (path: string) => Promise<GitRepoInfo | null>
   pickFiles: () => Promise<string[]>
   readFileDataUrl: (path: string) => Promise<string>
+  watchFile: (path: string) => Promise<void>
+  unwatchFile: (path: string) => Promise<void>
+  onFileChanged: (callback: (path: string) => void) => () => void
   onOpenFolder: (callback: (path: string) => void) => () => void
   onCloseTab: (callback: () => void) => () => void
 }

@@ -1,5 +1,5 @@
-import { Fragment } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { Fragment, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
 import { File, type FileContents } from '@pierre/diffs/react'
 import { cn } from '../../lib/cn'
@@ -13,6 +13,7 @@ interface FilesViewProps {
 
 export default function FilesView({ filePath, folderPath }: FilesViewProps) {
   const { theme } = useTheme()
+  const queryClient = useQueryClient()
   const {
     data: fileContents,
     isLoading,
@@ -22,6 +23,23 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
     queryFn: () => window.api.fs.readFile(filePath),
     retry: false
   })
+
+  // Watch the open file on disk and invalidate the query when it changes,
+  // so any external edit (Claude, the user's terminal editor, git checkout)
+  // is reflected immediately. The watcher is the source of truth: we don't
+  // have to enumerate change sources or pile on speculative invalidations.
+  useEffect(() => {
+    void window.api.fs.watchFile(filePath)
+    const unsubscribe = window.api.fs.onFileChanged((changedPath) => {
+      if (changedPath === filePath) {
+        void queryClient.invalidateQueries({ queryKey: ['read-file', filePath] })
+      }
+    })
+    return () => {
+      unsubscribe()
+      void window.api.fs.unwatchFile(filePath)
+    }
+  }, [filePath, queryClient])
 
   const relativePath = getRelativePath(filePath, folderPath)
   const segments = relativePath.split('/')
