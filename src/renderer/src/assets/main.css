@@ -48,15 +48,15 @@ body {
 }
 
 .light {
-  --color-background: rgb(247, 247, 244);
-  --color-surface: #f2f1ed;
-  --color-surface-hover: #e6e5e0;
-  --color-foreground: #26251e;
-  --color-foreground-muted: #7a7970;
-  --color-foreground-subtle: #a5a49e;
-  --color-border: #e2e1dc;
-  --color-interactive: #ededea;
-  --color-interactive-hover: #e2e1dc;
+  --color-background: rgb(253, 253, 252);
+  --color-surface: rgb(243, 243, 242);
+  --color-surface-hover: rgb(229, 229, 228);
+  --color-foreground: rgb(60, 60, 57);
+  --color-foreground-muted: rgb(122, 121, 112);
+  --color-foreground-subtle: rgb(165, 164, 158);
+  --color-border: rgb(234, 234, 233);
+  --color-interactive: rgb(237, 237, 234);
+  --color-interactive-hover: rgb(226, 225, 220);
   /* --color-accent: #f54e00;
   --color-accent-hover: #d94400;
   --color-accent-bg: hsl(17, 33%, 91%); */

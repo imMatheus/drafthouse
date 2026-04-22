@@ -1421,7 +1421,7 @@ function CommentBox({
           <button
             onClick={handleSubmit}
             disabled={!body.trim() || isSubmitting}
-            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+            className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
           >
             {isSubmitting ? 'Commenting...' : claudeMention ? 'Ask Claude' : 'Comment'}
           </button>

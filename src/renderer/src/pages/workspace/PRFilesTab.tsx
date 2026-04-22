@@ -1432,7 +1432,7 @@ function SubmitReviewDialog({
               type="button"
               onClick={() => void handleSubmit('COMMENT')}
               disabled={isSubmitting}
-              className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-accent-foreground hover:bg-interactive-hover rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             >
               Comment
             </button>
@@ -1440,7 +1440,7 @@ function SubmitReviewDialog({
               type="button"
               onClick={() => void handleSubmit('APPROVE')}
               disabled={isSubmitting}
-              className="bg-success text-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-success text-accent-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             >
               Approve
             </button>
@@ -1448,7 +1448,7 @@ function SubmitReviewDialog({
               type="button"
               onClick={() => void handleSubmit('REQUEST_CHANGES')}
               disabled={isSubmitting}
-              className="bg-danger text-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+              className="bg-danger text-accent-foreground rounded-md px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             >
               Request changes
             </button>
