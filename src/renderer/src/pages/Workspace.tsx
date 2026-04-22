@@ -5,7 +5,6 @@ import { Files, GitBranch, GitGraph, Terminal } from 'lucide-react'
 import type {
   AgentContext,
   AgentSessionMeta,
-  AgentStreamEvent,
   GitChangedFile,
   GitRepoInfo,
   PullRequestDetail
@@ -41,7 +40,7 @@ import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
 import { WorkspaceContextProvider } from '../contexts/WorkspaceContext'
-import { AgentSessionsProvider } from '../contexts/AgentSessionsContext'
+import { AgentSessionsProvider, AgentSessionsStore } from '../contexts/AgentSessionsContext'
 import { LoadingView } from '../components/Loading'
 import { appendOrReplaceAssistant, mergePartialMessage } from '../lib/agentStream'
 
@@ -89,22 +88,17 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
   const activeFilePath = activeTab?.kind === 'file' ? activeTab.path : null
 
-  // Agent state: session metadata and per-session events are stored separately
-  // so that streaming tokens only re-render components that actually display
-  // events (via useAgentSessionEvents), never the whole tree that consumes
-  // meta (status, prompt, cliSessionId, context).
+  // Agent state: session metadata lives in React state (infrequent — only on
+  // session start / status changes). Per-session stream events live in a
+  // mutable external store so each token update re-renders only the
+  // components subscribed to *that* specific session's events (AgentConversation,
+  // InlineAgentResponseCard), never the whole workspace tree.
   const [sessionMetas, setSessionMetas] = useState<AgentSessionMeta[]>([])
-  const [sessionEvents, setSessionEvents] = useState<Map<string, AgentStreamEvent[]>>(() => new Map())
+  const agentSessionsStoreRef = useRef<AgentSessionsStore | null>(null)
+  if (agentSessionsStoreRef.current === null) agentSessionsStoreRef.current = new AgentSessionsStore()
+  const agentSessionsStore = agentSessionsStoreRef.current
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
-
-  const updateSessionEvents = (sessionId: string, updater: (prev: AgentStreamEvent[]) => AgentStreamEvent[]): void => {
-    setSessionEvents((prev) => {
-      const next = new Map(prev)
-      next.set(sessionId, updater(prev.get(sessionId) ?? []))
-      return next
-    })
-  }
 
   // Tab navigation history (back/forward buttons in the top bar). Tracks visited
   // tab ids so the user can move through them like a browser. Local-only state —
@@ -185,12 +179,13 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
   }, [folderPath, onCloseWorkspace, onUpdateSession])
 
-  // Subscribe to agent events. Token events only update the events Map.
-  // Metadata (status, cliSessionId) updates happen on init/result only, which
-  // are rare compared to the per-token stream.
+  // Subscribe to agent events. Token events mutate the external events store
+  // which notifies only the specific session's subscribers. Metadata updates
+  // (status / cliSessionId) happen on init / result only and go through
+  // React state so the session list / status chrome reflects the change.
   useEffect(() => {
     return window.api.agent.onEvent(({ sessionId, event }) => {
-      updateSessionEvents(sessionId, (prev) => {
+      agentSessionsStore.setEvents(sessionId, (prev) => {
         if (event.type === 'stream_event') return mergePartialMessage(prev, event)
         if (event.type === 'assistant') return appendOrReplaceAssistant(prev, event)
         return [...prev, event]
@@ -214,7 +209,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
         )
       }
     })
-  }, [])
+  }, [agentSessionsStore])
 
   const openOrFocusTab = (nextTab: WorkspaceTab): void => {
     const existingTab = tabs.find((tab) => tab.id === nextTab.id)
@@ -442,7 +437,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
         }
       })
     )
-    updateSessionEvents(agentSessionId, (prev) => [
+    agentSessionsStore.setEvents(agentSessionId, (prev) => [
       ...prev,
       {
         type: 'user' as const,
@@ -628,7 +623,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   return (
     <WorkspaceContextProvider value={{ gitInfo: gitInfo ?? null, onOpenPullRequest: handleOpenPullRequest }}>
-      <AgentSessionsProvider eventsBySessionId={sessionEvents}>
+      <AgentSessionsProvider store={agentSessionsStore}>
         <div className="bg-background flex w-screen flex-1 flex-col">
           <WorkspaceTopBar
             projectName={projectName}
