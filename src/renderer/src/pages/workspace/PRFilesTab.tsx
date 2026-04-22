@@ -645,7 +645,7 @@ export default function PRFilesTab({
               <p className="text-foreground-muted text-sm">{filesErrorMessage.message}</p>
             </div>
           ) : null}
-          {isLoading ? <Loading label="Loading changed files..." /> : null}
+          {isLoading && files === undefined ? <Loading label="Loading changed files..." /> : null}
           <Virtualizer contentClassName="flex flex-col gap-5">
             {filteredFiles.map((file) => {
               const mounted = mountedFiles.has(file.filename)
