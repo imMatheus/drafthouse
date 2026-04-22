@@ -3,8 +3,8 @@ import AsciiArt from '../../components/AsciiArt'
 const TIPS: Array<{ label: string; keys: string[] }> = [
   { label: 'Open the command palette', keys: ['⌘', 'K'] },
   { label: 'Toggle the sidebar', keys: ['⌘', 'B'] },
-  { label: 'Jump to pull requests', keys: ['⌘', '3'] },
-  { label: 'Open the agent', keys: ['⌘', '4'] }
+  { label: 'Open the agent', keys: ['⌘', '1'] },
+  { label: 'Jump to pull requests', keys: ['⌘', '2'] }
 ]
 
 export default function WelcomeView() {

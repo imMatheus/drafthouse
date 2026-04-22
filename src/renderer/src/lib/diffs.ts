@@ -125,12 +125,23 @@ export function syntheticFilenameForLang(lang: string): string {
   return `snippet.${ext}`
 }
 
+const DIFFS_UNSAFE_CSS = `
+[data-utility-button] {
+  background-color: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+[data-utility-button]:hover {
+  background-color: var(--color-accent-hover);
+}
+`
+
 export const BASE_DIFF_OPTIONS: Omit<BaseDiffOptions, 'hunkSeparators'> = {
   theme: DIFFS_THEMES,
   diffIndicators: 'classic',
   overflow: 'wrap',
   expandUnchanged: true,
-  lineDiffType: 'word'
+  lineDiffType: 'word',
+  unsafeCSS: DIFFS_UNSAFE_CSS
 }
 
 export const BASE_CODE_OPTIONS: BaseCodeOptions = {

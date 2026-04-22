@@ -338,19 +338,19 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '1') {
         e.preventDefault()
-        handleToggleSidebar('explorer')
+        handleToggleSidebar('agent')
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '2') {
         e.preventDefault()
-        handleToggleSidebar('source-control')
+        handleToggleSidebar('pull-requests')
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '3') {
         e.preventDefault()
-        handleToggleSidebar('pull-requests')
+        handleToggleSidebar('source-control')
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '4') {
         e.preventDefault()
-        handleToggleSidebar('agent')
+        handleToggleSidebar('explorer')
       }
     }
 
@@ -589,12 +589,21 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const activityItems = [
     {
-      id: 'explorer',
-      label: 'Explorer',
-      icon: Files,
-      active: sidebar.visible && sidebar.activePanel === 'explorer',
-      onClick: () => handleToggleSidebar('explorer'),
+      id: 'agent',
+      label: 'Agent',
+      icon: Terminal,
+      active: sidebar.visible && sidebar.activePanel === 'agent',
+      badge: runningAgentCount > 0 ? runningAgentCount : undefined,
+      onClick: handleAgentActivityClick,
       shortcut: ['⌘', '1']
+    },
+    {
+      id: 'pull-requests',
+      label: 'Pull Requests',
+      icon: GitGraph,
+      active: sidebar.visible && sidebar.activePanel === 'pull-requests',
+      onClick: () => handleToggleSidebar('pull-requests'),
+      shortcut: ['⌘', '2']
     },
     {
       id: 'source-control',
@@ -603,23 +612,14 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       active: sidebar.visible && sidebar.activePanel === 'source-control',
       badge: changedFileCount > 0 ? changedFileCount : undefined,
       onClick: () => handleToggleSidebar('source-control'),
-      shortcut: ['⌘', '2']
-    },
-    {
-      id: 'pull-requests',
-      label: 'Pull Requests',
-      icon: GitGraph,
-      active: sidebar.visible && sidebar.activePanel === 'pull-requests',
-      onClick: () => handleToggleSidebar('pull-requests'),
       shortcut: ['⌘', '3']
     },
     {
-      id: 'agent',
-      label: 'Agent',
-      icon: Terminal,
-      active: sidebar.visible && sidebar.activePanel === 'agent',
-      badge: runningAgentCount > 0 ? runningAgentCount : undefined,
-      onClick: handleAgentActivityClick,
+      id: 'explorer',
+      label: 'Files',
+      icon: Files,
+      active: sidebar.visible && sidebar.activePanel === 'explorer',
+      onClick: () => handleToggleSidebar('explorer'),
       shortcut: ['⌘', '4']
     }
   ]
@@ -864,10 +864,10 @@ function renderWorkspaceTabContent({
 const EMPTY_STATE_SHORTCUTS: Array<{ label: string; keys: string[] }> = [
   { label: 'Command Palette', keys: ['⌘', 'K'] },
   { label: 'Toggle Sidebar', keys: ['⌘', 'B'] },
-  { label: 'Explorer', keys: ['⌘', '1'] },
-  { label: 'Source Control', keys: ['⌘', '2'] },
-  { label: 'Pull Requests', keys: ['⌘', '3'] },
-  { label: 'Agent', keys: ['⌘', '4'] }
+  { label: 'Agent', keys: ['⌘', '1'] },
+  { label: 'Pull Requests', keys: ['⌘', '2'] },
+  { label: 'Source Control', keys: ['⌘', '3'] },
+  { label: 'Files', keys: ['⌘', '4'] }
 ]
 
 function EmptyStateShortcuts() {
