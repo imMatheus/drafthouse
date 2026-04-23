@@ -585,7 +585,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const changedFileCount = gitStatus?.length ?? 0
 
-  const runningAgentCount = sessionMetas.filter((s) => s.status === 'running' && !s.context?.inline).length
+  const runningAgentCount = sessionMetas.filter((s) => s.status === 'running').length
 
   const activityItems = [
     {

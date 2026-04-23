@@ -63,7 +63,7 @@ export default function CommandPalette({
     retry: false
   })
 
-  const sessions = agentSessions.filter((s) => !s.context?.inline).sort((a, b) => b.startedAt - a.startedAt)
+  const sessions = [...agentSessions].sort((a, b) => b.startedAt - a.startedAt)
 
   const showPulls = filter === 'all' || filter === 'pulls'
   const showAgents = filter === 'all' || filter === 'agents'

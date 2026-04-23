@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowUp, ChevronRight, ExternalLink, Square } from 'lucide-react'
 import type { AgentSessionMeta, AgentStreamEvent, AgentStreamResult } from '../../../shared/types'
 import { cn } from '../lib/cn'
@@ -46,17 +46,12 @@ export default function InlineAgentResponseCard({
   variant?: 'standalone' | 'nested'
   compact?: boolean
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const [followUp, setFollowUp] = useState('')
   const followUpRef = useRef<HTMLTextAreaElement>(null)
   const isRunning = session.status === 'running'
   const canContinue = !isRunning && session.cliSessionId !== null
   const events = useAgentSessionEvents(session.id)
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [events.length])
 
   // Separate thinking steps from the response. File-edit tool uses (Edit/Write/MultiEdit)
   // are rendered inline in the response area; other tool uses stay in the collapsible
@@ -268,8 +263,6 @@ export default function InlineAgentResponseCard({
             </button>
           </div>
         )}
-
-        <div ref={bottomRef} />
       </div>
     </div>
   )

@@ -28,7 +28,7 @@ function StatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {
 }
 
 export default function AgentPanel({ sessions, activeSessionId, onSelectSession, onNewSession }: AgentPanelProps) {
-  const sortedSessions = [...sessions].filter((s) => !s.context?.inline).reverse()
+  const sortedSessions = [...sessions].reverse()
 
   return (
     <div className="border-border bg-surface flex min-h-0 w-60 shrink-0 flex-col border-r">
