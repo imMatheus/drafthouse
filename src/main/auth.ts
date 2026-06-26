@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, app, shell } from 'electron'
+import { BrowserWindow, ipcMain, app, shell, safeStorage } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs'
 import type { AuthData, GitHubUser } from '../shared/types'
@@ -6,15 +6,29 @@ import { fetchGitHubJson } from './github/client'
 
 const GITHUB_CLIENT_ID = import.meta.env.MAIN_VITE_GITHUB_CLIENT_ID
 
+// On-disk wrapper when the OS keychain is available. Legacy files are the bare
+// AuthData JSON (no `encrypted` field) and are still readable for back-compat.
+interface EncryptedAuth {
+  encrypted: true
+  data: string
+}
+
 function getAuthPath(): string {
   return join(app.getPath('userData'), 'auth.json')
+}
+
+function isEncryptedAuth(value: unknown): value is EncryptedAuth {
+  return typeof value === 'object' && value !== null && (value as { encrypted?: unknown }).encrypted === true
 }
 
 export function loadAuth(): AuthData | null {
   const authPath = getAuthPath()
   if (!existsSync(authPath)) return null
   try {
-    const data = JSON.parse(readFileSync(authPath, 'utf-8')) as Partial<AuthData>
+    const raw = JSON.parse(readFileSync(authPath, 'utf-8')) as unknown
+    const data = (
+      isEncryptedAuth(raw) ? JSON.parse(safeStorage.decryptString(Buffer.from(raw.data, 'base64'))) : raw
+    ) as Partial<AuthData>
     if (typeof data.token !== 'string' || !data.token) return null
     if (!Array.isArray(data.scopes) || !data.scopes.includes('repo')) return null
     if (!data.user) return null
@@ -25,7 +39,13 @@ export function loadAuth(): AuthData | null {
 }
 
 function saveAuth(data: AuthData): void {
-  writeFileSync(getAuthPath(), JSON.stringify(data))
+  const json = JSON.stringify(data)
+  if (safeStorage.isEncryptionAvailable()) {
+    const stored: EncryptedAuth = { encrypted: true, data: safeStorage.encryptString(json).toString('base64') }
+    writeFileSync(getAuthPath(), JSON.stringify(stored), { mode: 0o600 })
+  } else {
+    writeFileSync(getAuthPath(), json, { mode: 0o600 })
+  }
 }
 
 function clearAuth(): void {
@@ -54,15 +74,21 @@ async function requestDeviceCode(): Promise<{
     })
   })
 
+  if (!res.ok) throw new Error(`Device code request failed (${res.status})`)
   const data = await res.json()
   if (data.error) throw new Error(data.error_description || data.error)
   return data
 }
 
-async function pollForToken(deviceCode: string, interval: number): Promise<{ token: string; scopes: string[] }> {
+async function pollForToken(
+  deviceCode: string,
+  interval: number,
+  expiresIn: number
+): Promise<{ token: string; scopes: string[] }> {
   const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+  const deadline = Date.now() + expiresIn * 1000
 
-  while (true) {
+  while (Date.now() < deadline) {
     await wait(interval * 1000)
 
     const res = await fetch('https://github.com/login/oauth/access_token', {
@@ -78,6 +104,7 @@ async function pollForToken(deviceCode: string, interval: number): Promise<{ tok
       })
     })
 
+    if (!res.ok) throw new Error(`Token poll failed (${res.status})`)
     const data = await res.json()
 
     if (data.access_token) {
@@ -96,6 +123,8 @@ async function pollForToken(deviceCode: string, interval: number): Promise<{ tok
     }
     throw new Error(data.error_description || data.error)
   }
+
+  throw new Error('Device authorization timed out. Please try signing in again.')
 }
 
 async function fetchGitHubUser(token: string): Promise<GitHubUser> {
@@ -104,14 +133,14 @@ async function fetchGitHubUser(token: string): Promise<GitHubUser> {
 
 export function registerAuthHandlers(): void {
   ipcMain.handle('auth:login', async (event) => {
-    const { device_code, user_code, verification_uri, interval } = await requestDeviceCode()
+    const { device_code, user_code, verification_uri, interval, expires_in } = await requestDeviceCode()
 
     shell.openExternal(`${verification_uri}?code=${user_code}`)
 
     const window = BrowserWindow.fromWebContents(event.sender)
     window?.webContents.send('auth:device-code', { userCode: user_code })
 
-    const { token, scopes } = await pollForToken(device_code, interval)
+    const { token, scopes } = await pollForToken(device_code, interval, expires_in)
     const user = await fetchGitHubUser(token)
     const authData: AuthData = { token, scopes, user }
     saveAuth(authData)

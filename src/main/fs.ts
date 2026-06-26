@@ -332,7 +332,8 @@ export function registerFsHandlers(): void {
     return result.filePaths
   })
 
-  ipcMain.handle('fs:read-file-data-url', (_event, filePath: string) => {
+  ipcMain.handle('fs:read-file-data-url', (event, filePath: string) => {
+    const resolved = requireAllowedFile(event.sender, filePath)
     const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
     const mimeTypes: Record<string, string> = {
       png: 'image/png',
@@ -345,7 +346,7 @@ export function registerFsHandlers(): void {
       ico: 'image/x-icon'
     }
     const mime = mimeTypes[ext] ?? 'application/octet-stream'
-    const data = readFileSync(filePath)
+    const data = readFileSync(resolved)
     return `data:${mime};base64,${data.toString('base64')}`
   })
 }

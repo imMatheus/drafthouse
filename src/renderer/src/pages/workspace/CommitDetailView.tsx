@@ -13,6 +13,7 @@ import {
   Search,
   X
 } from 'lucide-react'
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
 import type {
   AgentSessionMeta,
   GitHubCommit,
@@ -26,7 +27,7 @@ import { LoadingView } from '../../components/Loading'
 import { cn } from '../../lib/cn'
 import { ChangedFileDiffCard } from './PRFilesTab'
 import PlaceholderView from './PlaceholderView'
-import { DiffStat, formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
+import { DiffStat, formatAbsoluteDate, formatRelativeTime, getCommitBody, getCommitSubject } from './pullRequestShared'
 
 const EMPTY_FILES: PullRequestFile[] = []
 const EMPTY_SESSIONS: AgentSessionMeta[] = []
@@ -47,7 +48,7 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
   const [filterValue, setFilterValue] = useState('')
   const [fileListCollapsed, setFileListCollapsed] = useState(false)
   const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
-  const [shaCopied, setShaCopied] = useState(false)
+  const { copied: shaCopied, copy: copySha } = useCopyToClipboard()
   const fileSectionRefs = useRef(new Map<string, HTMLElement>())
 
   const {
@@ -125,16 +126,6 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
     fileSectionRefs.current.get(path)?.scrollIntoView({ behavior: 'instant', block: 'start' })
   }
 
-  const handleCopySha = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(commitSha)
-      setShaCopied(true)
-      window.setTimeout(() => setShaCopied(false), 1500)
-    } catch (copyError) {
-      console.error('Failed to copy commit SHA:', copyError)
-    }
-  }
-
   if (isLoading) {
     return <LoadingView label="Loading commit..." />
   }
@@ -181,7 +172,7 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
             <Tooltip label={shaCopied ? 'Copied' : 'Copy SHA'} side="top">
               <button
                 type="button"
-                onClick={() => void handleCopySha()}
+                onClick={() => copySha(commitSha)}
                 className="text-foreground-subtle hover:bg-interactive hover:text-foreground inline-flex size-8 items-center justify-center rounded-md transition-colors"
                 aria-label={shaCopied ? 'Copied SHA' : 'Copy SHA'}
               >
@@ -501,12 +492,4 @@ function FileStatusIcon({ status }: { status: string }) {
     default:
       return <FileDiff size={14} className="text-foreground-subtle shrink-0" />
   }
-}
-
-function getCommitSubject(message: string | null | undefined): string {
-  return message?.split('\n')[0]?.trim() || 'Untitled commit'
-}
-
-function getCommitBody(message: string | null | undefined): string {
-  return message?.split('\n').slice(1).join('\n').trim() ?? ''
 }

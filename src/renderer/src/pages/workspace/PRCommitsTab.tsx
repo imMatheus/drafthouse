@@ -7,7 +7,8 @@ import PlaceholderView from './PlaceholderView'
 import Tooltip from '../../components/Tooltip'
 import Loading from '../../components/Loading'
 import CommitActorStack, { formatCommitActorNames, getCommitActors } from '../../components/CommitActorStack'
-import { formatAbsoluteDate, formatRelativeTime } from './pullRequestShared'
+import { formatAbsoluteDate, formatRelativeTime, getCommitBody, getCommitSubject } from './pullRequestShared'
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
 
 const COMMITS_PER_PAGE = 100
 
@@ -230,17 +231,7 @@ function CommitRow({
   const commitDate = commit.commit.author?.date ?? commit.commit.committer?.date ?? null
   const authoredLabel = commitDate != null ? formatRelativeTime(commitDate) : 'Date unavailable'
   const isMergeCommit = commit.parents.length > 1
-  const [isCopied, setIsCopied] = useState(false)
-
-  const handleCopySha = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(commit.sha)
-      setIsCopied(true)
-      window.setTimeout(() => setIsCopied(false), 1500)
-    } catch (error) {
-      console.error('Failed to copy commit SHA:', error)
-    }
-  }
+  const { copied: isCopied, copy: copySha } = useCopyToClipboard()
 
   return (
     <div className={cn('px-4 py-2.5', !isLast && 'border-border border-b')}>
@@ -280,7 +271,7 @@ function CommitRow({
           <Tooltip label={isCopied ? 'Copied' : 'Copy SHA'} side="top">
             <button
               type="button"
-              onClick={handleCopySha}
+              onClick={() => copySha(commit.sha)}
               className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-7 items-center justify-center rounded-md transition-[background-color,color,transform] active:scale-[0.96]"
               aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
             >
@@ -302,14 +293,6 @@ function CommitRow({
       </div>
     </div>
   )
-}
-
-function getCommitSubject(message: string): string {
-  return message.split('\n')[0]?.trim() || 'Untitled commit'
-}
-
-function getCommitBody(message: string): string {
-  return message.split('\n').slice(1).join('\n').trim()
 }
 
 function groupCommitsByDay(commits: PullRequestCommit[]): CommitDayGroupData[] {

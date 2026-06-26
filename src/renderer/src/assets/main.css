@@ -32,7 +32,6 @@ body {
   --color-accent-bg: rgb(18, 26, 36);
   --color-accent-foreground: #ffffff;
   --color-success: rgb(102, 201, 95);
-  --color-success-bg: rgb(30, 40, 28);
   --color-success-foreground: #ffffff;
   --color-danger: rgb(227, 66, 88);
   --color-danger-foreground: #ffffff;
@@ -54,7 +53,6 @@ body {
   --color-accent-bg: rgb(238, 243, 250);
   --color-accent-foreground: #ffffff;
   --color-success: #16a34a;
-  --color-success-bg: rgb(30, 40, 28);
   --color-success-foreground: #ffffff;
   --color-danger: #dc2626;
   --color-danger-foreground: #ffffff;
@@ -98,7 +96,6 @@ body {
   --color-accent-bg: var(--color-accent-bg);
   --color-accent-foreground: var(--color-accent-foreground);
   --color-success: var(--color-success);
-  --color-success-bg: var(--color-success-bg);
   --color-success-foreground: var(--color-success-foreground);
   --color-danger: var(--color-danger);
   --color-danger-foreground: var(--color-danger-foreground);

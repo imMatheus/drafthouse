@@ -5,6 +5,7 @@ import { File, type FileContents } from '@pierre/diffs/react'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
 import { BASE_CODE_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { LoadingView } from '../../components/Loading'
 
 interface FilesViewProps {
   filePath: string
@@ -64,7 +65,9 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
       </div>
 
       <div className="bg-background min-h-0 flex-1 overflow-auto">
-        {isLoading ? null : error ? (
+        {isLoading ? (
+          <LoadingView label="Loading file..." />
+        ) : error ? (
           <div className="px-4 py-6">
             <p className="text-foreground text-sm font-medium">File unavailable</p>
             <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>

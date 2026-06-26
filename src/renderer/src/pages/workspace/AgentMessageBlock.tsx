@@ -28,6 +28,26 @@ export function eventHasVisibleResponse(event: AgentStreamEvent): boolean {
   return false
 }
 
+// One-line label for a tool use shown in the collapsed "thinking" accordion.
+export function getThinkingStepLabel(name: string, input: Record<string, unknown>): string {
+  switch (name) {
+    case 'Bash':
+      return typeof input.command === 'string' ? `${input.command.slice(0, 60)}` : name
+    case 'Read':
+      return typeof input.file_path === 'string' ? `Reading ${input.file_path.split('/').pop()}` : name
+    case 'Grep':
+      return typeof input.pattern === 'string' ? `Searching for "${input.pattern}"` : name
+    case 'Glob':
+      return typeof input.pattern === 'string' ? `Finding files: ${input.pattern}` : name
+    case 'Edit':
+      return typeof input.file_path === 'string' ? `Editing ${input.file_path.split('/').pop()}` : name
+    case 'Write':
+      return typeof input.file_path === 'string' ? `Writing ${input.file_path.split('/').pop()}` : name
+    default:
+      return name
+  }
+}
+
 export function UserBubble({
   text,
   markdown,

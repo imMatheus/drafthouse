@@ -369,7 +369,6 @@ const api = {
       files?: string[]
     ): Promise<unknown> => ipcRenderer.invoke('agent:continue', sessionId, cliSessionId, cwd, prompt, files),
     stop: (sessionId: string): Promise<unknown> => ipcRenderer.invoke('agent:stop', sessionId),
-    listSessions: (): Promise<unknown> => ipcRenderer.invoke('agent:list-sessions'),
     onEvent: (callback: (data: { sessionId: string; event: unknown }) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, data: { sessionId: string; event: unknown }): void => callback(data)
       ipcRenderer.on('agent:event', listener)

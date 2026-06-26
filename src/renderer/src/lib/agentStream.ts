@@ -38,6 +38,9 @@ export function mergePartialMessage(
     const existing = content[sub.index]
     if (sub.delta.type === 'text_delta' && existing?.type === 'text') {
       content[sub.index] = { ...existing, text: existing.text + sub.delta.text }
+    } else if (sub.delta.type === 'input_json_delta' && existing?.type === 'tool_use') {
+      // Tool inputs stream as JSON fragments; buffer them and parse at block stop.
+      content[sub.index] = { ...existing, partialJson: (existing.partialJson ?? '') + sub.delta.partial_json }
     }
   } else if (sub.type === 'message_delta') {
     const updated: AgentStreamAssistant = {
@@ -45,7 +48,20 @@ export function mergePartialMessage(
       message: { ...last.message, content, stop_reason: sub.delta.stop_reason }
     }
     return [...events.slice(0, lastIdx), updated]
-  } else if (sub.type === 'content_block_stop' || sub.type === 'message_stop') {
+  } else if (sub.type === 'content_block_stop') {
+    const existing = content[sub.index]
+    if (existing?.type !== 'tool_use' || existing.partialJson === undefined) return events
+    try {
+      content[sub.index] = {
+        type: 'tool_use',
+        id: existing.id,
+        name: existing.name,
+        input: JSON.parse(existing.partialJson) as Record<string, unknown>
+      }
+    } catch {
+      return events
+    }
+  } else if (sub.type === 'message_stop') {
     return events
   }
 

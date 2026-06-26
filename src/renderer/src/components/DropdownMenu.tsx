@@ -35,7 +35,7 @@ export const Item = forwardRef<ElementRef<typeof RadixDropdownMenu.Item>, ItemPr
     <RadixDropdownMenu.Item
       ref={ref}
       className={cn(
-        'flex w-full cursor-pointer items-center px-3 py-1.5 text-left text-xs transition-colors outline-none select-none',
+        'flex w-full rounded-sm cursor-pointer items-center px-3 py-1.5 text-left text-xs transition-colors outline-none select-none',
         'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
         variant === 'danger'
           ? 'text-danger data-[highlighted]:bg-surface-hover'

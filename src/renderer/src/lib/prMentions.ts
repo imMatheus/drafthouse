@@ -235,11 +235,12 @@ export function splitTextIntoMentionSegments(text: string): MentionSegment[] {
 }
 
 /**
- * Removes every `@prN` occurrence of the given PR number from the text,
- * collapsing any resulting doubled spaces. Used when the user clicks the
- * X on a PR pill above the prompt bar.
+ * Removes every `@prN` occurrence of the given PR number from the text. Only
+ * whitespace adjacent to the removed mention is collapsed — intentional spacing
+ * elsewhere in the prompt is preserved. Used when the user clicks the X on a PR
+ * pill above the prompt bar.
  */
 export function removePRMention(text: string, prNumber: number): string {
-  const re = new RegExp(`\\s?@pr${prNumber}\\b`, 'gi')
-  return text.replace(re, '').replace(/  +/g, ' ')
+  const re = new RegExp(`\\s*@pr${prNumber}\\b\\s*`, 'gi')
+  return text.replace(re, ' ').trim()
 }

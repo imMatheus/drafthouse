@@ -3,7 +3,7 @@ import { ChevronRight, FileCode, FileText, GitBranch } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import AgentSpinner from './AgentSpinner'
 import type { AgentContext, AgentSessionMeta, AgentStreamEvent, AgentStreamResult } from '../../../../shared/types'
-import AgentMessageBlock from './AgentMessageBlock'
+import AgentMessageBlock, { getThinkingStepLabel } from './AgentMessageBlock'
 import HighlightedMentionText from '../../components/HighlightedMentionText'
 import MessagePRMentions from '../../components/MessagePRMentions'
 import PRStateIcon from '../../components/PRStateIcon'
@@ -14,38 +14,35 @@ import { getPathBasename, isImageFile } from '../../lib/path'
 // Tool calls that render inline as part of the response (not hidden in the thinking accordion)
 const VISIBLE_TOOL_NAMES = new Set(['Edit'])
 
-function getThinkingStepLabel(name: string, input: Record<string, unknown>): string {
-  switch (name) {
-    case 'Bash':
-      return typeof input.command === 'string' ? `${input.command.slice(0, 60)}` : name
-    case 'Read':
-      return typeof input.file_path === 'string' ? `Reading ${(input.file_path as string).split('/').pop()}` : name
-    case 'Grep':
-      return typeof input.pattern === 'string' ? `Searching for "${input.pattern}"` : name
-    case 'Glob':
-      return typeof input.pattern === 'string' ? `Finding files: ${input.pattern}` : name
-    case 'Edit':
-      return typeof input.file_path === 'string' ? `Editing ${(input.file_path as string).split('/').pop()}` : name
-    case 'Write':
-      return typeof input.file_path === 'string' ? `Writing ${(input.file_path as string).split('/').pop()}` : name
-    default:
-      return name
-  }
-}
-
 interface AgentConversationProps {
   session: AgentSessionMeta
 }
 
 export default function AgentConversation({ session }: AgentConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isAtBottomRef = useRef(true)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const isRunning = session.status === 'running'
   const events = useAgentSessionEvents(session.id)
 
+  // Changes as streamed content grows (not only when new events are appended),
+  // so autoscroll follows text/tool streaming rather than just new blocks.
+  let streamCharCount = 0
+  for (const event of events) {
+    if (event.type === 'assistant') {
+      for (const b of event.message.content) {
+        if (b.type === 'text') streamCharCount += b.text.length
+        else if (b.type === 'tool_use') streamCharCount += b.partialJson?.length ?? 0
+      }
+    }
+  }
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [events.length])
+    if (isAtBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' })
+    }
+  }, [events.length, streamCharCount])
 
   // Separate thinking steps from the final response
   const thinkingEvents: AgentStreamEvent[] = []
@@ -133,7 +130,14 @@ export default function AgentConversation({ session }: AgentConversationProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div
+      ref={scrollContainerRef}
+      onScroll={(e) => {
+        const el = e.currentTarget
+        isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+      }}
+      className="flex-1 overflow-y-auto"
+    >
       <div className="mx-auto max-w-3xl px-6 py-6">
         {session.context ? <AgentContextBox context={session.context} /> : null}
 

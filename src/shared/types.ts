@@ -282,7 +282,6 @@ export interface PullRequestDetail extends PullRequest {
   node_id: string
   body: string | null
   merged: boolean
-  draft: boolean
   mergeable: boolean | null
   mergeable_state: string
   additions: number
@@ -299,18 +298,6 @@ export interface PullRequestDetail extends PullRequest {
     label: string
     sha: string
   }
-  labels: {
-    name: string
-    color: string
-  }[]
-  assignees: {
-    login: string
-    avatar_url: string
-  }[]
-  requested_reviewers: {
-    login: string
-    avatar_url: string
-  }[]
 }
 
 export interface CreatePullRequestInput {
@@ -411,11 +398,6 @@ export type GitErrorKind =
   | 'origin-mismatch'
   | 'refs-unavailable'
   | 'unknown'
-
-export interface GitErrorPayload {
-  kind: GitErrorKind
-  message: string
-}
 
 export type PullRequestMergeMethod = 'merge' | 'squash' | 'rebase'
 
@@ -566,13 +548,6 @@ export interface AgentContext {
 
 export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'
 
-export interface AgentSessionSummary {
-  id: string
-  prompt: string
-  status: AgentSessionStatus
-  startedAt: number
-}
-
 // Content blocks within assistant messages
 export interface AgentContentBlockText {
   type: 'text'
@@ -584,6 +559,9 @@ export interface AgentContentBlockToolUse {
   id: string
   name: string
   input: Record<string, unknown>
+  // Raw accumulator for `input_json_delta` chunks while streaming; parsed into
+  // `input` on `content_block_stop`. Absent on finalized (non-streaming) blocks.
+  partialJson?: string
 }
 
 export interface AgentContentBlockToolResult {
@@ -702,11 +680,4 @@ export interface AgentSessionMeta {
   cliSessionId: string | null
   files: string[]
   context?: AgentContext
-}
-
-// Renderer-side agent session with accumulated events. Kept for components
-// that still receive a combined view (e.g. persistence); prefer AgentSessionMeta
-// + useAgentSessionEvents(id) at the boundary of re-render-sensitive trees.
-export interface AgentSession extends AgentSessionMeta {
-  events: AgentStreamEvent[]
 }

@@ -42,6 +42,7 @@ import type {
   PullRequestReviewThreadSummary
 } from '../../../../shared/types'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
 import { FolderIcon } from '../../components/FileIcon'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ReactionBar from '../../components/ReactionBar'
@@ -820,7 +821,7 @@ export default function PRFilesTab({
         {showViewer ? (
           <>
             <DiffSidebar
-              className="hidden w-[280px] shrink-0 md:flex"
+              className="flex w-[280px] shrink-0"
               sidebarTab={sidebarTab}
               onSidebarTabChange={setSidebarTab}
               filterValue={filterValue}
@@ -1360,13 +1361,8 @@ function FileDiffHeader({
   collapsed: boolean
   onToggleCollapse: () => void
 }) {
-  const [pathCopied, setPathCopied] = useState(false)
-
-  const handleCopyPath = (): void => {
-    navigator.clipboard.writeText(file.filename).catch(() => {})
-    setPathCopied(true)
-    setTimeout(() => setPathCopied(false), 1500)
-  }
+  const { copied: pathCopied, copy: copyPath } = useCopyToClipboard()
+  const handleCopyPath = (): void => copyPath(file.filename)
 
   return (
     <div className="bg-surface flex h-11 items-center gap-2 px-3">
@@ -2154,13 +2150,8 @@ function ChangedFileDiffCardInner({
   const { theme } = useTheme()
 
   const [isCollapsed, setIsCollapsed] = useState(false)
-  const [pathCopied, setPathCopied] = useState(false)
-
-  const handleCopyPath = (): void => {
-    navigator.clipboard.writeText(file.filename).catch(() => {})
-    setPathCopied(true)
-    setTimeout(() => setPathCopied(false), 1500)
-  }
+  const { copied: pathCopied, copy: copyPath } = useCopyToClipboard()
+  const handleCopyPath = (): void => copyPath(file.filename)
 
   const hasRenderablePatch = !!file.patch
 

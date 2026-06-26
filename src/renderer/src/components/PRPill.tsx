@@ -1,19 +1,7 @@
-import { useEffect, useState } from 'react'
-import type { PullRequestDetail } from '../../../shared/types'
+import { useQuery } from '@tanstack/react-query'
 import { prStateLabel, type PRState } from '../lib/prMentions'
 import PRStateIcon from './PRStateIcon'
 import { cn } from '../lib/cn'
-
-const cache = new Map<string, Promise<PullRequestDetail | null>>()
-
-function loadPR(owner: string, repo: string, number: number): Promise<PullRequestDetail | null> {
-  const key = `${owner}/${repo}#${number}`
-  const existing = cache.get(key)
-  if (existing) return existing
-  const promise = window.api.github.pulls.get(owner, repo, number).catch(() => null)
-  cache.set(key, promise)
-  return promise
-}
 
 const PR_URL_REGEX = /^https?:\/\/(?:www\.)?github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)(?:[/#?].*)?$/i
 
@@ -33,17 +21,10 @@ interface PRPillProps {
 }
 
 export default function PRPill({ owner, repo, number, href, onClick }: PRPillProps) {
-  const [pr, setPr] = useState<PullRequestDetail | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    loadPR(owner, repo, number).then((result) => {
-      if (!cancelled) setPr(result)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [owner, repo, number])
+  const { data: pr } = useQuery({
+    queryKey: ['pr-pill', owner, repo, number],
+    queryFn: () => window.api.github.pulls.get(owner, repo, number)
+  })
 
   const state: PRState = pr ? prStateLabel(pr) : 'open'
   const title = pr?.title

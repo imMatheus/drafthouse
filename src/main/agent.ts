@@ -2,7 +2,7 @@ import { app, ipcMain, type WebContents } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
 import { readFileSync } from 'fs'
-import type { AgentSessionSummary, AgentStreamEvent } from '../shared/types'
+import type { AgentStreamEvent } from '../shared/types'
 
 interface AgentProcess {
   id: string
@@ -130,14 +130,15 @@ function wireChildProcess(child: ChildProcess, sessionId: string): void {
 
   child.on('error', (err) => {
     const session = sessions.get(sessionId)
-    if (session) {
-      session.status = 'error'
-      sendAgentEvent(session, {
-        type: 'system',
-        subtype: 'error',
-        message: `Failed to start agent: ${err.message}`
-      })
-    }
+    if (!session) return
+    session.status = 'error'
+    sendAgentEvent(session, {
+      type: 'system',
+      subtype: 'error',
+      message: `Failed to start agent: ${err.message}`
+    })
+    // Spawn failed: 'exit' may never fire, so release the session here.
+    sessions.delete(sessionId)
   })
 
   child.on('exit', (code) => {
@@ -154,16 +155,23 @@ function wireChildProcess(child: ChildProcess, sessionId: string): void {
     }
 
     const session = sessions.get(sessionId)
-    if (!session || session.status === 'cancelled') return
+    if (!session) return
 
-    session.status = code === 0 ? 'completed' : 'error'
-    if (code !== 0) {
-      sendAgentEvent(session, {
-        type: 'system',
-        subtype: 'exit',
-        message: `Process exited with code ${code}`
-      })
+    // Only finalize sessions still running — cancelled (via stop) and errored
+    // (via the error handler) sessions keep their status.
+    if (session.status === 'running') {
+      session.status = code === 0 ? 'completed' : 'error'
+      if (code !== 0) {
+        sendAgentEvent(session, {
+          type: 'system',
+          subtype: 'exit',
+          message: `Process exited with code ${code}`
+        })
+      }
     }
+
+    // Terminal state reached — drop the child/webContents references.
+    sessions.delete(sessionId)
   })
 }
 
@@ -179,7 +187,6 @@ export function startAgentSession(
 
   const child = spawn('claude', buildCliArgs({ prompt: fullPrompt, appendSystemPrompt }), {
     cwd,
-    env: { ...process.env },
     stdio: ['pipe', 'pipe', 'pipe']
   })
 
@@ -207,20 +214,31 @@ export function continueAgentSession(
   files: string[] | undefined,
   webContents: WebContents
 ): void {
+  // A prior turn for this session may still be running (rapid re-submit); kill
+  // it before starting a new child so we never leak an untracked process.
   const existingSession = sessions.get(existingSessionId)
+  if (existingSession && existingSession.status === 'running') {
+    existingSession.childProcess.kill('SIGTERM')
+  }
+
   const fullPrompt = buildPromptWithFiles(prompt, files)
 
   const child = spawn('claude', buildCliArgs({ prompt: fullPrompt, resumeSessionId: cliSessionId }), {
     cwd,
-    env: { ...process.env },
     stdio: ['pipe', 'pipe', 'pipe']
   })
 
-  if (existingSession) {
-    existingSession.childProcess = child
-    existingSession.status = 'running'
-    existingSession.webContents = webContents
-  }
+  // Create-or-replace: the previous entry is dropped once its turn exits, so we
+  // always re-register a fresh entry rather than relying on one existing.
+  sessions.set(existingSessionId, {
+    id: existingSessionId,
+    prompt,
+    cwd,
+    status: 'running',
+    startedAt: Date.now(),
+    childProcess: child,
+    webContents
+  })
 
   wireChildProcess(child, existingSessionId)
 }
@@ -243,19 +261,6 @@ export function registerAgentHandlers(): void {
 
     session.status = 'cancelled'
     session.childProcess.kill('SIGTERM')
-  })
-
-  ipcMain.handle('agent:list-sessions', () => {
-    const summaries: AgentSessionSummary[] = []
-    for (const session of sessions.values()) {
-      summaries.push({
-        id: session.id,
-        prompt: session.prompt,
-        status: session.status,
-        startedAt: session.startedAt
-      })
-    }
-    return summaries
   })
 
   app.on('before-quit', () => {

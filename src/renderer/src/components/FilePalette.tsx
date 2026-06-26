@@ -131,7 +131,7 @@ export default function FilePalette({ open, onOpenChange, folderPath, onOpenFile
   const [search, setSearch] = useState('')
   const strippedQuery = search.replace(/\s+/g, '')
 
-  const { data: files } = useQuery<string[]>({
+  const { data: files, isLoading: filesLoading } = useQuery<string[]>({
     queryKey: ['read-dir-recursive', folderPath],
     queryFn: () => window.api.fs.readDirRecursive(folderPath),
     enabled: open,
@@ -165,7 +165,9 @@ export default function FilePalette({ open, onOpenChange, folderPath, onOpenFile
       />
 
       <Command.List className="max-h-[420px] overflow-y-auto p-2">
-        <Command.Empty className="text-foreground-subtle py-6 text-center text-xs">No files found.</Command.Empty>
+        <Command.Empty className="text-foreground-subtle py-6 text-center text-xs">
+          {filesLoading ? 'Loading…' : 'No files found.'}
+        </Command.Empty>
 
         {matchedFiles.map((match) => {
           const basename = getPathBasename(match.path)

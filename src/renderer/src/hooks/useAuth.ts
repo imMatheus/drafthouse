@@ -30,15 +30,25 @@ export function useAuthProvider(): AuthContextValue {
   })
 
   useEffect(() => {
-    window.api.auth.getUser().then((data) => {
-      setState((s) => ({ ...s, user: data?.user ?? null, loading: false }))
-    })
+    let cancelled = false
+    window.api.auth
+      .getUser()
+      .then((data) => {
+        if (!cancelled) setState((s) => ({ ...s, user: data?.user ?? null, loading: false }))
+      })
+      .catch(() => {
+        // Never leave the app stuck on the loading screen if the IPC call fails.
+        if (!cancelled) setState((s) => ({ ...s, loading: false }))
+      })
 
     const unsubscribe = window.api.auth.onDeviceCode(({ userCode }) => {
       setState((s) => ({ ...s, deviceCode: userCode }))
     })
 
-    return unsubscribe
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [])
 
   const login = async (): Promise<void> => {

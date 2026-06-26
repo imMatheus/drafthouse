@@ -1,7 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   AgentEvent,
-  AgentSessionSummary,
   AuthData,
   FileEntry,
   GitHubRepo,
@@ -419,7 +418,6 @@ interface AgentAPI {
   start: (cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string) => Promise<{ sessionId: string }>
   continue: (sessionId: string, cliSessionId: string, cwd: string, prompt: string, files?: string[]) => Promise<void>
   stop: (sessionId: string) => Promise<void>
-  listSessions: () => Promise<AgentSessionSummary[]>
   onEvent: (callback: (data: AgentEvent) => void) => () => void
 }
 

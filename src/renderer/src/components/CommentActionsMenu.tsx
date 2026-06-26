@@ -42,6 +42,7 @@ export default function CommentActionsMenu({
   onQuoteReply
 }: CommentActionsMenuProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [isHiding, setIsHiding] = useState(false)
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -80,10 +81,19 @@ export default function CommentActionsMenu({
     }
   }
 
+  // Two-step inline confirm (first select arms it and keeps the menu open via
+  // preventDefault; second select deletes) — avoids a jarring native confirm().
+  const handleDeleteSelect = (event: Event): void => {
+    if (!confirmingDelete) {
+      event.preventDefault()
+      setConfirmingDelete(true)
+      return
+    }
+    void handleDelete()
+  }
+
   const handleDelete = async (): Promise<void> => {
     if (isDeleting) return
-    const confirmed = window.confirm('Delete this comment? This cannot be undone.')
-    if (!confirmed) return
     setIsDeleting(true)
     try {
       if (commentType === 'issue-comment') {
@@ -100,7 +110,11 @@ export default function CommentActionsMenu({
   }
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root
+      onOpenChange={(open) => {
+        if (!open) setConfirmingDelete(false)
+      }}
+    >
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
@@ -123,8 +137,8 @@ export default function CommentActionsMenu({
             <DropdownMenu.Item onSelect={handleHide} disabled={isHiding}>
               {isHiding ? 'Hiding...' : 'Hide'}
             </DropdownMenu.Item>
-            <DropdownMenu.Item variant="danger" onSelect={handleDelete} disabled={isDeleting}>
-              {isDeleting ? 'Deleting...' : 'Delete'}
+            <DropdownMenu.Item variant="danger" onSelect={handleDeleteSelect} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : confirmingDelete ? 'Click again to delete' : 'Delete'}
             </DropdownMenu.Item>
           </>
         ) : null}

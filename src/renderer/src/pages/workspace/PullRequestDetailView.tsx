@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bold,
   Check,
   ChevronDown,
-  Code,
   Copy,
   ExternalLink,
   Eye,
@@ -13,14 +11,8 @@ import {
   GitCommit,
   GitMerge,
   GitPullRequest,
-  Heading,
-  Italic,
-  Link,
-  List,
-  ListOrdered,
   MessageSquare,
-  Pencil,
-  Quote
+  Pencil
 } from 'lucide-react'
 import type {
   AgentContext,
@@ -65,8 +57,11 @@ import {
   buildPullRequestReviewThreads,
   DiffStat,
   formatRelativeTime,
+  getCommitSubject,
   type PullRequestReviewThread
 } from './pullRequestShared'
+import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
+import MarkdownToolbar from '../../components/MarkdownToolbar'
 
 interface PullRequestDetailViewProps {
   owner: string
@@ -101,7 +96,7 @@ export default function PullRequestDetailView({
   onStopAgent,
   onPromoteAgent
 }: PullRequestDetailViewProps) {
-  const [headBranchCopied, setHeadBranchCopied] = useState(false)
+  const { copied: headBranchCopied, copy: copyBranch } = useCopyToClipboard()
   const [draftReviewComments, setDraftReviewComments] = useState<PullRequestReviewDraftComment[]>([])
   const [threadJumpTarget, setThreadJumpTarget] = useState<{
     path: string
@@ -232,12 +227,7 @@ export default function PullRequestDetailView({
           <Tooltip label={headBranchCopied ? 'Copied' : 'Copy branch name'} side="top">
             <button
               type="button"
-              onClick={() => {
-                void navigator.clipboard.writeText(pr.head.ref).then(() => {
-                  setHeadBranchCopied(true)
-                  setTimeout(() => setHeadBranchCopied(false), 1500)
-                })
-              }}
+              onClick={() => copyBranch(pr.head.ref)}
               className="text-foreground-subtle hover:bg-interactive hover:text-foreground ml-1 inline-flex size-5 items-center justify-center rounded align-middle transition-[background-color,color,transform] active:scale-[0.96]"
               aria-label="Copy branch name"
             >
@@ -770,19 +760,9 @@ function CommitTimelineRow({
   resolvedAuthors: PullRequestCommitAuthors | undefined
   onOpenCommit: (sha: string, title?: string) => void
 }) {
-  const subject = commit.commit.message.split('\n')[0]?.trim() || 'Untitled commit'
+  const subject = getCommitSubject(commit.commit.message)
   const actors = getCommitActors(commit, resolvedAuthors)
-  const [isCopied, setIsCopied] = useState(false)
-
-  const handleCopySha = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(commit.sha)
-      setIsCopied(true)
-      window.setTimeout(() => setIsCopied(false), 1500)
-    } catch (error) {
-      console.error('Failed to copy commit SHA:', error)
-    }
-  }
+  const { copied: isCopied, copy: copySha } = useCopyToClipboard()
 
   return (
     <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-3">
@@ -807,7 +787,7 @@ function CommitTimelineRow({
           <Tooltip label={isCopied ? 'Copied' : 'Copy SHA'} side="top">
             <button
               type="button"
-              onClick={handleCopySha}
+              onClick={() => copySha(commit.sha)}
               className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-6 items-center justify-center rounded transition-colors"
               aria-label={isCopied ? 'Copied SHA' : 'Copy SHA'}
             >
@@ -975,42 +955,6 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
     }
   }
 
-  const wrapSelection = (before: string, after: string, placeholder: string): void => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selected = editBody.substring(start, end)
-    const content = selected || placeholder
-    const newText = editBody.substring(0, start) + before + content + after + editBody.substring(end)
-    setEditBody(newText)
-    requestAnimationFrame(() => {
-      textarea.focus()
-      if (selected) {
-        textarea.setSelectionRange(start + before.length, start + before.length + content.length)
-      } else {
-        textarea.setSelectionRange(start + before.length, start + before.length + placeholder.length)
-      }
-    })
-  }
-
-  const insertAtLineStart = (prefix: string): void => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const lineStart = editBody.lastIndexOf('\n', start - 1) + 1
-    const newText = editBody.substring(0, lineStart) + prefix + editBody.substring(lineStart)
-    setEditBody(newText)
-    requestAnimationFrame(() => {
-      textarea.focus()
-      const pos = start + prefix.length
-      textarea.setSelectionRange(pos, pos)
-    })
-  }
-
-  const toolbarBtnClass =
-    'rounded p-1.5 text-foreground-muted hover:bg-surface-hover hover:text-foreground transition-colors'
-
   if (isEditing) {
     return (
       <div className="border-border bg-surface rounded-lg border">
@@ -1039,90 +983,7 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
           </div>
 
           {editTab === 'write' ? (
-            <div className="flex items-center gap-0.5">
-              <Tooltip label="Heading" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('### ')}
-                  aria-label="Heading"
-                >
-                  <Heading size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Bold" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('**', '**', 'bold text')}
-                  aria-label="Bold"
-                >
-                  <Bold size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Italic" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('_', '_', 'italic text')}
-                  aria-label="Italic"
-                >
-                  <Italic size={14} />
-                </button>
-              </Tooltip>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Tooltip label="Unordered list" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('- ')}
-                  aria-label="Unordered list"
-                >
-                  <List size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Ordered list" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('1. ')}
-                  aria-label="Ordered list"
-                >
-                  <ListOrdered size={14} />
-                </button>
-              </Tooltip>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Tooltip label="Code" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('`', '`', 'code')}
-                  aria-label="Code"
-                >
-                  <Code size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Link" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('[', '](url)', 'link text')}
-                  aria-label="Link"
-                >
-                  <Link size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Quote" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('> ')}
-                  aria-label="Quote"
-                >
-                  <Quote size={14} />
-                </button>
-              </Tooltip>
-            </div>
+            <MarkdownToolbar textareaRef={textareaRef} value={editBody} onChange={setEditBody} />
           ) : null}
         </div>
 
@@ -1218,39 +1079,6 @@ function CommentBox({
 
   const claudeMention = isClaudeMention(body)
 
-  const wrapSelection = (before: string, after: string, placeholder: string): void => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selected = body.substring(start, end)
-    const content = selected || placeholder
-    const newText = body.substring(0, start) + before + content + after + body.substring(end)
-    setBody(newText)
-    requestAnimationFrame(() => {
-      textarea.focus()
-      if (selected) {
-        textarea.setSelectionRange(start + before.length, start + before.length + content.length)
-      } else {
-        textarea.setSelectionRange(start + before.length, start + before.length + placeholder.length)
-      }
-    })
-  }
-
-  const insertAtLineStart = (prefix: string): void => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const lineStart = body.lastIndexOf('\n', start - 1) + 1
-    const newText = body.substring(0, lineStart) + prefix + body.substring(lineStart)
-    setBody(newText)
-    requestAnimationFrame(() => {
-      textarea.focus()
-      const pos = start + prefix.length
-      textarea.setSelectionRange(pos, pos)
-    })
-  }
-
   const handleSubmit = async (): Promise<void> => {
     if (!body.trim() || isSubmitting) return
 
@@ -1276,9 +1104,6 @@ function CommentBox({
       setIsSubmitting(false)
     }
   }
-
-  const toolbarBtnClass =
-    'rounded p-1.5 text-foreground-muted hover:bg-surface-hover hover:text-foreground transition-colors'
 
   return (
     <div className="mt-2">
@@ -1316,92 +1141,7 @@ function CommentBox({
             </button>
           </div>
 
-          {activeTab === 'write' ? (
-            <div className="flex items-center gap-0.5">
-              <Tooltip label="Heading" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('### ')}
-                  aria-label="Heading"
-                >
-                  <Heading size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Bold" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('**', '**', 'bold text')}
-                  aria-label="Bold"
-                >
-                  <Bold size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Italic" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('_', '_', 'italic text')}
-                  aria-label="Italic"
-                >
-                  <Italic size={14} />
-                </button>
-              </Tooltip>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Tooltip label="Unordered list" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('- ')}
-                  aria-label="Unordered list"
-                >
-                  <List size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Ordered list" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('1. ')}
-                  aria-label="Ordered list"
-                >
-                  <ListOrdered size={14} />
-                </button>
-              </Tooltip>
-              <div className="bg-border mx-1 h-4 w-px" />
-              <Tooltip label="Code" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('`', '`', 'code')}
-                  aria-label="Code"
-                >
-                  <Code size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Link" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => wrapSelection('[', '](url)', 'link text')}
-                  aria-label="Link"
-                >
-                  <Link size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Quote" side="top">
-                <button
-                  type="button"
-                  className={toolbarBtnClass}
-                  onClick={() => insertAtLineStart('> ')}
-                  aria-label="Quote"
-                >
-                  <Quote size={14} />
-                </button>
-              </Tooltip>
-            </div>
-          ) : null}
+          {activeTab === 'write' ? <MarkdownToolbar textareaRef={textareaRef} value={body} onChange={setBody} /> : null}
         </div>
 
         {activeTab === 'write' ? (

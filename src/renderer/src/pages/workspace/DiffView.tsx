@@ -4,6 +4,7 @@ import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
 import { BASE_DIFF_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { LoadingView } from '../../components/Loading'
 
 interface DiffViewProps {
   filePath: string
@@ -24,16 +25,16 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
     retry: false
   })
 
-  const { data: modifiedContent, isLoading: isModifiedLoading } = useQuery<string, Error>({
+  const {
+    data: modifiedContent,
+    isLoading: isModifiedLoading,
+    error: modifiedError
+  } = useQuery<string, Error>({
     queryKey: staged ? ['git-show-staged-file', folderPath, filePath] : ['read-file', absolutePath],
     queryFn: () =>
       staged ? window.api.git.showStagedFile(folderPath, filePath) : window.api.fs.readFile(absolutePath),
     retry: false
   })
-
-  if (isOriginalLoading || isModifiedLoading) {
-    return null
-  }
 
   const lang = getLanguageFromPath(filePath)
   const oldFile: FileContents = { name: filePath, contents: originalContent ?? '', lang }
@@ -58,17 +59,26 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <MultiFileDiff
-          key={settings.diffViewMode}
-          oldFile={oldFile}
-          newFile={newFile}
-          options={{
-            ...BASE_DIFF_OPTIONS,
-            themeType: theme,
-            diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
-            disableFileHeader: true
-          }}
-        />
+        {isOriginalLoading || isModifiedLoading ? (
+          <LoadingView label="Loading diff..." />
+        ) : modifiedError ? (
+          <div className="px-4 py-6">
+            <p className="text-foreground text-sm font-medium">Diff unavailable</p>
+            <p className="text-foreground-muted mt-1 text-sm">{modifiedError.message}</p>
+          </div>
+        ) : (
+          <MultiFileDiff
+            key={settings.diffViewMode}
+            oldFile={oldFile}
+            newFile={newFile}
+            options={{
+              ...BASE_DIFF_OPTIONS,
+              themeType: theme,
+              diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
+              disableFileHeader: true
+            }}
+          />
+        )}
       </div>
     </div>
   )

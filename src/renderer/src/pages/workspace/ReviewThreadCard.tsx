@@ -9,6 +9,7 @@ import { BASE_DIFF_OPTIONS, wrapGitPatch } from '../../lib/diffs'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
+import CommentComposer from '../../components/CommentComposer'
 import FixWithClaudeButton from '../../components/FixWithClaudeButton'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ResolveThreadButton from '../../components/ResolveThreadButton'
@@ -327,41 +328,19 @@ function InlineReviewReplyForm({
   }
 
   return (
-    <div className="border-border bg-background rounded-lg border">
-      <textarea
-        value={body}
-        onChange={(event) => onBodyChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault()
-            void handleSubmit()
-          }
-        }}
-        placeholder="Reply to this thread"
-        className="text-foreground placeholder:text-foreground-subtle min-h-24 w-full resize-y bg-transparent px-4 py-3 text-sm focus:outline-none"
-        autoFocus
-      />
-      {errorMessage ? <p className="text-danger px-4 text-sm">{errorMessage}</p> : null}
-      <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
-        <button
-          type="button"
-          onClick={() => {
-            onOpenChange(false)
-            setErrorMessage(null)
-          }}
-          className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!body.trim() || isSubmitting}
-          className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {isSubmitting ? 'Replying...' : 'Reply'}
-        </button>
-      </div>
-    </div>
+    <CommentComposer
+      value={body}
+      onChange={onBodyChange}
+      onSubmit={() => void handleSubmit()}
+      onCancel={() => {
+        onOpenChange(false)
+        setErrorMessage(null)
+      }}
+      submitLabel="Reply"
+      submittingLabel="Replying..."
+      isSubmitting={isSubmitting}
+      placeholder="Reply to this thread"
+      error={errorMessage}
+    />
   )
 }

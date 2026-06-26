@@ -6,30 +6,12 @@ import claudeLogoUrl from '../assets/claude.png'
 import AgentMessageBlock, {
   eventHasVisibleResponse,
   FILE_EDIT_TOOLS,
+  getThinkingStepLabel,
   UserBubble
 } from '../pages/workspace/AgentMessageBlock'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
 import Tooltip from './Tooltip'
 import { useAgentSessionEvents } from '../contexts/AgentSessionsContext'
-
-function getThinkingStepLabel(name: string, input: Record<string, unknown>): string {
-  switch (name) {
-    case 'Bash':
-      return typeof input.command === 'string' ? `${input.command.slice(0, 60)}` : name
-    case 'Read':
-      return typeof input.file_path === 'string' ? `Reading ${(input.file_path as string).split('/').pop()}` : name
-    case 'Grep':
-      return typeof input.pattern === 'string' ? `Searching for "${input.pattern}"` : name
-    case 'Glob':
-      return typeof input.pattern === 'string' ? `Finding files: ${input.pattern}` : name
-    case 'Edit':
-      return typeof input.file_path === 'string' ? `Editing ${(input.file_path as string).split('/').pop()}` : name
-    case 'Write':
-      return typeof input.file_path === 'string' ? `Writing ${(input.file_path as string).split('/').pop()}` : name
-    default:
-      return name
-  }
-}
 
 export default function InlineAgentResponseCard({
   session,

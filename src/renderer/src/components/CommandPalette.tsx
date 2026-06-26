@@ -1,19 +1,12 @@
 import { useState } from 'react'
 import { Command } from 'cmdk'
 import { useQuery } from '@tanstack/react-query'
-import {
-  Check,
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  Plus,
-  Terminal,
-  X
-} from 'lucide-react'
+import { Check, GitPullRequest, Plus, Terminal, X } from 'lucide-react'
 import type { AgentSessionMeta, GitRepoInfo, PullRequest } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
+import PRStateIcon from './PRStateIcon'
+import { prStateLabel } from '../lib/prMentions'
 
 function matchesQuery(text: string, query: string): boolean {
   if (!query) return true
@@ -55,7 +48,7 @@ export default function CommandPalette({
   const [filter, setFilter] = useState<ResourceFilter>('all')
   const [search, setSearch] = useState('')
 
-  const { data: prs } = useQuery<PullRequest[]>({
+  const { data: prs, isLoading: prsLoading } = useQuery<PullRequest[]>({
     queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, 'open'],
     queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: 'open' }),
     enabled: open && gitInfo != null,
@@ -105,7 +98,9 @@ export default function CommandPalette({
       </div>
 
       <Command.List className="max-h-[340px] overflow-y-auto p-2">
-        <Command.Empty className="text-foreground-subtle py-6 text-center text-xs">No results found.</Command.Empty>
+        <Command.Empty className="text-foreground-subtle py-6 text-center text-xs">
+          {prsLoading ? 'Loading…' : 'No results found.'}
+        </Command.Empty>
 
         {showNewAgent ? (
           <Command.Group heading="Actions" className={GROUP_HEADING_CLASSES}>
@@ -135,7 +130,7 @@ export default function CommandPalette({
                 }}
                 className={ITEM_CLASSES}
               >
-                <PrStateIcon state={pr.state} draft={pr.draft} merged={pr.merged_at != null} />
+                <PRStateIcon state={prStateLabel(pr)} size={14} />
                 <span className="text-foreground min-w-0 flex-1 truncate">{pr.title}</span>
                 <span className="text-foreground-subtle shrink-0">#{pr.number}</span>
               </Command.Item>
@@ -192,13 +187,6 @@ function FilterChip({
       {label}
     </button>
   )
-}
-
-function PrStateIcon({ state, draft, merged }: { state: string; draft: boolean; merged: boolean }) {
-  if (merged) return <GitMerge size={14} className="text-purple shrink-0" />
-  if (state === 'closed') return <GitPullRequestClosed size={14} className="text-danger shrink-0" />
-  if (draft) return <GitPullRequestDraft size={14} className="text-foreground-muted shrink-0" />
-  return <GitPullRequest size={14} className="text-success shrink-0" />
 }
 
 function AgentStatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {

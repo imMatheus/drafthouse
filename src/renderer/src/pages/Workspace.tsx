@@ -133,7 +133,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const targetTabId = navState.history[targetIndex]
     skipNextHistoryPushRef.current = true
     setNavState({ ...navState, index: targetIndex })
-    onUpdateSession({ ...session, activeTabId: targetTabId })
+    onUpdateSession({ activeTabId: targetTabId })
   }
 
   const handleGoForward = (): void => {
@@ -142,7 +142,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const targetTabId = navState.history[targetIndex]
     skipNextHistoryPushRef.current = true
     setNavState({ ...navState, index: targetIndex })
-    onUpdateSession({ ...session, activeTabId: targetTabId })
+    onUpdateSession({ activeTabId: targetTabId })
   }
 
   const { data: gitInfo, isLoading: isLoadingGitInfo } = useQuery<GitRepoInfo | null, Error>({
@@ -217,7 +217,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const existingTab = tabs.find((tab) => tab.id === nextTab.id)
 
     onUpdateSession({
-      ...session,
       tabs: existingTab ? tabs : [...tabs, nextTab],
       activeTabId: nextTab.id
     })
@@ -233,7 +232,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
 
     onUpdateSession({
-      ...session,
       activeTabId: tabId
     })
   }
@@ -263,7 +261,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
     if (activeTabId !== tabId) {
       onUpdateSession({
-        ...session,
         tabs: nextTabs
       })
       return
@@ -272,14 +269,13 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const nextActiveTabId = nextTabs[tabIndex - 1]?.id ?? nextTabs[tabIndex]?.id ?? null
 
     onUpdateSession({
-      ...session,
       tabs: nextTabs,
       activeTabId: nextActiveTabId
     })
   }
 
   const handleReorderTabs = (reorderedTabs: WorkspaceTab[]): void => {
-    onUpdateSession({ ...session, tabs: reorderedTabs })
+    onUpdateSession({ tabs: reorderedTabs })
   }
 
   const handleOpenFile = (filePath: string): void => {
@@ -297,7 +293,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const handleToggleSidebar = (panel: 'explorer' | 'source-control' | 'pull-requests' | 'agent'): void => {
     if (activeView === 'settings') {
       onUpdateSession({
-        ...session,
         activeView: 'workspace',
         sidebar: { visible: true, activePanel: panel }
       })
@@ -307,7 +302,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const isActive = sidebar.visible && sidebar.activePanel === panel
 
     onUpdateSession({
-      ...session,
       sidebar: isActive ? { visible: false, activePanel: panel } : { visible: true, activePanel: panel }
     })
   }
@@ -316,7 +310,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const panelToRestore = sidebar.activePanel ?? 'explorer'
 
     onUpdateSession({
-      ...session,
       sidebar: sidebar.visible
         ? { visible: false, activePanel: sidebar.activePanel }
         : { visible: true, activePanel: panelToRestore }
@@ -364,17 +357,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   }
 
   const handleToggleSettings = (): void => {
-    if (activeView === 'settings') {
-      onUpdateSession({
-        ...session,
-        activeView: 'workspace'
-      })
-    } else {
-      onUpdateSession({
-        ...session,
-        activeView: 'settings'
-      })
-    }
+    onUpdateSession({ activeView: activeView === 'settings' ? 'workspace' : 'settings' })
   }
 
   const handleStartAgent = async (prompt: string, files?: string[], context?: AgentContext): Promise<void> => {
@@ -406,7 +389,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const nextTabs = tabs.filter((tab) => !(tab.kind === 'agent' && tab.sessionId === 'new')).concat(newTab)
 
     onUpdateSession({
-      ...session,
       tabs: nextTabs,
       activeTabId: newTab.id
     })
@@ -479,7 +461,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     if (activeView === 'settings') {
       const tabToFocus = emptyAgentTab ?? createAgentTab('new', 'New Session')
       onUpdateSession({
-        ...session,
         activeView: 'workspace',
         tabs: emptyAgentTab ? tabs : [...tabs, tabToFocus],
         activeTabId: tabToFocus.id,
@@ -490,7 +471,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
     if (emptyAgentTab) {
       onUpdateSession({
-        ...session,
         activeTabId: emptyAgentTab.id,
         sidebar: { visible: true, activePanel: 'agent' }
       })
@@ -499,7 +479,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
     const newTab = createAgentTab('new', 'New Session')
     onUpdateSession({
-      ...session,
       tabs: [...tabs, newTab],
       activeTabId: newTab.id,
       sidebar: { visible: true, activePanel: 'agent' }
@@ -514,7 +493,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const handlePullRequestSubviewChange = (tabId: WorkspaceTab['id'], subview: PullRequestSubview): void => {
     onUpdateSession({
-      ...session,
       tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, subview } : tab))
     })
   }
@@ -527,7 +505,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
 
     onUpdateSession({
-      ...session,
       tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, title } : tab))
     })
   }
@@ -543,7 +520,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
 
     onUpdateSession({
-      ...session,
       tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, prState } : tab))
     })
   }
@@ -556,7 +532,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     }
 
     onUpdateSession({
-      ...session,
       tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'commit' ? { ...tab, title } : tab))
     })
   }
@@ -579,10 +554,16 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     openOrFocusTab(createAgentTab(sessionId, tabTitle))
   }
 
+  // Keep the latest close handler in a ref so the IPC listener subscribes once
+  // instead of re-subscribing on every render (handleCloseTab is unmemoized and
+  // the workspace re-renders on agent activity / git polling).
+  const closeActiveTabRef = useRef<() => void>(() => {})
+  closeActiveTabRef.current = () => {
+    if (activeTabId) handleCloseTab(activeTabId)
+  }
   useEffect(() => {
-    if (!activeTabId) return
-    return window.api.fs.onCloseTab(() => handleCloseTab(activeTabId))
-  }, [activeTabId, handleCloseTab])
+    return window.api.fs.onCloseTab(() => closeActiveTabRef.current())
+  }, [])
 
   const changedFileCount = gitStatus?.length ?? 0
 

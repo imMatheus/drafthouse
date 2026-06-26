@@ -117,6 +117,14 @@ export function formatAbsoluteDate(dateStr: string): string {
   }).format(new Date(dateStr))
 }
 
+export function getCommitSubject(message: string | null | undefined): string {
+  return message?.split('\n')[0]?.trim() || 'Untitled commit'
+}
+
+export function getCommitBody(message: string | null | undefined): string {
+  return message?.split('\n').slice(1).join('\n').trim() ?? ''
+}
+
 export function DiffStat({ additions, deletions }: { additions: number; deletions: number }) {
   return (
     <span

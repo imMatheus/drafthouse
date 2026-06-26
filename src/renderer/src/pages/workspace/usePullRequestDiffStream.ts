@@ -28,6 +28,38 @@ class DiffStreamError extends Error {
   }
 }
 
+// Module-level cache of fully-loaded diffs, so navigating away from a PR and
+// back doesn't re-stream and re-parse the whole patch. Keyed by
+// owner/repo/number/headSha, so a new push (new head SHA) naturally misses and
+// refetches. Bounded with simple LRU eviction to cap memory for large diffs.
+interface CachedDiff {
+  items: CodeViewDiffItem<unknown>[]
+  fileMetas: PrDiffFileMeta[]
+  diffStats: PrDiffDiffStats | null
+}
+
+const DIFF_CACHE_MAX = 12
+const diffCache = new Map<string, CachedDiff>()
+
+function readDiffCache(key: string): CachedDiff | undefined {
+  const entry = diffCache.get(key)
+  if (!entry) return undefined
+  // Re-insert to mark as most-recently-used.
+  diffCache.delete(key)
+  diffCache.set(key, entry)
+  return entry
+}
+
+function writeDiffCache(key: string, entry: CachedDiff): void {
+  diffCache.delete(key)
+  diffCache.set(key, entry)
+  while (diffCache.size > DIFF_CACHE_MAX) {
+    const oldest = diffCache.keys().next().value
+    if (oldest === undefined) break
+    diffCache.delete(oldest)
+  }
+}
+
 interface UsePullRequestDiffStreamArgs<TMeta> {
   owner: string
   repo: string
@@ -85,15 +117,39 @@ export function usePullRequestDiffStream<TMeta>({
     const isCurrent = (): boolean => requestIdRef.current === requestId
     const blobUrlBase = `https://github.com/${owner}/${repo}/blob/${headSha}`
     const cacheKeyPrefix = `${owner}/${repo}/${number}/${headSha}`
+    setViewerKey(requestId)
+    setErrorMessage(null)
+
+    // Cache hit: restore the fully-parsed diff without touching the network.
+    const cached = readDiffCache(cacheKeyPrefix)
+    if (cached) {
+      const items = cached.items as CodeViewDiffItem<TMeta>[]
+      prepareItemsRef.current(items)
+      setInitialItems(items)
+      setFileMetas(cached.fileMetas)
+      setDiffStats(cached.diffStats)
+      setItemsRevision((revision) => revision + 1)
+      setLoadState('ready')
+      return () => {
+        requestIdRef.current++
+      }
+    }
+
     const accumulator = createPrDiffAccumulator<TMeta>()
 
-    setViewerKey(requestId)
     setInitialItems([])
     setFileMetas([])
     setDiffStats(null)
     setItemsRevision(0)
-    setErrorMessage(null)
     setLoadState('streaming')
+
+    const commitToCache = (): void => {
+      writeDiffCache(cacheKeyPrefix, {
+        items: accumulator.items.slice(),
+        fileMetas: accumulator.fileMetas.slice(),
+        diffStats: { ...accumulator.diffStats }
+      })
+    }
 
     let cancelStream: (() => void) | null = null
     let streamController: ReadableStreamDefaultController<Uint8Array> | null = null
@@ -188,7 +244,9 @@ export function usePullRequestDiffStream<TMeta>({
         await ingestFile(wrapGitPatch(file.filename, file.patch), accumulator.fileIndex)
       }
       flush()
-      if (isCurrent()) setLoadState('ready')
+      if (!isCurrent()) return
+      commitToCache()
+      setLoadState('ready')
     }
 
     const run = async (): Promise<void> => {
@@ -196,6 +254,7 @@ export function usePullRequestDiffStream<TMeta>({
         await streamGitPatchFiles(buildStream(), (fileText) => ingestFile(fileText, accumulator.fileIndex))
         if (!isCurrent()) return
         flush()
+        commitToCache()
         setLoadState('ready')
       } catch (error) {
         if (!isCurrent()) return
@@ -237,7 +296,10 @@ export function usePullRequestDiffStream<TMeta>({
     itemsRevision,
     loadState,
     errorMessage,
-    retry: () => setLoadAttempt((attempt) => attempt + 1)
+    retry: () => {
+      diffCache.delete(`${owner}/${repo}/${number}/${headSha}`)
+      setLoadAttempt((attempt) => attempt + 1)
+    }
   }
 }
 

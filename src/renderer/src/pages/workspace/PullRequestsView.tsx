@@ -13,7 +13,9 @@ import {
 } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../../shared/types'
+import { filterPullRequests } from '../../lib/pullRequestFilter'
 import { formatRelativeTime } from './pullRequestShared'
+import * as DropdownMenu from '../../components/DropdownMenu'
 import PlaceholderView from './PlaceholderView'
 import Loading from '../../components/Loading'
 
@@ -36,7 +38,6 @@ export default function PullRequestsView({
   const [stateFilter, setStateFilter] = useState<PrStateFilter>('open')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('newest')
-  const [isSortOpen, setIsSortOpen] = useState(false)
 
   const {
     data: prs,
@@ -126,42 +127,28 @@ export default function PullRequestsView({
             </button>
           </div>
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsSortOpen(!isSortOpen)}
-              className="text-foreground-muted hover:text-foreground inline-flex items-center gap-1.5 text-sm"
-            >
-              <ArrowDownUp size={14} />
-              Sort
-            </button>
-            {isSortOpen ? (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setIsSortOpen(false)} />
-                <div className="border-border bg-surface absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-lg border shadow-xl">
-                  <div className="border-border text-foreground-muted border-b px-3 py-2 text-xs font-medium">
-                    Sort by
-                  </div>
-                  {SORT_OPTIONS.map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => {
-                        setSortKey(option.key)
-                        setIsSortOpen(false)
-                      }}
-                      className="text-foreground hover:bg-surface-hover flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
-                    >
-                      <span className="inline-flex size-4 items-center justify-center">
-                        {sortKey === option.key ? <Check size={13} /> : null}
-                      </span>
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </div>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                className="text-foreground-muted hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+              >
+                <ArrowDownUp size={14} />
+                Sort
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="end" className="w-56">
+              <DropdownMenu.Label>Sort by</DropdownMenu.Label>
+              {SORT_OPTIONS.map((option) => (
+                <DropdownMenu.Item key={option.key} onSelect={() => setSortKey(option.key)} className="gap-2">
+                  <span className="inline-flex size-4 items-center justify-center">
+                    {sortKey === option.key ? <Check size={13} /> : null}
+                  </span>
+                  {option.label}
+                </DropdownMenu.Item>
+              ))}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
         </div>
 
         {isLoading ? (
@@ -293,20 +280,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 ]
 
 function filterAndSort(prs: PullRequest[], query: string, sort: SortKey): PullRequest[] {
-  let result = prs
-
-  if (query.trim()) {
-    const lower = query.toLowerCase()
-    result = result.filter(
-      (pr) =>
-        pr.title.toLowerCase().includes(lower) ||
-        pr.user.login.toLowerCase().includes(lower) ||
-        String(pr.number).includes(lower) ||
-        pr.labels.some((l) => l.name.toLowerCase().includes(lower))
-    )
-  }
-
-  const sorted = [...result]
+  const sorted = [...filterPullRequests(prs, query)]
   switch (sort) {
     case 'newest':
       sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())

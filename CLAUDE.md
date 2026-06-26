@@ -16,15 +16,21 @@ All colors in the frontend must use the token-based design system defined in `sr
 - `border` — borders and dividers
 - `interactive` / `interactive-hover` — secondary buttons, clickable elements
 - `accent` / `accent-hover` — primary CTA buttons, key actions
+- `accent-bg` — subtle accent-tinted background (e.g. agent prompt bubbles)
+- `accent-foreground` — text/icons placed on an `accent` background
 - `success` — positive states (open PRs, confirmations)
+- `success-foreground` — text/icons placed on a `success` background
 - `danger` — destructive/negative states (closed PRs, errors, deletions)
+- `danger-foreground` — text/icons placed on a `danger` background
 - `purple` — merged state (merged PRs)
 
 ## Code Rendering
 
-Use Monaco Editor (`@monaco-editor/react`) for interactive code viewing and diff rendering. The configuration is in `src/renderer/src/lib/monaco.ts` with custom themes (`drafthouse-dark`/`drafthouse-light`). Use `Editor` for file viewing, `DiffEditor` for diffs. For PR diffs with inline comments, use the `MonacoDiffWithComments` component which leverages Monaco's view zone API. Detect the language from file paths with `getMonacoLanguage` (or `getLanguageFromPath` from shiki.ts).
+Use `@pierre/diffs` for all code viewing and diff rendering — this project does **not** use Monaco or Shiki. Shared configuration lives in `src/renderer/src/lib/diffs.ts`: the `drafthouse-dark`/`drafthouse-light` themes (`DIFFS_THEMES`), `BASE_DIFF_OPTIONS` / `BASE_CODE_OPTIONS`, and the helpers `getLanguageFromPath`, `wrapGitPatch`, and `syntheticFilenameForLang`. React components come from `@pierre/diffs/react` (e.g. `MultiFileDiff`, `File`); the diff worker pool is wired up by `WorkerPoolProvider` (`@pierre/diffs/worker`).
 
-Use `shiki` for non-interactive code highlighting only: `AgentEditDiffBlock.tsx` (agent edit diffs) and `MarkdownBody.tsx` (markdown code blocks). The Shiki highlighter is configured in `src/renderer/src/lib/shiki.ts`.
+- File viewing / single-file diffs: `DiffView.tsx`, `FilesView.tsx`.
+- Agent edit diffs: `AgentEditDiffBlock.tsx`. Markdown code blocks: `MarkdownBody.tsx`. Inline review threads: `ReviewThreadCard.tsx`.
+- Streamed PR diffs with inline comments: `PRFilesTab.tsx`, backed by `usePullRequestDiffStream.ts` and `prDiffAccumulator.ts` (accumulates streamed file diffs into `@pierre/diffs` CodeView items).
 
 ## Icons
 

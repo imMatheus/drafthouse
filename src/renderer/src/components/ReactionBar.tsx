@@ -27,6 +27,7 @@ interface ReactionBarProps {
 
 export default function ReactionBar({ owner, repo, commentId, commentType }: ReactionBarProps) {
   const [showPicker, setShowPicker] = useState(false)
+  const [pending, setPending] = useState(false)
   const queryClient = useQueryClient()
 
   const queryKey = ['reactions', owner, repo, commentType, commentId]
@@ -70,20 +71,26 @@ export default function ReactionBar({ owner, repo, commentId, commentType }: Rea
   }
 
   const handleToggleReaction = async (content: ReactionContent): Promise<void> => {
-    const existing = grouped.get(content)
+    if (pending) return
+    setPending(true)
+    try {
+      const existing = grouped.get(content)
 
-    if (existing?.reacted && existing.reactionId) {
-      await window.api.github.reactions.delete(owner, repo, existing.reactionId)
-    } else {
-      if (commentType === 'issue-comment') {
-        await window.api.github.reactions.createForIssueComment(owner, repo, commentId, content)
+      if (existing?.reacted && existing.reactionId) {
+        await window.api.github.reactions.delete(owner, repo, existing.reactionId)
       } else {
-        await window.api.github.reactions.createForPullComment(owner, repo, commentId, content)
+        if (commentType === 'issue-comment') {
+          await window.api.github.reactions.createForIssueComment(owner, repo, commentId, content)
+        } else {
+          await window.api.github.reactions.createForPullComment(owner, repo, commentId, content)
+        }
       }
-    }
 
-    await queryClient.invalidateQueries({ queryKey })
-    setShowPicker(false)
+      await queryClient.invalidateQueries({ queryKey })
+    } finally {
+      setPending(false)
+      setShowPicker(false)
+    }
   }
 
   // Close picker on outside click
@@ -104,8 +111,9 @@ export default function ReactionBar({ owner, repo, commentId, commentType }: Rea
             key={r.content}
             type="button"
             onClick={() => handleToggleReaction(r.content)}
+            disabled={pending}
             className={cn(
-              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors',
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors disabled:opacity-50',
               group.reacted
                 ? 'border-accent/40 bg-accent/10 text-foreground'
                 : 'border-border bg-surface text-foreground-muted hover:border-accent/40'
@@ -145,8 +153,9 @@ export default function ReactionBar({ owner, repo, commentId, commentType }: Rea
                   key={r.content}
                   type="button"
                   onClick={() => handleToggleReaction(r.content)}
+                  disabled={pending}
                   className={cn(
-                    'hover:bg-surface-hover flex size-7 items-center justify-center rounded text-sm transition-colors',
+                    'hover:bg-surface-hover flex size-7 items-center justify-center rounded text-sm transition-colors disabled:opacity-50',
                     group?.reacted && 'bg-accent/10'
                   )}
                   title={r.content}

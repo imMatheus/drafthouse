@@ -883,6 +883,9 @@ function BranchSwitcher({ folderPath, branchInfo }: { folderPath: string; branch
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setIsOpen(false)
+              }}
               placeholder="Search branches..."
               className="border-border text-foreground placeholder:text-foreground-subtle w-full border-b bg-transparent px-3 py-2 text-xs focus:outline-none"
             />

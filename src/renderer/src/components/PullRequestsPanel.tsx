@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Check, GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, Search, X } from 'lucide-react'
+import { Check, GitPullRequest, Search, X } from 'lucide-react'
 import { cn } from '../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../shared/types'
+import PRStateIcon from './PRStateIcon'
+import { prStateLabel } from '../lib/prMentions'
+import { filterPullRequests } from '../lib/pullRequestFilter'
 import Loading from './Loading'
 
 interface PullRequestsPanelProps {
@@ -58,7 +61,7 @@ export default function PullRequestsPanel({
   // search is in-flight, fall back to a cheap local filter over the last list
   // result so the sidebar doesn't go blank.
   const displayedPRs =
-    isSearching && searchQuery.trim() !== debouncedQuery ? localFilter(prs ?? [], searchQuery) : (prs ?? [])
+    isSearching && searchQuery.trim() !== debouncedQuery ? filterPullRequests(prs ?? [], searchQuery) : (prs ?? [])
 
   const noResults = !isLoading && displayedPRs.length === 0
 
@@ -149,7 +152,7 @@ export default function PullRequestsPanel({
                   isActive ? 'bg-border' : 'hover:bg-surface-hover'
                 )}
               >
-                <PrStateIcon pr={pr} />
+                <PRStateIcon state={prStateLabel(pr)} size={14} />
                 <div className="min-w-0 flex-1">
                   <p className={cn('truncate text-xs', isActive ? 'text-foreground font-medium' : 'text-foreground')}>
                     {pr.title}
@@ -165,28 +168,4 @@ export default function PullRequestsPanel({
       </div>
     </div>
   )
-}
-
-function localFilter(prs: PullRequest[], query: string): PullRequest[] {
-  const lower = query.trim().toLowerCase()
-  if (!lower) return prs
-  return prs.filter(
-    (pr) =>
-      pr.title.toLowerCase().includes(lower) ||
-      pr.user.login.toLowerCase().includes(lower) ||
-      String(pr.number).includes(lower)
-  )
-}
-
-function PrStateIcon({ pr }: { pr: PullRequest }) {
-  if (pr.merged_at) {
-    return <GitMerge size={14} className="text-purple shrink-0" />
-  }
-  if (pr.state === 'closed') {
-    return <GitPullRequestClosed size={14} className="text-danger shrink-0" />
-  }
-  if (pr.draft) {
-    return <GitPullRequestDraft size={14} className="text-foreground-muted shrink-0" />
-  }
-  return <GitPullRequest size={14} className="text-success shrink-0" />
 }

@@ -3,8 +3,8 @@ import {
   createDiffTab,
   createFileTab,
   createInitialWorkspaceSession,
-  createPullRequestTab,
   createWelcomeTab,
+  getPullRequestTabId,
   type PullRequestSubview,
   type WorkspaceActiveView,
   type WorkspaceSidebarPanel,
@@ -168,19 +168,13 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
         return null
       }
 
-      const subview = isPullRequestSubview(tab.subview) ? tab.subview : 'conversation'
-      const nextTab = createPullRequestTab(tab.number)
-
-      if (nextTab.kind !== 'pull-request') {
-        return null
-      }
-
       return {
-        id: nextTab.id,
-        kind: nextTab.kind,
-        number: nextTab.number,
-        subview,
-        title: typeof tab.title === 'string' && tab.title.length > 0 ? tab.title : undefined
+        id: getPullRequestTabId(tab.number),
+        kind: 'pull-request',
+        number: tab.number,
+        subview: isPullRequestSubview(tab.subview) ? tab.subview : 'conversation',
+        title: typeof tab.title === 'string' && tab.title.length > 0 ? tab.title : undefined,
+        prState: isPRState(tab.prState) ? tab.prState : undefined
       }
     }
     default:
@@ -189,7 +183,11 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
 }
 
 function isPullRequestSubview(value: unknown): value is PullRequestSubview {
-  return value === 'conversation' || value === 'commits' || value === 'checks' || value === 'files'
+  return value === 'conversation' || value === 'commits' || value === 'files'
+}
+
+function isPRState(value: unknown): value is 'open' | 'closed' | 'merged' | 'draft' {
+  return value === 'open' || value === 'closed' || value === 'merged' || value === 'draft'
 }
 
 function saveWorkspaceSessionStore(store: WorkspaceSessionStore): void {
