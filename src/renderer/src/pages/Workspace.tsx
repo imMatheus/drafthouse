@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Files, GitBranch, GitGraph, Terminal } from 'lucide-react'
+import { Files, GitBranch, GitGraph, Search, Terminal } from 'lucide-react'
 import type {
   AgentContext,
   AgentSessionMeta,
@@ -17,6 +17,7 @@ import CommandPalette from '../components/CommandPalette'
 import FilePalette from '../components/FilePalette'
 import AgentPanel from '../components/AgentPanel'
 import ExplorerPanel from '../components/ExplorerPanel'
+import SearchPanel from '../components/SearchPanel'
 import PullRequestsPanel from '../components/PullRequestsPanel'
 import SourceControlPanel from '../components/SourceControlPanel'
 import WorkspaceTabBar from '../components/WorkspaceTabBar'
@@ -29,6 +30,7 @@ import {
   createFileTab,
   createPullRequestTab,
   type PullRequestSubview,
+  type WorkspaceSidebarPanel,
   type WorkspaceTab
 } from '../lib/workspaceTabs'
 import AgentSessionTab from './workspace/AgentSessionTab'
@@ -101,6 +103,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const agentSessionsStore = agentSessionsStoreRef.current
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
   const [activePalette, setActivePalette] = useState<'command' | 'file' | null>(null)
+  const [searchFocusNonce, setSearchFocusNonce] = useState(0)
 
   // Tab navigation history (back/forward buttons in the top bar). Tracks visited
   // tab ids so the user can move through them like a browser. Local-only state —
@@ -290,7 +293,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     openOrFocusTab(createCommitTab(sha, title))
   }
 
-  const handleToggleSidebar = (panel: 'explorer' | 'source-control' | 'pull-requests' | 'agent'): void => {
+  const handleToggleSidebar = (panel: WorkspaceSidebarPanel): void => {
     if (activeView === 'settings') {
       onUpdateSession({
         activeView: 'workspace',
@@ -304,6 +307,14 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     onUpdateSession({
       sidebar: isActive ? { visible: false, activePanel: panel } : { visible: true, activePanel: panel }
     })
+  }
+
+  // Cmd+Shift+F: reveal the search panel and (re)focus its input every time.
+  const handleOpenSearch = (): void => {
+    setSearchFocusNonce((n) => n + 1)
+    if (activeView !== 'workspace' || !sidebar.visible || sidebar.activePanel !== 'search') {
+      onUpdateSession({ activeView: 'workspace', sidebar: { visible: true, activePanel: 'search' } })
+    }
   }
 
   const handleToggleSidebarVisibility = (): void => {
@@ -329,6 +340,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
         e.preventDefault()
         setActivePalette((prev) => (prev === 'file' ? null : 'file'))
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        handleOpenSearch()
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '1') {
         e.preventDefault()
@@ -603,6 +618,14 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       active: sidebar.visible && sidebar.activePanel === 'explorer',
       onClick: () => handleToggleSidebar('explorer'),
       shortcut: ['⌘', '4']
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      icon: Search,
+      active: sidebar.visible && sidebar.activePanel === 'search',
+      onClick: () => handleToggleSidebar('search'),
+      shortcut: ['⌘', '⇧', 'F']
     }
   ]
 
@@ -641,6 +664,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                       selectedFilePath={activeFilePath}
                       onSelectFile={handleOpenFile}
                     />
+                  ) : null}
+
+                  {sidebar.visible && sidebar.activePanel === 'search' ? (
+                    <SearchPanel folderPath={folderPath} onOpenFile={handleOpenFile} focusNonce={searchFocusNonce} />
                   ) : null}
 
                   {sidebar.visible && sidebar.activePanel === 'source-control' ? (
@@ -847,6 +874,7 @@ function renderWorkspaceTabContent({
 
 const EMPTY_STATE_SHORTCUTS: Array<{ label: string; keys: string[] }> = [
   { label: 'Command Palette', keys: ['⌘', 'K'] },
+  { label: 'Search', keys: ['⌘', '⇧', 'F'] },
   { label: 'Toggle Sidebar', keys: ['⌘', 'B'] },
   { label: 'Agent', keys: ['⌘', '1'] },
   { label: 'Pull Requests', keys: ['⌘', '2'] },

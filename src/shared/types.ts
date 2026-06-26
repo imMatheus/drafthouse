@@ -31,6 +31,41 @@ export interface GitRepoInfo {
 }
 
 // ============================================================
+// Codebase search
+// ============================================================
+
+export interface SearchOptions {
+  caseSensitive?: boolean
+  wholeWord?: boolean
+  isRegex?: boolean
+}
+
+export interface SearchMatch {
+  /** 1-based line number. */
+  line: number
+  /** The (possibly truncated) full text of the matching line. */
+  text: string
+  /** 0-based column where the match starts within `text`. */
+  matchStart: number
+  matchLength: number
+}
+
+export interface SearchFileResult {
+  /** Path relative to the searched root. */
+  path: string
+  matches: SearchMatch[]
+}
+
+export interface SearchResults {
+  files: SearchFileResult[]
+  totalMatches: number
+  /** True when a result cap was hit and the search stopped early. */
+  truncated: boolean
+  /** True when `isRegex` was set but the query failed to compile. */
+  invalidRegex: boolean
+}
+
+// ============================================================
 // Local Git (CLI-based)
 // ============================================================
 

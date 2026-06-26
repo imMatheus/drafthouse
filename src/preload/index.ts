@@ -405,6 +405,11 @@ const api = {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),
     readDir: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir', path),
     readDirRecursive: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-dir-recursive', path),
+    searchInFiles: (
+      path: string,
+      query: string,
+      options: { caseSensitive?: boolean; wholeWord?: boolean; isRegex?: boolean }
+    ): Promise<unknown> => ipcRenderer.invoke('fs:search-in-files', path, query, options),
     readFile: (path: string): Promise<unknown> => ipcRenderer.invoke('fs:read-file', path),
     writeFile: (path: string, content: string): Promise<unknown> => ipcRenderer.invoke('fs:write-file', path, content),
     getRecentFolders: (): Promise<unknown> => ipcRenderer.invoke('fs:get-recent-folders'),

@@ -2,6 +2,7 @@ import { memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } fr
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlignJustify,
+  ArrowRight,
   Check,
   ChevronDown,
   ChevronRight,
@@ -13,6 +14,7 @@ import {
   EyeOff,
   FileDiff,
   FileMinus,
+  FilePen,
   FilePlus,
   FileSymlink,
   GitCompare,
@@ -1375,7 +1377,7 @@ function FileDiffHeader({
         {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
       </button>
       <FileStatusIcon status={file.status} />
-      <span className="text-foreground min-w-0 truncate text-sm font-semibold">{file.filename}</span>
+      <FileHeaderName name={file.filename} previousName={file.previousFilename} />
       <Tooltip label={pathCopied ? 'Copied' : 'Copy file path'} side="top">
         <button
           type="button"
@@ -1386,9 +1388,6 @@ function FileDiffHeader({
           {pathCopied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
         </button>
       </Tooltip>
-      {file.previousFilename ? (
-        <span className="text-foreground-muted min-w-0 shrink truncate text-xs">from {file.previousFilename}</span>
-      ) : null}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <DiffStat additions={file.additions} deletions={file.deletions} />
         <a
@@ -2056,17 +2055,37 @@ const FileTreeFileRow = memo(function FileTreeFileRow({
   )
 })
 
+// Distinct icon + token color per change status so the status reads at a glance
+// — both in the file tree and at the top of each file in the diff. Each
+// silhouette is deliberately different (plus / minus / pencil / arrow) so they
+// stay distinguishable at small sizes and for color-blind users.
 function FileStatusIcon({ status, size = 14 }: { status: string; size?: number }) {
   switch (status) {
     case 'added':
-      return <FilePlus size={size} className="text-success shrink-0" />
+      return <FilePlus size={size} className="text-success shrink-0" aria-label="Added" />
     case 'removed':
-      return <FileMinus size={size} className="text-danger shrink-0" />
+      return <FileMinus size={size} className="text-danger shrink-0" aria-label="Removed" />
     case 'renamed':
-      return <FileSymlink size={size} className="text-purple shrink-0" />
+      return <FileSymlink size={size} className="text-purple shrink-0" aria-label="Renamed or moved" />
     default:
-      return <FileDiff size={size} className="text-foreground-subtle shrink-0" />
+      return <FilePen size={size} className="text-foreground-muted shrink-0" aria-label="Modified" />
   }
+}
+
+// Renders the filename in a file-content header. For a renamed/moved file (a
+// previous path that differs from the current one) it shows `old → new` with an
+// arrow, matching how GitHub renders moves; otherwise just the current path.
+function FileHeaderName({ name, previousName }: { name: string; previousName?: string | null }) {
+  if (previousName && previousName !== name) {
+    return (
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="text-foreground-muted min-w-0 truncate text-sm">{previousName}</span>
+        <ArrowRight size={13} className="text-foreground-subtle shrink-0" />
+        <span className="text-foreground min-w-0 truncate text-sm font-semibold">{name}</span>
+      </span>
+    )
+  }
+  return <span className="text-foreground min-w-0 truncate text-sm font-semibold">{name}</span>
 }
 
 // Tints a filename by its change status so the tree reads at a glance. Modified
@@ -2304,7 +2323,8 @@ function ChangedFileDiffCardInner({
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
-        <span className="text-foreground min-w-0 truncate text-sm font-semibold">{file.filename}</span>
+        <FileStatusIcon status={file.status} />
+        <FileHeaderName name={file.filename} previousName={file.previous_filename} />
         <Tooltip label={pathCopied ? 'Copied' : 'Copy file path'} side="top">
           <button
             type="button"
@@ -2315,9 +2335,6 @@ function ChangedFileDiffCardInner({
             {pathCopied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
           </button>
         </Tooltip>
-        {file.previous_filename ? (
-          <span className="text-foreground-muted min-w-0 shrink truncate text-xs">from {file.previous_filename}</span>
-        ) : null}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <DiffStat additions={file.additions} deletions={file.deletions} />
           <a

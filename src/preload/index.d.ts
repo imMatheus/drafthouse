@@ -5,6 +5,8 @@ import type {
   FileEntry,
   GitHubRepo,
   GitRepoInfo,
+  SearchOptions,
+  SearchResults,
   GitChangedFile,
   GitBranchInfo,
   GitLogEntry,
@@ -429,6 +431,7 @@ interface FsAPI {
   openFolder: () => Promise<string | null>
   readDir: (path: string) => Promise<FileEntry[]>
   readDirRecursive: (path: string) => Promise<string[]>
+  searchInFiles: (path: string, query: string, options: SearchOptions) => Promise<SearchResults>
   readFile: (path: string) => Promise<string>
   writeFile: (path: string, content: string) => Promise<void>
   getRecentFolders: () => Promise<string[]>

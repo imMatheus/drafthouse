@@ -1,7 +1,14 @@
 import { ipcMain, dialog, app, BrowserWindow, type WebContents } from 'electron'
 import { join, relative, resolve, isAbsolute } from 'path'
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync, realpathSync, watch, type FSWatcher } from 'fs'
-import type { FileEntry, GitRepoInfo } from '../shared/types'
+import type {
+  FileEntry,
+  GitRepoInfo,
+  SearchFileResult,
+  SearchMatch,
+  SearchOptions,
+  SearchResults
+} from '../shared/types'
 
 const allowedRoots = new Map<number, string>()
 
@@ -183,6 +190,168 @@ function readDirectoryRecursive(rootPath: string): string[] {
   return results
 }
 
+const SEARCH_BINARY_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'ico',
+  'svg',
+  'avif',
+  'mp3',
+  'mp4',
+  'wav',
+  'avi',
+  'mov',
+  'mkv',
+  'flac',
+  'ogg',
+  'webm',
+  'zip',
+  'tar',
+  'gz',
+  'tgz',
+  'rar',
+  '7z',
+  'bz2',
+  'xz',
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
+  'exe',
+  'dll',
+  'so',
+  'dylib',
+  'wasm',
+  'bin',
+  'o',
+  'a',
+  'class',
+  'jar',
+  'ttf',
+  'otf',
+  'woff',
+  'woff2',
+  'eot',
+  'node'
+])
+
+const SEARCH_MAX_FILES = 5000
+const SEARCH_MAX_RESULTS = 2000
+const SEARCH_MAX_MATCHES_PER_FILE = 100
+const SEARCH_MAX_FILE_BYTES = 1_000_000
+const SEARCH_MAX_LINE_LENGTH = 1000
+
+function buildSearchRegex(query: string, options: SearchOptions): RegExp | null {
+  const escaped = options.isRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = options.wholeWord ? `\\b${escaped}\\b` : escaped
+  try {
+    return new RegExp(pattern, options.caseSensitive ? 'g' : 'gi')
+  } catch {
+    return null
+  }
+}
+
+function searchLine(lineText: string, lineNumber: number, regex: RegExp): SearchMatch[] {
+  const matches: SearchMatch[] = []
+  regex.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(lineText)) !== null && matches.length < SEARCH_MAX_MATCHES_PER_FILE) {
+    matches.push({ line: lineNumber, text: lineText, matchStart: match.index, matchLength: match[0].length })
+    // Guard against zero-width matches looping forever (e.g. `a*`).
+    if (match.index === regex.lastIndex) regex.lastIndex++
+  }
+  return matches
+}
+
+function searchFileContents(content: string, regex: RegExp): SearchMatch[] {
+  const matches: SearchMatch[] = []
+  const lines = content.split('\n')
+  for (let i = 0; i < lines.length && matches.length < SEARCH_MAX_MATCHES_PER_FILE; i++) {
+    let line = lines[i]
+    if (line.endsWith('\r')) line = line.slice(0, -1)
+    if (line.length > SEARCH_MAX_LINE_LENGTH) line = line.slice(0, SEARCH_MAX_LINE_LENGTH)
+    matches.push(...searchLine(line, i + 1, regex))
+  }
+  return matches.slice(0, SEARCH_MAX_MATCHES_PER_FILE)
+}
+
+function searchDirectory(rootPath: string, query: string, options: SearchOptions): SearchResults {
+  const regex = buildSearchRegex(query, options)
+  if (!regex) {
+    return { files: [], totalMatches: 0, truncated: false, invalidRegex: true }
+  }
+
+  const files: SearchFileResult[] = []
+  let totalMatches = 0
+  let filesScanned = 0
+  let truncated = false
+
+  function walk(dirPath: string, re: RegExp): void {
+    if (truncated) return
+
+    let entries: string[]
+    try {
+      entries = readdirSync(dirPath)
+    } catch {
+      return
+    }
+
+    for (const name of entries) {
+      if (truncated) return
+      if (name.startsWith('.')) continue
+
+      const fullPath = join(dirPath, name)
+      let stat: ReturnType<typeof statSync>
+      try {
+        stat = statSync(fullPath)
+      } catch {
+        continue
+      }
+
+      if (stat.isDirectory()) {
+        if (!SKIP_DIRS.has(name)) walk(fullPath, re)
+        continue
+      }
+
+      const ext = name.split('.').pop()?.toLowerCase() ?? ''
+      if (SEARCH_BINARY_EXTENSIONS.has(ext) || stat.size > SEARCH_MAX_FILE_BYTES) continue
+
+      if (++filesScanned > SEARCH_MAX_FILES) {
+        truncated = true
+        return
+      }
+
+      let content: string
+      try {
+        content = readFileSync(fullPath, 'utf-8')
+      } catch {
+        continue
+      }
+      if (content.includes('\u0000')) continue // binary file slipped past the extension filter
+
+      const matches = searchFileContents(content, re)
+      if (matches.length === 0) continue
+
+      files.push({ path: relative(rootPath, fullPath), matches })
+      totalMatches += matches.length
+      if (totalMatches >= SEARCH_MAX_RESULTS) {
+        truncated = true
+        return
+      }
+    }
+  }
+
+  walk(rootPath, regex)
+  return { files, totalMatches, truncated, invalidRegex: false }
+}
+
 function readDirectory(dirPath: string): FileEntry[] {
   try {
     const entries = readdirSync(dirPath)
@@ -236,6 +405,17 @@ export function registerFsHandlers(): void {
   ipcMain.handle('fs:read-dir-recursive', (event, dirPath: string) => {
     return readDirectoryRecursive(requireAllowedDirectory(event.sender, dirPath))
   })
+
+  ipcMain.handle(
+    'fs:search-in-files',
+    (event, dirPath: string, query: string, options: SearchOptions): SearchResults => {
+      const root = requireAllowedDirectory(event.sender, dirPath)
+      if (query.trim().length === 0) {
+        return { files: [], totalMatches: 0, truncated: false, invalidRegex: false }
+      }
+      return searchDirectory(root, query, options ?? {})
+    }
+  )
 
   ipcMain.handle('fs:read-file', (event, filePath: string) => {
     try {

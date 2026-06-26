@@ -39,7 +39,7 @@ export type WorkspaceTab =
 
 export type WorkspaceActiveView = 'workspace' | 'settings'
 
-export type WorkspaceSidebarPanel = 'explorer' | 'source-control' | 'pull-requests' | 'agent'
+export type WorkspaceSidebarPanel = 'explorer' | 'search' | 'source-control' | 'pull-requests' | 'agent'
 
 export interface WorkspaceSidebarState {
   visible: boolean

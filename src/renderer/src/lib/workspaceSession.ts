@@ -109,7 +109,7 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
   }
 }
 
-const VALID_SIDEBAR_PANELS: WorkspaceSidebarPanel[] = ['explorer', 'source-control', 'pull-requests', 'agent']
+const VALID_SIDEBAR_PANELS: WorkspaceSidebarPanel[] = ['explorer', 'search', 'source-control', 'pull-requests', 'agent']
 
 function parseWorkspaceSidebarState(value: unknown, explorerVisible?: boolean): WorkspaceSidebarState {
   if (value && typeof value === 'object') {

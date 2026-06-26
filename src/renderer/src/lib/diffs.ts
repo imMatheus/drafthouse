@@ -1,4 +1,5 @@
 import type { BaseCodeOptions, BaseDiffOptions, SupportedLanguages, ThemesType } from '@pierre/diffs'
+import type { PullRequestFile } from '../../../shared/types'
 
 export const DIFFS_THEMES: ThemesType = {
   dark: 'github-dark-default',
@@ -114,7 +115,6 @@ export function getLanguageFromPath(path: string): SupportedLanguages {
   if (lower === 'dockerfile' || lower.startsWith('dockerfile.')) return 'dockerfile'
   if (lower === 'makefile' || lower === 'gnumakefile') return 'makefile'
   if (lower === 'cmakelists.txt' || lower.endsWith('.cmake')) return 'cmake'
-  if (lower === '.gitignore' || lower === '.dockerignore') return 'gitignore'
 
   const ext = filename.includes('.') ? (filename.split('.').pop()?.toLowerCase() ?? '') : ''
   return EXTENSION_TO_LANG[ext] ?? 'text'
@@ -156,4 +156,40 @@ export const BASE_CODE_OPTIONS: BaseCodeOptions = {
  */
 export function wrapGitPatch(filename: string, patch: string): string {
   return `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n${patch}`
+}
+
+/**
+ * Reconstructs a full git-style patch from a REST `listFiles` entry, preserving
+ * the change type so `processFile` classifies it correctly. The REST API drops
+ * the `rename from/to`, `new file`, and `deleted file` headers that the raw
+ * `.diff` carries — without them every file looks "modified" and moves lose
+ * their old path. Used by the diff-stream loader's large-PR fallback.
+ *
+ * Returns `null` when there is nothing renderable to show (e.g. a binary file
+ * with no patch that wasn't renamed).
+ */
+export function buildGitPatchFromRestFile(file: PullRequestFile): string | null {
+  const newPath = file.filename
+  const isRename = file.previous_filename != null && file.previous_filename !== newPath
+  const oldPath = isRename ? file.previous_filename! : newPath
+
+  if (!file.patch && !isRename) return null
+
+  const lines = [`diff --git a/${oldPath} b/${newPath}`]
+  if (file.status === 'added') {
+    lines.push('new file mode 100644')
+  } else if (file.status === 'removed') {
+    lines.push('deleted file mode 100644')
+  } else if (isRename) {
+    lines.push(`similarity index ${file.patch ? '90%' : '100%'}`, `rename from ${oldPath}`, `rename to ${newPath}`)
+  }
+
+  if (file.patch) {
+    const fromLine = file.status === 'added' ? '--- /dev/null' : `--- a/${oldPath}`
+    const toLine = file.status === 'removed' ? '+++ /dev/null' : `+++ b/${newPath}`
+    lines.push(fromLine, toLine, file.patch)
+  }
+
+  // Header-only patches (pure renames) need a trailing newline to parse cleanly.
+  return file.patch ? lines.join('\n') : `${lines.join('\n')}\n`
 }

@@ -9,7 +9,7 @@ import {
   type PrDiffDiffStats,
   type PrDiffFileMeta
 } from '../../lib/prDiffAccumulator'
-import { wrapGitPatch } from '../../lib/diffs'
+import { buildGitPatchFromRestFile } from '../../lib/diffs'
 
 // Publish cadence for streamed files. The first file is published immediately
 // so the viewer paints fast; the rest are batched so a fast stream doesn't
@@ -240,8 +240,9 @@ export function usePullRequestDiffStream<TMeta>({
       const files = await window.api.github.pulls.listFiles(owner, repo, number)
       if (!isCurrent()) return
       for (const file of files) {
-        if (!file.patch) continue
-        await ingestFile(wrapGitPatch(file.filename, file.patch), accumulator.fileIndex)
+        const patchText = buildGitPatchFromRestFile(file)
+        if (patchText == null) continue
+        await ingestFile(patchText, accumulator.fileIndex)
       }
       flush()
       if (!isCurrent()) return
@@ -259,6 +260,7 @@ export function usePullRequestDiffStream<TMeta>({
       } catch (error) {
         if (!isCurrent()) return
         if (error instanceof DiffStreamError && error.tooLarge) {
+          console.info('[pr-diff] raw .diff too large — falling back to REST listFiles for', cacheKeyPrefix)
           try {
             await runRestFallback()
           } catch (fallbackError) {
