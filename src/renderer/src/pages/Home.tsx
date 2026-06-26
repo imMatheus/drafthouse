@@ -35,12 +35,12 @@ export default function Home({ onOpenFolder }: { onOpenFolder: (path: string) =>
   }
 
   return (
-    <div className="flex min-h-full flex-1 items-center justify-center px-6 py-12">
-      <div className="flex w-full max-w-md flex-col items-center gap-8">
-        <AsciiArt className="size-32" />
+    <div className="flex-1 overflow-y-auto px-4 py-16 sm:px-6 sm:py-12">
+      <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-6 sm:gap-8">
+        <AsciiArt className="size-24 sm:size-32" />
 
         <div className="flex flex-col items-center gap-1.5 text-center">
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">Welcome to Drafthouse</h1>
+          <h1 className="text-foreground text-xl font-semibold tracking-tight sm:text-2xl">Welcome to Drafthouse</h1>
           <p className="text-foreground-muted text-sm">Open a folder to get started</p>
         </div>
 

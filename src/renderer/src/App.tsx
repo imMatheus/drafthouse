@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import * as RadixTooltip from '@radix-ui/react-tooltip'
 import { AuthContext, useAuth, useAuthProvider } from './hooks/useAuth'
-import RepoSidebar from './components/RepoSidebar'
+import UserPill from './components/UserPill'
 import { LoadingView } from './components/Loading'
 import { SettingsProvider } from './hooks/useSettings'
 import { ThemeProvider } from './hooks/useTheme'
@@ -86,8 +86,8 @@ function AppContent(): React.JSX.Element {
       <Route
         path="/"
         element={
-          <div className="bg-background flex h-screen">
-            <RepoSidebar />
+          <div className="bg-background relative flex h-screen">
+            <UserPill />
             <Home onOpenFolder={openWorkspace} />
           </div>
         }
