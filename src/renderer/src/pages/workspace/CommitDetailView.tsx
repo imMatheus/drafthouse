@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Check,
@@ -65,12 +65,9 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
   const deferredFilterValue = useDeferredValue(filterValue)
   const allFiles = commit?.files ?? EMPTY_FILES
   const trimmedFilter = deferredFilterValue.trim().toLowerCase()
-  const filteredFiles = useMemo(
-    () =>
-      trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter)),
-    [allFiles, trimmedFilter]
-  )
-  const fileTree = useMemo(() => buildFileTree(filteredFiles), [filteredFiles])
+  const filteredFiles =
+    trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
+  const fileTree = buildFileTree(filteredFiles)
 
   useEffect(() => {
     if (commit) {
@@ -84,18 +81,22 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
   }, [commitSha, owner, repo])
 
   useEffect(() => {
-    if (filteredFiles.length === 0) {
+    const filtered =
+      trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
+    if (filtered.length === 0) {
       setActiveFilePath(null)
       return
     }
 
-    if (!activeFilePath || !filteredFiles.some((file) => file.filename === activeFilePath)) {
-      setActiveFilePath(filteredFiles[0]?.filename ?? null)
+    if (!activeFilePath || !filtered.some((file) => file.filename === activeFilePath)) {
+      setActiveFilePath(filtered[0]?.filename ?? null)
     }
-  }, [activeFilePath, filteredFiles])
+  }, [activeFilePath, allFiles, trimmedFilter])
 
   useEffect(() => {
-    if (filteredFiles.length === 0) return
+    const filtered =
+      trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
+    if (filtered.length === 0) return
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -111,13 +112,13 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
       { threshold: [0.1, 0.35, 0.6], rootMargin: '-15% 0px -55% 0px' }
     )
 
-    for (const file of filteredFiles) {
+    for (const file of filtered) {
       const element = fileSectionRefs.current.get(file.filename)
       if (element) observer.observe(element)
     }
 
     return () => observer.disconnect()
-  }, [filteredFiles])
+  }, [allFiles, trimmedFilter])
 
   const handleScrollToFile = (path: string): void => {
     setActiveFilePath(path)

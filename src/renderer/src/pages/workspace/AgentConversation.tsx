@@ -9,8 +9,7 @@ import MessagePRMentions from '../../components/MessagePRMentions'
 import PRStateIcon from '../../components/PRStateIcon'
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
 import { useAgentSessionEvents } from '../../contexts/AgentSessionsContext'
-
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
+import { getPathBasename, isImageFile } from '../../lib/path'
 
 // Tool calls that render inline as part of the response (not hidden in the thinking accordion)
 const VISIBLE_TOOL_NAMES = new Set(['Edit'])
@@ -287,9 +286,8 @@ function AgentContextBox({ context }: { context: AgentContext }) {
 }
 
 function FileAttachment({ filePath }: { filePath: string }) {
-  const fileName = filePath.split('/').pop() ?? filePath
-  const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
-  const isImage = IMAGE_EXTENSIONS.has(ext)
+  const fileName = getPathBasename(filePath)
+  const isImage = isImageFile(filePath)
   const [dataUrl, setDataUrl] = useState<string | null>(null)
 
   useEffect(() => {

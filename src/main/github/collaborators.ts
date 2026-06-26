@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { requireAuth, fetchGitHubJson, fetchGitHubVoid, fetchGitHubCheck, API } from './client'
+import { requireAuth, fetchGitHubJson, fetchGitHubVoid, fetchGitHubCheck, getGitHubHeaders, API } from './client'
 import type { GitHubCollaborator, GitHubCollaboratorPermission, CollaboratorInvitation } from '../../shared/types'
 
 export function registerCollaboratorsHandlers(): void {
@@ -64,12 +64,7 @@ export function registerCollaboratorsHandlers(): void {
       const response = await fetch(`${API}/repos/${owner}/${repo}/collaborators/${encodeURIComponent(username)}`, {
         method: 'PUT',
         body,
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2026-03-10',
-          ...(body ? { 'Content-Type': 'application/json' } : {})
-        }
+        headers: getGitHubHeaders(token, body ? { 'Content-Type': 'application/json' } : {})
       })
 
       if (response.status === 204) return null

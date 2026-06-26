@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain, app, shell } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs'
 import type { AuthData, GitHubUser } from '../shared/types'
 import { fetchGitHubJson } from './github/client'
 
@@ -31,7 +31,7 @@ function saveAuth(data: AuthData): void {
 function clearAuth(): void {
   const authPath = getAuthPath()
   if (existsSync(authPath)) {
-    writeFileSync(authPath, '')
+    unlinkSync(authPath)
   }
 }
 

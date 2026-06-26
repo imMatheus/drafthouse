@@ -27,24 +27,16 @@ body {
   --color-border: rgb(32, 32, 32);
   --color-interactive: rgb(47, 47, 47);
   --color-interactive-hover: rgb(43, 41, 35);
-  /* --color-accent: hsl(19, 100%, 48%);
-  --color-accent-hover: hsl(19, 100%, 55%);
-  --color-accent-bg: hsl(19, 100%, 7%);  */
-
   --color-accent: rgb(67, 151, 248);
   --color-accent-hover: rgb(87, 171, 255);
   --color-accent-bg: rgb(18, 26, 36);
-
-  /* --color-accent: hsl(0, 69%, 50%);
-  --color-accent-hover: hsl(0, 69%, 57%);
-  --color-accent-bg: hsl(0, 69%, 7%); */
   --color-accent-foreground: #ffffff;
   --color-success: rgb(102, 201, 95);
   --color-success-bg: rgb(30, 40, 28);
   --color-success-foreground: #ffffff;
   --color-danger: rgb(227, 66, 88);
   --color-danger-foreground: #ffffff;
-  --color-purple: rgb(167, 139, 250);
+  --color-purple: rgb(180, 142, 255);
 }
 
 .light {
@@ -57,27 +49,16 @@ body {
   --color-border: rgb(234, 234, 233);
   --color-interactive: rgb(237, 237, 234);
   --color-interactive-hover: rgb(226, 225, 220);
-  /* --color-accent: #f54e00;
-  --color-accent-hover: #d94400;
-  --color-accent-bg: hsl(17, 33%, 91%); */
   --color-accent: rgb(43, 101, 197);
   --color-accent-hover: rgb(48, 111, 207);
   --color-accent-bg: rgb(238, 243, 250);
-
-  /* --color-accent: hsl(270, 73%, 35%);
-  --color-accent-hover: hsl(270, 73%, 42%);
-  --color-accent-bg: hsl(270, 73%, 4%); */
-
-  /* --color-accent: hsl(0, 69%, 50%);
-  --color-accent-hover: hsl(0, 69%, 57%);
-  --color-accent-bg: hsl(0, 69%, 7%); */
   --color-accent-foreground: #ffffff;
   --color-success: #16a34a;
   --color-success-bg: rgb(30, 40, 28);
   --color-success-foreground: #ffffff;
   --color-danger: #dc2626;
   --color-danger-foreground: #ffffff;
-  --color-purple: #7c3aed;
+  --color-purple: rgb(130, 80, 223);
 }
 
 @keyframes check-in {

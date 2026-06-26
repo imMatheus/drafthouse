@@ -71,7 +71,7 @@ export default function RepoSidebar() {
                   }
                 }}
                 placeholder="Search repositories..."
-                className="text-foreground placeholder-foreground-subtle w-full bg-transparent text-xs outline-none"
+                className="text-foreground placeholder:text-foreground-subtle w-full bg-transparent text-xs outline-none"
               />
             ) : (
               <span className="text-foreground-muted text-xs">Top repositories</span>

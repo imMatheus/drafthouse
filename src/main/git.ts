@@ -141,17 +141,15 @@ async function gitStatus(cwd: string): Promise<GitChangedFile[]> {
 }
 
 async function gitBranchInfo(cwd: string): Promise<GitBranchInfo> {
-  const name = (await git(cwd, ['branch', '--show-current'])).trim()
+  const [name, upstream] = await Promise.all([
+    git(cwd, ['branch', '--show-current']).then((output) => output.trim()),
+    git(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])
+      .then((output) => output.trim())
+      .catch(() => null)
+  ])
 
-  let upstream: string | null = null
   let ahead = 0
   let behind = 0
-
-  try {
-    upstream = (await git(cwd, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])).trim()
-  } catch {
-    // No upstream configured
-  }
 
   if (upstream) {
     try {

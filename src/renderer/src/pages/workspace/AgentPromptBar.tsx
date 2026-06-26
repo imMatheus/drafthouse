@@ -11,19 +11,9 @@ import {
   searchPRs,
   splitTextIntoMentionSegments
 } from '../../lib/prMentions'
+import { getPathBasename, isImageFile } from '../../lib/path'
 import PRStateIcon from '../../components/PRStateIcon'
 import Tooltip from '../../components/Tooltip'
-
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'])
-
-function isImageFile(filePath: string): boolean {
-  const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
-  return IMAGE_EXTENSIONS.has(ext)
-}
-
-function getFileName(filePath: string): string {
-  return filePath.split('/').pop() ?? filePath
-}
 
 interface AgentPromptBarProps {
   onSubmit: (prompt: string, files?: string[], mentionedPRs?: PullRequestDetail[]) => Promise<void>
@@ -475,7 +465,7 @@ function PRSuggestionRow({
 }
 
 function FilePreview({ filePath, onRemove }: { filePath: string; onRemove: () => void }) {
-  const fileName = getFileName(filePath)
+  const fileName = getPathBasename(filePath)
   const isImage = isImageFile(filePath)
   const [dataUrl, setDataUrl] = useState<string | null>(null)
 

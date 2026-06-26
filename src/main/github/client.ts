@@ -3,7 +3,7 @@ import { loadAuth } from '../auth'
 const GITHUB_API_VERSION = '2026-03-10'
 const API = 'https://api.github.com'
 
-export { API }
+export { API, GITHUB_API_VERSION }
 
 export function requireAuth(): string {
   const auth = loadAuth()

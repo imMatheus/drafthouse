@@ -139,7 +139,3 @@ export function createAgentTab(sessionId: string, title: string): WorkspaceTab {
 export function getAgentTabId(sessionId: string): `agent:${string}` {
   return `agent:${sessionId}`
 }
-
-export function isPullRequestWorkspaceTab(tab: WorkspaceTab | null | undefined): boolean {
-  return tab?.kind === 'pull-request'
-}

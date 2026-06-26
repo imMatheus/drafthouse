@@ -155,8 +155,10 @@ function getStableGroupings(
     else threadsByFile.set(thread.path, [thread])
   }
   const commentCountsByFile = new Map<string, number>()
-  for (const comment of inputs.reviewComments ?? []) {
-    commentCountsByFile.set(comment.path, (commentCountsByFile.get(comment.path) ?? 0) + 1)
+  for (const thread of reviewThreads) {
+    if (thread.isOutdated) continue
+    const count = 1 + thread.replies.length
+    commentCountsByFile.set(thread.path, (commentCountsByFile.get(thread.path) ?? 0) + count)
   }
   const threadsByCommentId = new Map(reviewThreads.map((thread) => [thread.topLevelComment.id, thread]))
   const draftsByFile = new Map<string, PreparedDraftEntry[]>()
