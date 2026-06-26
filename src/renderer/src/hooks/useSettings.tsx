@@ -1,9 +1,18 @@
 import { createContext, useContext, useState } from 'react'
 
 export type DiffViewMode = 'unified' | 'split'
+export type DiffIndicatorStyle = 'bars' | 'classic' | 'none'
 
 export interface UserSettings {
   diffViewMode: DiffViewMode
+  /** Show gutter line numbers in diffs. */
+  diffLineNumbers: boolean
+  /** Wrap long lines instead of horizontal scroll. */
+  diffWordWrap: boolean
+  /** Change indicator style in the gutter. */
+  diffIndicators: DiffIndicatorStyle
+  /** Whether files default to collapsed when a diff loads. */
+  diffCollapsed: boolean
 }
 
 interface SettingsContextValue {
@@ -14,7 +23,11 @@ interface SettingsContextValue {
 const STORAGE_KEY = 'drafthouse.settings'
 
 const DEFAULT_SETTINGS: UserSettings = {
-  diffViewMode: 'unified'
+  diffViewMode: 'unified',
+  diffLineNumbers: true,
+  diffWordWrap: true,
+  diffIndicators: 'classic',
+  diffCollapsed: false
 }
 
 function loadSettings(): UserSettings {

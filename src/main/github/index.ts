@@ -5,6 +5,7 @@ import { registerCommitCommentsHandlers } from './commit-comments'
 import { registerCommitStatusesHandlers } from './commit-statuses'
 import { registerEmojisHandlers } from './emojis'
 import { registerPullsHandlers } from './pulls'
+import { registerPullDiffStreamHandlers } from './pull-diff-stream'
 import { registerPullCommentsHandlers } from './pull-comments'
 import { registerReactionsHandlers } from './reactions'
 import { registerReviewRequestsHandlers } from './review-requests'
@@ -20,6 +21,7 @@ export function registerGitHubHandlers(): void {
   registerCommitStatusesHandlers()
   registerEmojisHandlers()
   registerPullsHandlers()
+  registerPullDiffStreamHandlers()
   registerPullCommentsHandlers()
   registerReactionsHandlers()
   registerReviewRequestsHandlers()

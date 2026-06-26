@@ -3,15 +3,7 @@ import { execFile } from 'child_process'
 import { join } from 'path'
 import { unlinkSync, statSync } from 'fs'
 import { requireAllowedDirectory } from './fs'
-import { computePullRequestDiff, fetchPullRequestRefs } from './prDiff'
-import type {
-  ComputePullRequestDiffInput,
-  FetchPullRequestRefsInput,
-  GitChangedFile,
-  GitBranchInfo,
-  GitLogEntry,
-  GitStatusCode
-} from '../shared/types'
+import type { GitChangedFile, GitBranchInfo, GitLogEntry, GitStatusCode } from '../shared/types'
 
 export type GitErrorKind =
   | 'timeout'
@@ -399,15 +391,5 @@ export function registerGitHandlers(): void {
   ipcMain.handle('git:log', (event, cwd: string, count?: number) => {
     requireAllowedDirectory(event.sender, cwd)
     return gitLog(cwd, count ?? 20)
-  })
-
-  ipcMain.handle('git:fetch-pr-refs', (event, input: FetchPullRequestRefsInput) => {
-    requireAllowedDirectory(event.sender, input.cwd)
-    return fetchPullRequestRefs(input)
-  })
-
-  ipcMain.handle('git:compute-pr-diff', (event, input: ComputePullRequestDiffInput) => {
-    requireAllowedDirectory(event.sender, input.cwd)
-    return computePullRequestDiff(input)
   })
 }

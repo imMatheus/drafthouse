@@ -26,9 +26,6 @@ import type {
   GitHubCommitStatus,
   CommitStatusState,
   GitHubEmojis,
-  ComputePullRequestDiffInput,
-  FetchPullRequestRefsInput,
-  FetchPullRequestRefsResult,
   PullRequest,
   PullRequestDetail,
   PullRequestCommit,
@@ -231,6 +228,22 @@ interface GitHubPullsAPI {
   updateBranch: (owner: string, repo: string, number: number, expectedHeadSha?: string) => Promise<UpdateBranchResult>
   convertToDraft: (nodeId: string) => Promise<void>
   markReady: (nodeId: string) => Promise<void>
+  /**
+   * Streams the PR's raw unified diff to the renderer one network chunk at a
+   * time. Returns a cancel function that aborts the upstream fetch and detaches
+   * the listeners. `onError`'s `tooLarge` flag signals the diff exceeded
+   * GitHub's render limit so callers can fall back to {@link listFiles}.
+   */
+  streamDiff: (
+    owner: string,
+    repo: string,
+    number: number,
+    callbacks: {
+      onChunk: (chunk: Uint8Array) => void
+      onEnd: () => void
+      onError: (message: string, tooLarge: boolean) => void
+    }
+  ) => () => void
 }
 
 type MinimizeClassifier = 'ABUSE' | 'OFF_TOPIC' | 'OUTDATED' | 'RESOLVED' | 'DUPLICATE' | 'SPAM'
@@ -396,8 +409,6 @@ interface GitAPI {
   stash: (cwd: string, message?: string) => Promise<void>
   stashPop: (cwd: string) => Promise<void>
   log: (cwd: string, count?: number) => Promise<GitLogEntry[]>
-  fetchPullRequestRefs: (input: FetchPullRequestRefsInput) => Promise<FetchPullRequestRefsResult>
-  computePullRequestDiff: (input: ComputePullRequestDiffInput) => Promise<PullRequestFile[]>
 }
 
 // ============================================================

@@ -1,6 +1,6 @@
 import type { BaseCodeOptions, BaseDiffOptions, SupportedLanguages, ThemesType } from '@pierre/diffs'
 
-const DIFFS_THEMES: ThemesType = {
+export const DIFFS_THEMES: ThemesType = {
   dark: 'github-dark-default',
   light: 'github-light-default'
 }

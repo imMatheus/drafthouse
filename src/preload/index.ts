@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+let diffStreamCounter = 0
+
 const api = {
   auth: {
     login: (): Promise<unknown> => ipcRenderer.invoke('auth:login'),
@@ -188,7 +190,48 @@ const api = {
       updateBranch: (owner: string, repo: string, number: number, expectedHeadSha?: string): Promise<unknown> =>
         ipcRenderer.invoke('github:pulls:update-branch', owner, repo, number, expectedHeadSha),
       convertToDraft: (nodeId: string): Promise<unknown> => ipcRenderer.invoke('github:pulls:convert-to-draft', nodeId),
-      markReady: (nodeId: string): Promise<unknown> => ipcRenderer.invoke('github:pulls:mark-ready', nodeId)
+      markReady: (nodeId: string): Promise<unknown> => ipcRenderer.invoke('github:pulls:mark-ready', nodeId),
+      streamDiff: (
+        owner: string,
+        repo: string,
+        number: number,
+        callbacks: {
+          onChunk: (chunk: Uint8Array) => void
+          onEnd: () => void
+          onError: (message: string, tooLarge: boolean) => void
+        }
+      ): (() => void) => {
+        const streamId = `pr-diff-${++diffStreamCounter}`
+        const cleanup = (): void => {
+          ipcRenderer.removeListener('github:pull-diff-chunk', onChunk)
+          ipcRenderer.removeListener('github:pull-diff-end', onEnd)
+          ipcRenderer.removeListener('github:pull-diff-error', onError)
+        }
+        const onChunk = (_event: IpcRendererEvent, data: { streamId: string; chunk: Uint8Array }): void => {
+          if (data.streamId === streamId) callbacks.onChunk(data.chunk)
+        }
+        const onEnd = (_event: IpcRendererEvent, data: { streamId: string }): void => {
+          if (data.streamId !== streamId) return
+          cleanup()
+          callbacks.onEnd()
+        }
+        const onError = (
+          _event: IpcRendererEvent,
+          data: { streamId: string; message: string; tooLarge: boolean }
+        ): void => {
+          if (data.streamId !== streamId) return
+          cleanup()
+          callbacks.onError(data.message, data.tooLarge)
+        }
+        ipcRenderer.on('github:pull-diff-chunk', onChunk)
+        ipcRenderer.on('github:pull-diff-end', onEnd)
+        ipcRenderer.on('github:pull-diff-error', onError)
+        void ipcRenderer.invoke('github:pulls:stream-diff', streamId, owner, repo, number)
+        return () => {
+          cleanup()
+          void ipcRenderer.invoke('github:pulls:cancel-diff', streamId)
+        }
+      }
     },
     pullComments: {
       listIssueComments: (owner: string, repo: string, number: number): Promise<unknown> =>
@@ -357,9 +400,7 @@ const api = {
     pull: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:pull', cwd),
     stash: (cwd: string, message?: string): Promise<unknown> => ipcRenderer.invoke('git:stash', cwd, message),
     stashPop: (cwd: string): Promise<unknown> => ipcRenderer.invoke('git:stash-pop', cwd),
-    log: (cwd: string, count?: number): Promise<unknown> => ipcRenderer.invoke('git:log', cwd, count),
-    fetchPullRequestRefs: (input: unknown): Promise<unknown> => ipcRenderer.invoke('git:fetch-pr-refs', input),
-    computePullRequestDiff: (input: unknown): Promise<unknown> => ipcRenderer.invoke('git:compute-pr-diff', input)
+    log: (cwd: string, count?: number): Promise<unknown> => ipcRenderer.invoke('git:log', cwd, count)
   },
   fs: {
     openFolder: (): Promise<unknown> => ipcRenderer.invoke('fs:open-folder'),

@@ -59,6 +59,7 @@ import Tooltip from '../../components/Tooltip'
 import MarkdownBody from './MarkdownBody'
 import PRCommitsTab from './PRCommitsTab'
 import PRFilesTab from './PRFilesTab'
+import ErrorBoundary from '../../components/ErrorBoundary'
 import ReviewThreadCard from './ReviewThreadCard'
 import {
   buildPullRequestReviewThreads,
@@ -323,27 +324,29 @@ export default function PullRequestDetailView({
         ) : null}
 
         {subview === 'files' ? (
-          <PRFilesTab
-            pr={pr}
-            owner={owner}
-            repo={repo}
-            draftReviewComments={draftReviewComments}
-            onDraftReviewCommentsChange={setDraftReviewComments}
-            threadJumpTarget={threadJumpTarget}
-            agentSessions={agentSessions}
-            onAskClaude={async (prompt, filePath, lineNumber, lineContent, side) => {
-              const context = buildDiffLineAgentContext({ owner, repo, pr, filePath, lineNumber, lineContent, side })
-              await onStartAgent(prompt, undefined, context)
-            }}
-            onFixWithClaude={async (input) => {
-              const context = buildPullRequestAgentContext({ owner, repo, pr })
-              context.commentId = input.commentId
-              await onStartAgent(buildFixWithClaudePrompt(input), undefined, context)
-            }}
-            onContinueAgent={onContinueAgent}
-            onStopAgent={onStopAgent}
-            onPromoteAgent={onPromoteAgent}
-          />
+          <ErrorBoundary label="Failed to render the diff">
+            <PRFilesTab
+              pr={pr}
+              owner={owner}
+              repo={repo}
+              draftReviewComments={draftReviewComments}
+              onDraftReviewCommentsChange={setDraftReviewComments}
+              threadJumpTarget={threadJumpTarget}
+              agentSessions={agentSessions}
+              onAskClaude={async (prompt, filePath, lineNumber, lineContent, side) => {
+                const context = buildDiffLineAgentContext({ owner, repo, pr, filePath, lineNumber, lineContent, side })
+                await onStartAgent(prompt, undefined, context)
+              }}
+              onFixWithClaude={async (input) => {
+                const context = buildPullRequestAgentContext({ owner, repo, pr })
+                context.commentId = input.commentId
+                await onStartAgent(buildFixWithClaudePrompt(input), undefined, context)
+              }}
+              onContinueAgent={onContinueAgent}
+              onStopAgent={onStopAgent}
+              onPromoteAgent={onPromoteAgent}
+            />
+          </ErrorBoundary>
         ) : null}
       </div>
     </div>
