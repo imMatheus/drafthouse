@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { getPathBasename } from '../lib/path'
 import { FileIcon, FolderIcon } from './FileIcon'
 
 export default function ExplorerPanel({
@@ -18,11 +17,6 @@ export default function ExplorerPanel({
     <div className="border-border bg-surface flex min-h-0 w-60 shrink-0 flex-col border-r">
       <div className="px-4 py-3">
         <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Explorer</p>
-      </div>
-      <div className="px-4 pb-2">
-        <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">
-          {getPathBasename(folderPath)}
-        </p>
       </div>
       <div className="flex-1 overflow-y-auto">
         <FolderTree dirPath={folderPath} depth={0} selectedFilePath={selectedFilePath} onSelectFile={onSelectFile} />
