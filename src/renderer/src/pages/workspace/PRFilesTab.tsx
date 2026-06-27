@@ -18,6 +18,7 @@ import {
   FilePen,
   FilePlus,
   FileSymlink,
+  FileText,
   GitCompare,
   Hash,
   ListTree,
@@ -54,6 +55,7 @@ import CommentBodyEditor from '../../components/CommentBodyEditor'
 import FixWithClaudeButton from '../../components/FixWithClaudeButton'
 import ResolveThreadButton from '../../components/ResolveThreadButton'
 import type { FixWithClaudeInput } from '../../lib/agentContext'
+import type { PullRequestFileTabInput } from '../../lib/workspaceTabs'
 import Tooltip from '../../components/Tooltip'
 import { cn } from '../../lib/cn'
 import { useSettings, type DiffIndicatorStyle, type UserSettings } from '../../hooks/useSettings'
@@ -321,6 +323,7 @@ export default function PRFilesTab({
   onDraftReviewCommentsChange,
   threadJumpTarget,
   agentSessions,
+  onOpenPullRequestFile,
   onAskClaude,
   onFixWithClaude,
   onContinueAgent,
@@ -334,6 +337,7 @@ export default function PRFilesTab({
   onDraftReviewCommentsChange: (comments: PullRequestReviewDraftComment[]) => void
   threadJumpTarget: { path: string; commentId: number; nonce: number } | null
   agentSessions?: AgentSessionMeta[]
+  onOpenPullRequestFile: (input: PullRequestFileTabInput) => void
   onAskClaude?: (
     prompt: string,
     filePath: string,
@@ -442,6 +446,21 @@ export default function PRFilesTab({
     onPromoteAgent,
     onDraftReviewCommentsChange,
     draftReviewComments
+  }
+
+  const fileOpenCtxRef = useRef({
+    owner,
+    repo,
+    number: pr.number,
+    headSha: pr.head.sha,
+    onOpenPullRequestFile
+  })
+  fileOpenCtxRef.current = {
+    owner,
+    repo,
+    number: pr.number,
+    headSha: pr.head.sha,
+    onOpenPullRequestFile
   }
 
   // Stable item-annotator handed to the loader: brand-new streamed items pick
@@ -729,6 +748,17 @@ export default function PRFilesTab({
     }
   })
 
+  const [handleOpenPrFile] = useState(() => (file: PrDiffFileMeta): void => {
+    const ctx = fileOpenCtxRef.current
+    ctx.onOpenPullRequestFile({
+      owner: ctx.owner,
+      repo: ctx.repo,
+      number: ctx.number,
+      path: file.filename,
+      ref: ctx.headSha
+    })
+  })
+
   const [stableGutterClick] = useState(
     () =>
       (range: { start: number; side?: 'deletions' | 'additions' }, context: { item: { id: string } }): void => {
@@ -866,6 +896,7 @@ export default function PRFilesTab({
         viewed={viewedFilesRef.current.has(file.filename)}
         onToggleCollapse={() => handleToggleCollapse(item.id)}
         onToggleViewed={() => handleToggleViewed(item.id, file.filename)}
+        onOpenFile={() => handleOpenPrFile(file)}
       />
     )
   })
@@ -1584,13 +1615,15 @@ function FileDiffHeader({
   collapsed,
   viewed,
   onToggleCollapse,
-  onToggleViewed
+  onToggleViewed,
+  onOpenFile
 }: {
   file: PrDiffFileMeta
   collapsed: boolean
   viewed: boolean
   onToggleCollapse: () => void
   onToggleViewed: () => void
+  onOpenFile: () => void
 }) {
   const { copied: pathCopied, copy: copyPath } = useCopyToClipboard()
   const handleCopyPath = (): void => copyPath(file.filename)
@@ -1640,15 +1673,14 @@ function FileDiffHeader({
           </span>
           Viewed
         </button>
-        <a
-          href={file.blobUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
+        <button
+          type="button"
+          onClick={onOpenFile}
+          className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96]"
         >
+          <FileText size={12} />
           View
-          <ExternalLink size={12} />
-        </a>
+        </button>
       </div>
     </div>
   )

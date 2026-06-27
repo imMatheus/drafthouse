@@ -46,7 +46,11 @@ export default function EditorGroupView({
   const activeTab = group.tabs.find((tab) => tab.id === group.activeTabId) ?? null
 
   const contentClass =
-    activeTab && (activeTab.kind === 'file' || activeTab.kind === 'diff' || activeTab.kind === 'agent')
+    activeTab &&
+    (activeTab.kind === 'file' ||
+      activeTab.kind === 'pull-request-file' ||
+      activeTab.kind === 'diff' ||
+      activeTab.kind === 'agent')
       ? 'overflow-hidden'
       : activeTab
         ? 'overflow-y-auto p-5'

@@ -3,6 +3,7 @@ import {
   createDiffTab,
   createFileTab,
   createInitialWorkspaceSession,
+  createPullRequestFileTab,
   createWelcomeTab,
   getPullRequestTabId,
   singleGroupLayout,
@@ -251,6 +252,30 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
       return typeof tab.path === 'string' && tab.path.length > 0
         ? createDiffTab(tab.path, typeof tab.staged === 'boolean' ? tab.staged : false)
         : null
+    case 'pull-request-file': {
+      if (
+        typeof tab.owner !== 'string' ||
+        tab.owner.length === 0 ||
+        typeof tab.repo !== 'string' ||
+        tab.repo.length === 0 ||
+        typeof tab.number !== 'number' ||
+        Number.isNaN(tab.number) ||
+        typeof tab.path !== 'string' ||
+        tab.path.length === 0 ||
+        typeof tab.ref !== 'string' ||
+        tab.ref.length === 0
+      ) {
+        return null
+      }
+
+      return createPullRequestFileTab({
+        owner: tab.owner,
+        repo: tab.repo,
+        number: tab.number,
+        path: tab.path,
+        ref: tab.ref
+      })
+    }
     case 'commit':
       if (typeof tab.sha !== 'string' || tab.sha.length === 0) {
         return null

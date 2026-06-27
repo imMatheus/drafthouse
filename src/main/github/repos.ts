@@ -30,9 +30,10 @@ export function registerReposHandlers(): void {
     'github:repos:get-content',
     async (_event, owner: string, repo: string, path: string, ref: string): Promise<string> => {
       const token = requireAuth()
+      const encodedPath = path.split('/').map(encodeURIComponent).join('/')
       const data = await fetchGitHubJson<{ content: string; encoding: string }>(
         token,
-        `${API}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(ref)}`,
+        `${API}/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
         `Failed to fetch file content for ${path}`
       )
       if (data.encoding === 'base64') {

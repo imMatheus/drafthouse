@@ -38,7 +38,7 @@ import {
   type FixWithClaudeInput
 } from '../../lib/agentContext'
 import { cn } from '../../lib/cn'
-import type { PullRequestSubview } from '../../lib/workspaceTabs'
+import type { PullRequestFileTabInput, PullRequestSubview } from '../../lib/workspaceTabs'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import Loading, { LoadingView } from '../../components/Loading'
@@ -73,6 +73,7 @@ interface PullRequestDetailViewProps {
   onSubviewChange: (subview: PullRequestSubview) => void
   onTitleChange?: (title: string) => void
   onStateChange?: (prState: 'open' | 'closed' | 'merged' | 'draft') => void
+  onOpenPullRequestFile: (input: PullRequestFileTabInput) => void
   onOpenCommit: (sha: string, title?: string) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueAgent: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
@@ -90,6 +91,7 @@ export default function PullRequestDetailView({
   onSubviewChange,
   onTitleChange,
   onStateChange,
+  onOpenPullRequestFile,
   onOpenCommit,
   onStartAgent,
   onContinueAgent,
@@ -323,6 +325,7 @@ export default function PullRequestDetailView({
               onDraftReviewCommentsChange={setDraftReviewComments}
               threadJumpTarget={threadJumpTarget}
               agentSessions={agentSessions}
+              onOpenPullRequestFile={onOpenPullRequestFile}
               onAskClaude={async (prompt, filePath, lineNumber, lineContent, side) => {
                 const context = buildDiffLineAgentContext({ owner, repo, pr, filePath, lineNumber, lineContent, side })
                 await onStartAgent(prompt, undefined, context)

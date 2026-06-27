@@ -115,7 +115,6 @@ export function usePullRequestDiffStream<TMeta>({
   useEffect(() => {
     const requestId = ++requestIdRef.current
     const isCurrent = (): boolean => requestIdRef.current === requestId
-    const blobUrlBase = `https://github.com/${owner}/${repo}/blob/${headSha}`
     const cacheKeyPrefix = `${owner}/${repo}/${number}/${headSha}`
     setViewerKey(requestId)
     setErrorMessage(null)
@@ -196,7 +195,7 @@ export function usePullRequestDiffStream<TMeta>({
     const ingestFile = async (fileText: string, cacheKeyIndex: number): Promise<void> => {
       const fileDiff = processFile(fileText, { cacheKey: `${cacheKeyPrefix}/${cacheKeyIndex}`, isGitDiff: true })
       if (!fileDiff || !isCurrent()) return
-      appendFileDiff(accumulator, fileDiff, { blobUrlBase, patchText: fileText })
+      appendFileDiff(accumulator, fileDiff, { patchText: fileText })
       pendingCount++
       await maybeFlush()
     }

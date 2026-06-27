@@ -2,6 +2,14 @@ import { createEditorGroup, groupNode, type LayoutNode } from './editorLayout'
 
 export type PullRequestSubview = 'conversation' | 'commits' | 'files'
 
+export interface PullRequestFileTabInput {
+  owner: string
+  repo: string
+  number: number
+  path: string
+  ref: string
+}
+
 export type WorkspaceTab =
   | {
       id: 'welcome'
@@ -26,6 +34,10 @@ export type WorkspaceTab =
       title?: string
       prState?: 'open' | 'closed' | 'merged' | 'draft'
     }
+  | ({
+      id: `pull-request-file:${string}`
+      kind: 'pull-request-file'
+    } & PullRequestFileTabInput)
   | {
       id: `commit:${string}`
       kind: 'commit'
@@ -112,6 +124,18 @@ export function getFileTabId(path: string): `file:${string}` {
 
 export function getPullRequestTabId(number: number): `pull-request:${number}` {
   return `pull-request:${number}`
+}
+
+export function createPullRequestFileTab(input: PullRequestFileTabInput): WorkspaceTab {
+  return {
+    id: getPullRequestFileTabId(input),
+    kind: 'pull-request-file',
+    ...input
+  }
+}
+
+export function getPullRequestFileTabId(input: PullRequestFileTabInput): `pull-request-file:${string}` {
+  return `pull-request-file:${input.owner}/${input.repo}#${input.number}:${input.ref}:${input.path}`
 }
 
 export function createCommitTab(sha: string, title?: string): WorkspaceTab {

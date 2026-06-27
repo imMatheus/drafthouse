@@ -190,6 +190,11 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
         icon: <FileIcon name={getPathBasename(tab.path)} size={TAB_ICON_SIZE} />,
         label: getPathBasename(tab.path)
       }
+    case 'pull-request-file':
+      return {
+        icon: <FileIcon name={getPathBasename(tab.path)} size={TAB_ICON_SIZE} />,
+        label: `PR #${tab.number}: ${getPathBasename(tab.path)}`
+      }
     case 'diff':
       return {
         icon: <FileIcon name={getPathBasename(tab.path)} size={TAB_ICON_SIZE} />,

@@ -28,8 +28,10 @@ import {
   createCommitTab,
   createDiffTab,
   createFileTab,
+  createPullRequestFileTab,
   createPullRequestTab,
   getAgentTabId,
+  type PullRequestFileTabInput,
   type PullRequestSubview,
   type WorkspaceSidebarPanel,
   type WorkspaceTab
@@ -57,6 +59,7 @@ import DiffView from './workspace/DiffView'
 import FilesView from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
 import PullRequestDetailView from './workspace/PullRequestDetailView'
+import PullRequestFileView from './workspace/PullRequestFileView'
 import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
@@ -456,6 +459,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   const handleOpenPullRequest = (number: number): void => {
     openInActiveGroup(createPullRequestTab(number))
+  }
+
+  const handleOpenPullRequestFile = (input: PullRequestFileTabInput): void => {
+    openInActiveGroup(createPullRequestFileTab(input))
   }
 
   const handleOpenCommit = (sha: string, title?: string): void => {
@@ -916,6 +923,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                           isLoadingGitInfo,
                           agentSessions: sessionMetas,
                           onOpenFile: handleOpenFile,
+                          onOpenPullRequestFile: handleOpenPullRequestFile,
                           onOpenCommit: handleOpenCommit,
                           onStartAgent: handleStartAgent,
                           onContinueAgent: handleContinueAgent,
@@ -968,6 +976,7 @@ function renderWorkspaceTabContent({
   isLoadingGitInfo,
   agentSessions,
   onOpenFile,
+  onOpenPullRequestFile,
   onOpenCommit,
   onStartAgent,
   onContinueAgent,
@@ -984,6 +993,7 @@ function renderWorkspaceTabContent({
   isLoadingGitInfo: boolean
   agentSessions: AgentSessionMeta[]
   onOpenFile: (path: string) => void
+  onOpenPullRequestFile: (input: PullRequestFileTabInput) => void
   onOpenCommit: (sha: string, title?: string) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
   onContinueAgent: (
@@ -1015,6 +1025,16 @@ function renderWorkspaceTabContent({
       return <WelcomeView />
     case 'file':
       return <FilesView filePath={activeTab.path} folderPath={folderPath} />
+    case 'pull-request-file':
+      return (
+        <PullRequestFileView
+          owner={activeTab.owner}
+          repo={activeTab.repo}
+          number={activeTab.number}
+          filePath={activeTab.path}
+          gitRef={activeTab.ref}
+        />
+      )
     case 'diff':
       return (
         <DiffView filePath={activeTab.path} folderPath={folderPath} staged={activeTab.staged} onOpenFile={onOpenFile} />
@@ -1035,6 +1055,7 @@ function renderWorkspaceTabContent({
           onSubviewChange={(subview) => onPullRequestSubviewChange(activeTab.id, subview)}
           onTitleChange={(title) => onPullRequestTitleChange(activeTab.id, title)}
           onStateChange={(prState) => onPullRequestStateChange(activeTab.id, prState)}
+          onOpenPullRequestFile={onOpenPullRequestFile}
           onOpenCommit={onOpenCommit}
           onStartAgent={onStartAgent}
           onContinueAgent={onContinueAgent}
