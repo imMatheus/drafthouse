@@ -647,7 +647,19 @@ export default function PRFilesTab({
         item.version = typeof item.version === 'number' ? item.version + 1 : 1
         viewer.updateItem(item)
       }
-      viewer.scrollTo({ type: 'item', id: itemId, align: 'start' })
+      // Scroll to the commented line so the virtualizer mounts the annotation
+      // card; the double-rAF below then centers the card itself.
+      if (thread?.line != null && thread.side != null) {
+        viewer.scrollTo({
+          type: 'line',
+          id: itemId,
+          lineNumber: thread.line,
+          side: thread.side === 'LEFT' ? 'deletions' : 'additions',
+          align: 'center'
+        })
+      } else {
+        viewer.scrollTo({ type: 'item', id: itemId, align: 'start' })
+      }
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -882,7 +894,10 @@ export default function PRFilesTab({
     }
   }
 
-  // Jump from the Comments tab to a thread's anchor in the viewer.
+  // Jump from the Comments tab to a thread's anchor in the viewer. Scroll to the
+  // commented line first (not just the file top) so the virtualizer renders that
+  // region and mounts the annotation card; the double-rAF below then centers the
+  // card itself, which sits below the anchored line.
   const handleSelectThread = (thread: PullRequestReviewThread): void => {
     setActiveFilePath(thread.path)
     const itemId = itemIdByFilename.current.get(thread.path)
@@ -894,7 +909,17 @@ export default function PRFilesTab({
         item.version = typeof item.version === 'number' ? item.version + 1 : 1
         viewer.updateItem(item)
       }
-      viewer.scrollTo({ type: 'item', id: itemId, align: 'start' })
+      if (thread.line != null && thread.side != null) {
+        viewer.scrollTo({
+          type: 'line',
+          id: itemId,
+          lineNumber: thread.line,
+          side: thread.side === 'LEFT' ? 'deletions' : 'additions',
+          align: 'center'
+        })
+      } else {
+        viewer.scrollTo({ type: 'item', id: itemId, align: 'start' })
+      }
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -1472,24 +1497,35 @@ function DiffStatsPanel({
   )
 }
 
-// Compact "N / M viewed" readout with a ring that fills as files are marked
-// viewed; the ring flips to a solid success check once everything's reviewed.
+// Compact "N / M viewed" readout. The ring fill is animated as files are marked
+// viewed (the conic stop transitions via the registered --viewed-progress
+// property); once everything's reviewed the fill turns success-green and a check
+// crossfades into the center.
 function ViewedProgress({ viewedCount, totalCount }: { viewedCount: number; totalCount: number }) {
   const complete = viewedCount === totalCount
   const pct = totalCount > 0 ? Math.round((viewedCount / totalCount) * 100) : 0
   return (
     <Tooltip label={complete ? 'All files viewed' : `${viewedCount} of ${totalCount} files viewed`} side="top">
       <span className="ml-auto inline-flex items-center gap-1.5">
-        {complete ? (
-          <CircleCheck size={14} className="text-success animate-check-in" />
-        ) : (
-          <span
-            className="relative size-3.5 shrink-0 rounded-full"
-            style={{ background: `conic-gradient(var(--color-accent) ${pct}%, var(--color-interactive) ${pct}%)` }}
-          >
-            <span className="bg-surface absolute inset-[2.5px] rounded-full" />
-          </span>
-        )}
+        <span
+          className="viewed-progress-ring relative size-3.5 shrink-0 rounded-full"
+          style={
+            {
+              '--viewed-progress': `${pct}%`,
+              '--viewed-progress-fill': complete ? 'var(--color-success)' : 'var(--color-accent)'
+            } as React.CSSProperties
+          }
+        >
+          <span className="bg-surface absolute inset-[2.5px] rounded-full" />
+          <Check
+            size={9}
+            strokeWidth={3}
+            className={cn(
+              'text-success absolute inset-0 m-auto transition-[opacity,scale,filter] duration-300 ease-[cubic-bezier(0.2,0,0,1)]',
+              complete ? 'blur-0 scale-100 opacity-100' : 'scale-[0.25] opacity-0 blur-[4px]'
+            )}
+          />
+        </span>
         <span className={cn(complete ? 'text-success' : 'text-foreground-subtle')}>
           <span className={cn('font-medium', complete ? 'text-success' : 'text-foreground')}>{viewedCount}</span> /{' '}
           {totalCount} viewed

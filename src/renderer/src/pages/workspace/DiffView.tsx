@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
-import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
+import { MultiFileDiff, PatchDiff, type FileContents } from '@pierre/diffs/react'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
 import { BASE_DIFF_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
@@ -19,9 +19,23 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
 
   const absolutePath = `${folderPath}/${filePath}`
 
+  const {
+    data: patch,
+    isLoading: isPatchLoading,
+    error: patchError
+  } = useQuery<string, Error>({
+    queryKey: ['git-diff', folderPath, filePath, staged],
+    queryFn: () => window.api.git.diff(folderPath, filePath, staged),
+    retry: false
+  })
+
+  const hasPatch = typeof patch === 'string' && patch.trim().length > 0
+  const shouldLoadContentFallback = patch != null && !hasPatch && !patchError
+
   const { data: originalContent, isLoading: isOriginalLoading } = useQuery<string, Error>({
     queryKey: ['git-show-file', folderPath, filePath],
     queryFn: () => window.api.git.showFile(folderPath, filePath),
+    enabled: shouldLoadContentFallback,
     retry: false
   })
 
@@ -33,12 +47,19 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
     queryKey: staged ? ['git-show-staged-file', folderPath, filePath] : ['read-file', absolutePath],
     queryFn: () =>
       staged ? window.api.git.showStagedFile(folderPath, filePath) : window.api.fs.readFile(absolutePath),
+    enabled: shouldLoadContentFallback,
     retry: false
   })
 
   const lang = getLanguageFromPath(filePath)
   const oldFile: FileContents = { name: filePath, contents: originalContent ?? '', lang }
   const newFile: FileContents = { name: filePath, contents: modifiedContent ?? '', lang }
+  const diffOptions = {
+    ...BASE_DIFF_OPTIONS,
+    themeType: theme,
+    diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
+    disableFileHeader: true
+  } as const
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -59,26 +80,23 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
-        {isOriginalLoading || isModifiedLoading ? (
+        {isPatchLoading || (shouldLoadContentFallback && (isOriginalLoading || isModifiedLoading)) ? (
           <LoadingView label="Loading diff..." />
+        ) : patchError ? (
+          <div className="px-4 py-6">
+            <p className="text-foreground text-sm font-medium">Diff unavailable</p>
+            <p className="text-foreground-muted mt-1 text-sm">{patchError.message}</p>
+          </div>
         ) : modifiedError ? (
           <div className="px-4 py-6">
             <p className="text-foreground text-sm font-medium">Diff unavailable</p>
             <p className="text-foreground-muted mt-1 text-sm">{modifiedError.message}</p>
           </div>
-        ) : (
-          <MultiFileDiff
-            key={settings.diffViewMode}
-            oldFile={oldFile}
-            newFile={newFile}
-            options={{
-              ...BASE_DIFF_OPTIONS,
-              themeType: theme,
-              diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
-              disableFileHeader: true
-            }}
-          />
-        )}
+        ) : hasPatch ? (
+          <PatchDiff patch={patch} options={diffOptions} />
+        ) : shouldLoadContentFallback ? (
+          <MultiFileDiff oldFile={oldFile} newFile={newFile} options={diffOptions} />
+        ) : null}
       </div>
     </div>
   )

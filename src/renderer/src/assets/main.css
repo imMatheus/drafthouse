@@ -77,6 +77,23 @@ body {
   animation: check-in 300ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+/* Animated progress ring for the PR "viewed" tracker. Driving the conic-gradient
+   stop through a registered custom property is what lets it transition smoothly
+   as files are marked viewed — a plain conic-gradient can't be animated by CSS. */
+@property --viewed-progress {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.viewed-progress-ring {
+  background: conic-gradient(
+    var(--viewed-progress-fill, var(--color-accent)) var(--viewed-progress),
+    var(--color-interactive) var(--viewed-progress)
+  );
+  transition: --viewed-progress 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 @theme {
   --font-sans:
     'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,

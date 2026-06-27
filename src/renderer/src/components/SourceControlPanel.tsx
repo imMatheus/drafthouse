@@ -31,6 +31,7 @@ import Loading from './Loading'
 interface SourceControlPanelProps {
   folderPath: string
   gitInfo?: GitRepoInfo | null
+  activeFile?: { path: string; staged: boolean | null } | null
   onOpenDiff: (path: string, staged: boolean) => void
   onOpenPullRequest?: (number: number) => void
 }
@@ -38,6 +39,7 @@ interface SourceControlPanelProps {
 export default function SourceControlPanel({
   folderPath,
   gitInfo,
+  activeFile,
   onOpenDiff,
   onOpenPullRequest
 }: SourceControlPanelProps) {
@@ -335,6 +337,7 @@ export default function SourceControlPanel({
             files={stagedFiles}
             staged
             isOpen={stagedOpen}
+            activeFile={activeFile}
             onToggle={() => setStagedOpen(!stagedOpen)}
             onOpenDiff={onOpenDiff}
             onAction={handleUnstage}
@@ -353,6 +356,7 @@ export default function SourceControlPanel({
             files={changedFiles}
             staged={false}
             isOpen={changesOpen}
+            activeFile={activeFile}
             onToggle={() => setChangesOpen(!changesOpen)}
             onOpenDiff={onOpenDiff}
             onAction={handleStage}
@@ -647,6 +651,7 @@ function FileSection({
   files,
   staged,
   isOpen,
+  activeFile,
   onToggle,
   onOpenDiff,
   onAction,
@@ -662,6 +667,7 @@ function FileSection({
   files: GitChangedFile[]
   staged: boolean
   isOpen: boolean
+  activeFile?: { path: string; staged: boolean | null } | null
   onToggle: () => void
   onOpenDiff: (path: string, staged: boolean) => void
   onAction: (paths: string[]) => void
@@ -709,18 +715,25 @@ function FileSection({
       </div>
       {isOpen ? (
         <div>
-          {files.map((file) => (
-            <FileRow
-              key={`${file.path}-${staged ? 'staged' : 'changed'}`}
-              file={file}
-              staged={staged}
-              onOpenDiff={() => onOpenDiff(file.path, staged)}
-              onAction={() => onAction([file.path])}
-              actionIcon={actionIcon}
-              actionTitle={actionTitle}
-              onDiscard={onDiscard ? () => onDiscard([file.path]) : undefined}
-            />
-          ))}
+          {files.map((file) => {
+            const isSameFile = activeFile?.path === file.path
+            const isSameStage = activeFile?.staged === null || activeFile?.staged === staged
+            const isActive = isSameFile && isSameStage
+
+            return (
+              <FileRow
+                key={`${file.path}-${staged ? 'staged' : 'changed'}`}
+                file={file}
+                staged={staged}
+                isActive={isActive}
+                onOpenDiff={() => onOpenDiff(file.path, staged)}
+                onAction={() => onAction([file.path])}
+                actionIcon={actionIcon}
+                actionTitle={actionTitle}
+                onDiscard={onDiscard ? () => onDiscard([file.path]) : undefined}
+              />
+            )
+          })}
         </div>
       ) : null}
     </div>
@@ -730,6 +743,7 @@ function FileSection({
 function FileRow({
   file,
   staged,
+  isActive,
   onOpenDiff,
   onAction,
   actionIcon,
@@ -738,6 +752,7 @@ function FileRow({
 }: {
   file: GitChangedFile
   staged: boolean
+  isActive: boolean
   onOpenDiff: () => void
   onAction: () => void
   actionIcon: React.ReactNode
@@ -749,8 +764,17 @@ function FileRow({
   const dirPath = file.path.includes('/') ? file.path.slice(0, file.path.lastIndexOf('/')) : ''
 
   return (
-    <div className="group hover:bg-surface-hover flex items-center gap-1 py-[3px] pr-2 pl-6">
-      <button onClick={onOpenDiff} className="flex flex-1 items-center gap-1.5 overflow-hidden text-left">
+    <div
+      className={cn(
+        'group before:bg-accent relative flex items-center gap-1 py-[3px] pr-2 pl-6 transition-colors before:absolute before:top-1/2 before:left-3 before:h-3.5 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:opacity-0',
+        isActive ? 'bg-accent-bg before:opacity-100' : 'hover:bg-surface-hover'
+      )}
+    >
+      <button
+        onClick={onOpenDiff}
+        className="flex flex-1 items-center gap-1.5 overflow-hidden text-left"
+        aria-current={isActive ? 'page' : undefined}
+      >
         <FileIcon name={displayName} />
         <span className="text-foreground truncate text-xs">{displayName}</span>
         {dirPath ? <span className="text-foreground-subtle truncate text-[10px]">{dirPath}</span> : null}

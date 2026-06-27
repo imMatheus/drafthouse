@@ -111,6 +111,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const activeTabId = activeGroup?.activeTabId ?? null
   const activeTab = activeGroup?.tabs.find((tab) => tab.id === activeTabId) ?? null
   const activeFilePath = activeTab?.kind === 'file' ? activeTab.path : null
+  const activeSourceControlFile =
+    activeTab?.kind === 'diff'
+      ? { path: activeTab.path, staged: activeTab.staged }
+      : activeTab?.kind === 'file'
+        ? { path: getWorkspaceRelativePath(activeTab.path, folderPath), staged: null }
+        : null
   const totalGroups = countGroups(layout)
 
   // The thing currently being dragged. `fromGroupId` is the source group for an
@@ -860,6 +866,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                     <SourceControlPanel
                       folderPath={folderPath}
                       gitInfo={gitInfo}
+                      activeFile={activeSourceControlFile}
                       onOpenDiff={handleOpenDiff}
                       onOpenPullRequest={handleOpenPullRequest}
                     />
@@ -946,6 +953,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       </AgentSessionsProvider>
     </WorkspaceContextProvider>
   )
+}
+
+function getWorkspaceRelativePath(filePath: string, folderPath: string): string {
+  const folderPrefix = folderPath.endsWith('/') ? folderPath : `${folderPath}/`
+  if (!filePath.startsWith(folderPrefix)) return filePath
+  return filePath.slice(folderPrefix.length)
 }
 
 function renderWorkspaceTabContent({
