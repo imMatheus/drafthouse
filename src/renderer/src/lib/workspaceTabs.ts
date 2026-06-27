@@ -1,3 +1,5 @@
+import { createEditorGroup, groupNode, type LayoutNode } from './editorLayout'
+
 export type PullRequestSubview = 'conversation' | 'commits' | 'files'
 
 export type WorkspaceTab =
@@ -49,9 +51,20 @@ export interface WorkspaceSidebarState {
 export interface WorkspaceSession {
   folderPath: string
   sidebar: WorkspaceSidebarState
-  tabs: WorkspaceTab[]
-  activeTabId: WorkspaceTab['id'] | null
+  // The editor area is a tree of split groups. `activeGroupId` is the group that
+  // receives newly opened files and keyboard actions.
+  layout: LayoutNode
+  activeGroupId: string
   activeView: WorkspaceActiveView
+}
+
+/** Build a layout containing a single group holding `tabs`. */
+export function singleGroupLayout(
+  tabs: WorkspaceTab[],
+  activeTabId?: WorkspaceTab['id'] | null
+): { layout: LayoutNode; activeGroupId: string } {
+  const group = createEditorGroup(tabs, activeTabId)
+  return { layout: groupNode(group), activeGroupId: group.id }
 }
 
 export function createWelcomeTab(): WorkspaceTab {
@@ -79,7 +92,7 @@ export function createPullRequestTab(number: number): WorkspaceTab {
 }
 
 export function createInitialWorkspaceSession(folderPath: string): WorkspaceSession {
-  const welcomeTab = createWelcomeTab()
+  const { layout, activeGroupId } = singleGroupLayout([createWelcomeTab()])
 
   return {
     folderPath,
@@ -87,8 +100,8 @@ export function createInitialWorkspaceSession(folderPath: string): WorkspaceSess
       visible: true,
       activePanel: 'explorer'
     },
-    tabs: [welcomeTab],
-    activeTabId: welcomeTab.id,
+    layout,
+    activeGroupId,
     activeView: 'workspace'
   }
 }

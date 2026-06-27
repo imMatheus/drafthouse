@@ -6,6 +6,7 @@ import {
   GitPullRequestClosed,
   GitPullRequestDraft,
   Home,
+  SplitSquareHorizontal,
   Terminal,
   X
 } from 'lucide-react'
@@ -18,102 +19,140 @@ import type { WorkspaceTab } from '../lib/workspaceTabs'
 interface WorkspaceTabBarProps {
   tabs: WorkspaceTab[]
   activeTabId: WorkspaceTab['id'] | null
+  isActiveGroup: boolean
+  showActiveIndicator: boolean
+  // True while any tab (in this or another group) is being dragged.
+  isDragActive: boolean
   onSelectTab: (tabId: WorkspaceTab['id']) => void
   onCloseTab: (tabId: WorkspaceTab['id']) => void
-  onReorderTabs: (tabs: WorkspaceTab[]) => void
+  onTabDragStart: (tab: WorkspaceTab) => void
+  onTabDragEnd: () => void
+  // Drop a dragged tab into this group's strip at the given insertion index.
+  onDropAtIndex: (index: number) => void
+  onSplit: () => void
 }
 
 export default function WorkspaceTabBar({
   tabs,
   activeTabId,
+  isActiveGroup,
+  showActiveIndicator,
+  isDragActive,
   onSelectTab,
   onCloseTab,
-  onReorderTabs
+  onTabDragStart,
+  onTabDragEnd,
+  onDropAtIndex,
+  onSplit
 }: WorkspaceTabBarProps) {
-  const [dragTabId, setDragTabId] = useState<WorkspaceTab['id'] | null>(null)
-  const [dropTargetId, setDropTargetId] = useState<WorkspaceTab['id'] | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
 
   if (tabs.length === 0) {
     return null
   }
 
-  const handleDrop = (targetTabId: WorkspaceTab['id']): void => {
-    if (!dragTabId || dragTabId === targetTabId) return
-
-    const dragIndex = tabs.findIndex((t) => t.id === dragTabId)
-    const targetIndex = tabs.findIndex((t) => t.id === targetTabId)
-    if (dragIndex === -1 || targetIndex === -1) return
-
-    const reordered = [...tabs]
-    const [moved] = reordered.splice(dragIndex, 1)
-    reordered.splice(targetIndex, 0, moved)
-    onReorderTabs(reordered)
-  }
-
   return (
-    <div className="border-border bg-background border-b">
-      <div className="flex min-h-9 items-stretch gap-1 overflow-x-auto px-2 pt-1">
-        {tabs.map((tab) => {
-          const { icon, label } = getWorkspaceTabPresentation(tab)
-          const isActive = tab.id === activeTabId
-          const isDropTarget = tab.id === dropTargetId && dragTabId !== null && dragTabId !== tab.id
+    <div className={cn('border-border bg-background relative border-b', !isActiveGroup && 'opacity-80')}>
+      {showActiveIndicator ? <div className="bg-accent absolute inset-x-0 top-0 z-10 h-0.5" /> : null}
+      <div className="flex min-h-9 items-stretch">
+        <div
+          className="flex flex-1 items-stretch gap-1 overflow-x-auto px-2 pt-1"
+          onDragOver={(e) => {
+            if (!isDragActive) return
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            setDropIndex(tabs.length)
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            setDropIndex(null)
+            onDropAtIndex(tabs.length)
+          }}
+        >
+          {tabs.map((tab, index) => {
+            const { icon, label } = getWorkspaceTabPresentation(tab)
+            const isActive = tab.id === activeTabId
+            const showBar = isDragActive && dropIndex === index
 
-          return (
-            <div
-              key={tab.id}
-              draggable
-              onDragStart={(e) => {
-                setDragTabId(tab.id)
-                e.dataTransfer.effectAllowed = 'move'
-              }}
-              onDragOver={(e) => {
-                e.preventDefault()
-                e.dataTransfer.dropEffect = 'move'
-                setDropTargetId(tab.id)
-              }}
-              onDragLeave={() => setDropTargetId(null)}
-              onDrop={(e) => {
-                e.preventDefault()
-                setDropTargetId(null)
-                handleDrop(tab.id)
-              }}
-              onDragEnd={() => {
-                setDragTabId(null)
-                setDropTargetId(null)
-              }}
-              className={cn(
-                'group flex max-w-52 min-w-0 shrink-0 cursor-pointer items-stretch rounded-t-md border border-b-0 transition-colors',
-                isActive ? 'border-border bg-surface' : 'hover:bg-surface-hover border-transparent',
-                isDropTarget && 'border-l-accent border-l-2'
-              )}
-            >
-              <button
-                onClick={() => onSelectTab(tab.id)}
-                className="flex min-w-0 flex-1 items-center gap-1.5 pr-1.5 pl-2.5 text-left"
+            return (
+              <div
+                key={tab.id}
+                draggable
+                onDragStart={(e) => {
+                  onTabDragStart(tab)
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', tab.id)
+                }}
+                onDragOver={(e) => {
+                  if (!isDragActive) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDropIndex(index)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setDropIndex(null)
+                  onDropAtIndex(index)
+                }}
+                onDragEnd={() => {
+                  onTabDragEnd()
+                  setDropIndex(null)
+                }}
+                className={cn(
+                  'group flex max-w-52 min-w-0 shrink-0 cursor-pointer items-stretch rounded-t-md border border-b-0 transition-colors',
+                  isActive ? 'border-border bg-surface' : 'hover:bg-surface-hover border-transparent',
+                  showBar && 'border-l-accent border-l-2'
+                )}
               >
-                <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
-                <span
-                  className={cn('truncate text-xs font-medium', isActive ? 'text-foreground' : 'text-foreground-muted')}
-                >
-                  {label}
-                </span>
-              </button>
-
-              <Tooltip label={`Close ${label}`} side="bottom">
                 <button
-                  onClick={() => onCloseTab(tab.id)}
-                  className={cn(
-                    'text-foreground-subtle hover:bg-interactive hover:text-foreground my-1 mr-1 flex items-center justify-center rounded px-1 transition-[opacity,background-color,color]',
-                    isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                  )}
-                  aria-label={`Close ${label}`}
+                  onClick={() => onSelectTab(tab.id)}
+                  className="flex min-w-0 flex-1 items-center gap-1.5 pr-1.5 pl-2.5 text-left"
                 >
-                  <X size={12} />
+                  <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
+                  <span
+                    className={cn(
+                      'truncate text-xs font-medium',
+                      isActive ? 'text-foreground' : 'text-foreground-muted'
+                    )}
+                  >
+                    {label}
+                  </span>
                 </button>
-              </Tooltip>
-            </div>
-          )
-        })}
+
+                <Tooltip label={`Close ${label}`} side="bottom">
+                  <button
+                    onClick={() => onCloseTab(tab.id)}
+                    className={cn(
+                      'text-foreground-subtle hover:bg-interactive hover:text-foreground my-1 mr-1 flex items-center justify-center rounded px-1 transition-[opacity,background-color,color]',
+                      isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    )}
+                    aria-label={`Close ${label}`}
+                  >
+                    <X size={12} />
+                  </button>
+                </Tooltip>
+              </div>
+            )
+          })}
+
+          {isDragActive && dropIndex === tabs.length ? (
+            <div className="bg-accent my-1.5 w-0.5 shrink-0 self-stretch rounded" />
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-center px-1.5">
+          <Tooltip label="Split editor right" side="bottom">
+            <button
+              onClick={onSplit}
+              className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-7 items-center justify-center rounded transition-colors"
+              aria-label="Split editor right"
+            >
+              <SplitSquareHorizontal size={15} strokeWidth={1.8} />
+            </button>
+          </Tooltip>
+        </div>
       </div>
     </div>
   )

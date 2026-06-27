@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  CircleCheck,
   Columns2,
   Copy,
   ExternalLink,
@@ -30,7 +31,7 @@ import {
   X
 } from 'lucide-react'
 import { CodeView, PatchDiff, useWorkerPool, type CodeViewHandle, type DiffLineAnnotation } from '@pierre/diffs/react'
-import type { CodeViewDiffItem } from '@pierre/diffs'
+import { processFile, type CodeViewDiffItem } from '@pierre/diffs'
 import * as DropdownMenu from '../../components/DropdownMenu'
 import type {
   AgentSessionMeta,
@@ -84,10 +85,23 @@ const ANNOTATION_WRAPPER_STYLE: React.CSSProperties = {
   lineHeight: '1.5'
 }
 
+// Shared shell for every inline annotation card (thread, draft, composer),
+// mirroring @pierre/diffs' diffshub `annotationCardBase`: a self-contained card
+// that floats on the annotation row's context background, capped in width so it
+// stays readable in wide/unified columns, and lifted with a soft layered shadow
+// rather than a heavy border. Per-card border color is layered on after this.
+const ANNOTATION_CARD =
+  'bg-surface border-border w-full max-w-[600px] overflow-hidden rounded-xl border bg-clip-padding shadow-[0_1px_2px_rgb(0_0_0_/_0.05),0_4px_12px_rgb(0_0_0_/_0.07)]'
+
 // Must match @pierre/diffs' DEFAULT_VIRTUAL_FILE_METRICS.diffHeaderHeight so the
 // virtualizer reserves the right amount of space for our custom file header.
 const DIFF_HEADER_HEIGHT = 44
 
+// Floats the annotation card inside the row the package gives us. The package
+// already paints the row with its own context background (`--diffs-bg-context`),
+// so — like diffshub — we keep this wrapper transparent and just add breathing
+// room; the card carries its own border + shadow. `data-annotation-side` records
+// the diff side without tinting, matching diffshub's neutral inline card.
 function AnnotationWrapper({
   side,
   elementRef,
@@ -98,11 +112,7 @@ function AnnotationWrapper({
   children: ReactNode
 }) {
   return (
-    <div
-      ref={elementRef}
-      style={ANNOTATION_WRAPPER_STYLE}
-      className={cn('border-border border-t p-3', side === 'deletions' ? 'bg-danger/5' : 'bg-success/5')}
-    >
+    <div ref={elementRef} data-annotation-side={side} style={ANNOTATION_WRAPPER_STYLE} className="p-2">
       {children}
     </div>
   )
@@ -345,6 +355,13 @@ export default function PRFilesTab({
   const [openCommentKey, setOpenCommentKey] = useState<string | null>(null)
   const [isSubmitReviewOpen, setIsSubmitReviewOpen] = useState(false)
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set())
+  // "Viewed" is tracked separately from a file's collapsed state (keyed by
+  // filename): marking a file viewed also collapses it, but a viewed file can
+  // still be expanded again without losing its viewed mark. The ref mirrors the
+  // set so the stable header/toggle closures read the latest value.
+  const [viewedFiles, setViewedFiles] = useState<Set<string>>(() => new Set())
+  const viewedFilesRef = useRef(viewedFiles)
+  viewedFilesRef.current = viewedFiles
   const threadRefs = useRef(new Map<number, HTMLElement>())
   // Latest settings for the stable prepareItems closure (new files inherit the
   // current expand/collapse default).
@@ -483,6 +500,12 @@ export default function PRFilesTab({
     }
   }, [threadsByFile, draftsByFile, inlineSessionsByFile, openCommentKey, fileMetas])
 
+  // Drop viewed marks when switching to a different PR — filenames can collide
+  // across PRs, so a stale mark would otherwise carry over.
+  useEffect(() => {
+    setViewedFiles(new Set())
+  }, [owner, repo, pr.number])
+
   // Default the active file to the first one once files arrive.
   useEffect(() => {
     if (filteredFiles.length === 0) {
@@ -493,6 +516,89 @@ export default function PRFilesTab({
       setActiveFilePath(filteredFiles[0]?.filename ?? null)
     }
   }, [activeFilePath, filteredFiles])
+
+  // Lazily upgrade each file to a non-partial diff as it scrolls into view, so
+  // the package's "N unmodified lines" separators become clickable to expand.
+  // GitHub's streamed `.diff` only carries changed regions (isPartial: true), so
+  // the bars can't expand until we re-parse the patch with the full old/new file
+  // contents. Contents and per-file upgrade state are cached so each file is
+  // fetched and re-parsed at most once.
+  const expansionContentRef = useRef(new Map<string, Promise<string | null>>())
+  const expansionStateRef = useRef(new Map<string, 'loading' | 'done' | 'error'>())
+
+  useEffect(() => {
+    // Switching PRs remounts the viewer; drop stale upgrade caches.
+    expansionContentRef.current.clear()
+    expansionStateRef.current.clear()
+  }, [owner, repo, pr.number, pr.head.sha])
+
+  useEffect(() => {
+    if (!activeFilePath) return
+    const activeIndex = fileMetas.findIndex((file) => file.filename === activeFilePath)
+    if (activeIndex < 0) return
+
+    const fetchContents = (path: string, ref: string): Promise<string | null> => {
+      const key = `${ref}::${path}`
+      const cached = expansionContentRef.current.get(key)
+      if (cached) return cached
+      const request = window.api.github.repos.getContent(owner, repo, path, ref).catch(() => null)
+      expansionContentRef.current.set(key, request)
+      return request
+    }
+
+    const upgrade = async (meta: PrDiffFileMeta): Promise<void> => {
+      const itemId = meta.itemId
+      if (expansionStateRef.current.has(itemId)) return
+      const viewer = viewerRef.current
+      const item = viewer?.getItem(itemId)
+      if (!viewer || !item || item.type !== 'diff') return
+      // Skip files with no collapsed gaps to expand, or no patch to re-parse.
+      if (!meta.patchText || !item.fileDiff.hunks.some((hunk) => hunk.collapsedBefore > 0)) {
+        expansionStateRef.current.set(itemId, 'done')
+        return
+      }
+      expansionStateRef.current.set(itemId, 'loading')
+      const newPath = meta.filename
+      const oldPath = meta.previousFilename ?? meta.filename
+      const [oldContents, newContents] = await Promise.all([
+        meta.status === 'added' ? Promise.resolve('') : fetchContents(oldPath, pr.base.sha),
+        meta.status === 'removed' ? Promise.resolve('') : fetchContents(newPath, pr.head.sha)
+      ])
+      // A failed fetch (file too large / 404) leaves the file partial rather than
+      // re-parsing against empty contents, which would render a bogus diff.
+      if (oldContents === null || newContents === null) {
+        expansionStateRef.current.set(itemId, 'error')
+        return
+      }
+      const fileDiff = processFile(meta.patchText, {
+        cacheKey: `${owner}/${repo}/${pr.number}/${pr.head.sha}/${itemId}/full`,
+        isGitDiff: true,
+        oldFile: { name: oldPath, contents: oldContents },
+        newFile: { name: newPath, contents: newContents }
+      })
+      if (!fileDiff || fileDiff.isPartial) {
+        expansionStateRef.current.set(itemId, 'error')
+        return
+      }
+      const live = viewer.getItem(itemId)
+      if (!live || live.type !== 'diff') {
+        expansionStateRef.current.set(itemId, 'error')
+        return
+      }
+      live.fileDiff = fileDiff
+      live.annotations = buildFileAnnotations(meta.filename, annotationInputsRef.current)
+      live.version = typeof live.version === 'number' ? live.version + 1 : 1
+      viewer.updateItem(live)
+      annotationSigRef.current.set(itemId, annotationsSignature(live.annotations))
+      expansionStateRef.current.set(itemId, 'done')
+    }
+
+    // Upgrade the file in view plus a small look-ahead, so bars are ready before
+    // you reach them and short, fully-visible diffs light up without scrolling.
+    for (let i = activeIndex; i < Math.min(activeIndex + 3, fileMetas.length); i++) {
+      void upgrade(fileMetas[i])
+    }
+  }, [activeFilePath, fileMetas, owner, repo, pr.number, pr.base.sha, pr.head.sha])
 
   // Track the topmost visible file for the sidebar highlight. Throttled to one
   // computation per animation frame.
@@ -582,6 +688,31 @@ export default function PRFilesTab({
     if (!viewer.updateItem(item)) return
     // Keep a collapsing file anchored if its top scrolled above the viewport.
     if (itemTop != null && itemTop < instance.getScrollTop()) {
+      viewer.scrollTo({ type: 'item', id: itemId, align: 'start' })
+    }
+  })
+
+  // Toggle a file's "viewed" mark. Marking viewed collapses the diff (and keeps
+  // a file anchored if it collapsed above the viewport); unmarking expands it.
+  const [handleToggleViewed] = useState(() => (itemId: string, filename: string): void => {
+    const willView = !viewedFilesRef.current.has(filename)
+    const next = new Set(viewedFilesRef.current)
+    if (willView) next.add(filename)
+    else next.delete(filename)
+    // Update the ref synchronously so the header Pierre re-renders below (via
+    // updateItem) reads the fresh viewed state; setViewedFiles re-renders the
+    // sidebar progress.
+    viewedFilesRef.current = next
+    setViewedFiles(next)
+    const viewer = viewerRef.current
+    const instance = viewer?.getInstance()
+    const item = viewer?.getItem(itemId)
+    if (!viewer || !instance || !item || item.type !== 'diff') return
+    const itemTop = instance.getTopForItem(itemId)
+    item.collapsed = willView
+    item.version = typeof item.version === 'number' ? item.version + 1 : 1
+    if (!viewer.updateItem(item)) return
+    if (willView && itemTop != null && itemTop < instance.getScrollTop()) {
       viewer.scrollTo({ type: 'item', id: itemId, align: 'start' })
     }
   })
@@ -720,7 +851,9 @@ export default function PRFilesTab({
       <FileDiffHeader
         file={file}
         collapsed={item.collapsed === true}
+        viewed={viewedFilesRef.current.has(file.filename)}
         onToggleCollapse={() => handleToggleCollapse(item.id)}
+        onToggleViewed={() => handleToggleViewed(item.id, file.filename)}
       />
     )
   })
@@ -728,6 +861,11 @@ export default function PRFilesTab({
   const diffStyle = settings.diffViewMode === 'split' ? 'split' : 'unified'
   const overflow = settings.diffWordWrap ? 'wrap' : 'scroll'
   const collapseMode = settings.diffCollapsed ? 'collapsed' : 'expanded'
+
+  // Count only viewed files that still exist in the diff (intersect with the
+  // loaded files) so the progress denominator stays honest.
+  let viewedCount = 0
+  for (const file of fileMetas) if (viewedFiles.has(file.filename)) viewedCount++
 
   // Expand/collapse every loaded file and persist the new default.
   const handleToggleCollapseMode = (): void => {
@@ -783,6 +921,12 @@ export default function PRFilesTab({
         diffIndicators: settings.diffIndicators,
         disableLineNumbers: !settings.diffLineNumbers,
         stickyHeaders: true,
+        // Collapse unchanged runs into expandable "N unmodified lines" bars
+        // (keeping GitHub's 3 lines of context around each change) rather than
+        // dumping the whole file. The bars only become *clickable* once a file
+        // is upgraded to a non-partial diff — see useExpandableDiffOnView.
+        expandUnchanged: false,
+        collapsedContextThreshold: 3,
         enableGutterUtility: true,
         onGutterUtilityClick: stableGutterClick
       }
@@ -838,6 +982,8 @@ export default function PRFilesTab({
               onSelectThread={handleSelectThread}
               diffStats={diffStats}
               streaming={loadState === 'streaming'}
+              viewedCount={viewedCount}
+              totalCount={fileMetas.length}
               draftCount={draftReviewComments.length}
               onSubmitReview={() => setIsSubmitReviewOpen(true)}
               hasFiles={filteredFiles.length > 0}
@@ -1072,6 +1218,8 @@ interface DiffSidebarProps {
   onSelectThread: (thread: PullRequestReviewThread) => void
   diffStats: PrDiffDiffStats | null
   streaming: boolean
+  viewedCount: number
+  totalCount: number
   draftCount: number
   onSubmitReview: () => void
   hasFiles: boolean
@@ -1099,6 +1247,8 @@ function DiffSidebar({
   onSelectThread,
   diffStats,
   streaming,
+  viewedCount,
+  totalCount,
   draftCount,
   onSubmitReview,
   hasFiles,
@@ -1192,7 +1342,7 @@ function DiffSidebar({
         )}
       </div>
 
-      <DiffStatsPanel stats={diffStats} streaming={streaming} />
+      <DiffStatsPanel stats={diffStats} streaming={streaming} viewedCount={viewedCount} totalCount={totalCount} />
 
       {draftCount > 0 ? (
         <div className="border-border border-t p-2">
@@ -1291,7 +1441,17 @@ function ThreadsList({
   )
 }
 
-function DiffStatsPanel({ stats, streaming }: { stats: PrDiffDiffStats | null; streaming: boolean }) {
+function DiffStatsPanel({
+  stats,
+  streaming,
+  viewedCount,
+  totalCount
+}: {
+  stats: PrDiffDiffStats | null
+  streaming: boolean
+  viewedCount: number
+  totalCount: number
+}) {
   if (!stats) return null
   return (
     <div className="border-border text-foreground-muted flex items-center gap-3 border-t px-3 py-2 text-xs tabular-nums">
@@ -1305,8 +1465,37 @@ function DiffStatsPanel({ stats, streaming }: { stats: PrDiffDiffStats | null; s
         <span className="border-border text-foreground-subtle ml-auto rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide uppercase">
           streaming
         </span>
+      ) : totalCount > 0 ? (
+        <ViewedProgress viewedCount={viewedCount} totalCount={totalCount} />
       ) : null}
     </div>
+  )
+}
+
+// Compact "N / M viewed" readout with a ring that fills as files are marked
+// viewed; the ring flips to a solid success check once everything's reviewed.
+function ViewedProgress({ viewedCount, totalCount }: { viewedCount: number; totalCount: number }) {
+  const complete = viewedCount === totalCount
+  const pct = totalCount > 0 ? Math.round((viewedCount / totalCount) * 100) : 0
+  return (
+    <Tooltip label={complete ? 'All files viewed' : `${viewedCount} of ${totalCount} files viewed`} side="top">
+      <span className="ml-auto inline-flex items-center gap-1.5">
+        {complete ? (
+          <CircleCheck size={14} className="text-success animate-check-in" />
+        ) : (
+          <span
+            className="relative size-3.5 shrink-0 rounded-full"
+            style={{ background: `conic-gradient(var(--color-accent) ${pct}%, var(--color-interactive) ${pct}%)` }}
+          >
+            <span className="bg-surface absolute inset-[2.5px] rounded-full" />
+          </span>
+        )}
+        <span className={cn(complete ? 'text-success' : 'text-foreground-subtle')}>
+          <span className={cn('font-medium', complete ? 'text-success' : 'text-foreground')}>{viewedCount}</span> /{' '}
+          {totalCount} viewed
+        </span>
+      </span>
+    </Tooltip>
   )
 }
 
@@ -1357,11 +1546,15 @@ function DiffStatusPanel({
 function FileDiffHeader({
   file,
   collapsed,
-  onToggleCollapse
+  viewed,
+  onToggleCollapse,
+  onToggleViewed
 }: {
   file: PrDiffFileMeta
   collapsed: boolean
+  viewed: boolean
   onToggleCollapse: () => void
+  onToggleViewed: () => void
 }) {
   const { copied: pathCopied, copy: copyPath } = useCopyToClipboard()
   const handleCopyPath = (): void => copyPath(file.filename)
@@ -1390,6 +1583,27 @@ function FileDiffHeader({
       </Tooltip>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <DiffStat additions={file.additions} deletions={file.deletions} />
+        <button
+          type="button"
+          onClick={onToggleViewed}
+          aria-pressed={viewed}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-[background-color,color,border-color,transform] active:scale-[0.96]',
+            viewed
+              ? 'border-accent/40 bg-accent/10 text-foreground'
+              : 'border-border bg-interactive text-foreground-muted hover:bg-interactive-hover hover:text-foreground'
+          )}
+        >
+          <span
+            className={cn(
+              'flex size-3.5 items-center justify-center rounded border transition-colors',
+              viewed ? 'border-accent bg-accent text-accent-foreground' : 'border-border'
+            )}
+          >
+            {viewed ? <Check size={10} strokeWidth={3} className="animate-check-in" /> : null}
+          </span>
+          Viewed
+        </button>
         <a
           href={file.blobUrl}
           target="_blank"
@@ -1413,30 +1627,191 @@ function DraftCommentCard({
   auth: AuthData | null | undefined
   onRemove: () => void
 }) {
+  const body = comment.body.trim()
   return (
-    <div className="border-border bg-surface rounded-xl border">
-      <div className="border-border flex items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          {auth?.user.avatar_url ? (
-            <img src={auth.user.avatar_url} alt={auth.user.login} className="size-7 rounded-full" />
-          ) : null}
-          <div className="text-foreground text-sm">
-            <span className="font-semibold">{auth?.user.login ?? 'You'}</span>{' '}
-            <span className="text-foreground-muted">pending review comment</span>
-          </div>
-        </div>
+    <div className={cn(ANNOTATION_CARD, 'border-accent/30')}>
+      <div className="border-border flex items-center gap-2 border-b px-3 py-2">
+        {auth?.user.avatar_url ? (
+          <img
+            src={auth.user.avatar_url}
+            alt={auth.user.login}
+            className="size-6 shrink-0 rounded-full outline outline-black/10 dark:outline-white/10"
+          />
+        ) : null}
+        <span className="text-foreground truncate text-xs font-semibold">{auth?.user.login ?? 'You'}</span>
+        <span className="bg-accent-bg text-accent shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium">
+          Pending
+        </span>
         <button
           type="button"
           onClick={onRemove}
-          className="text-foreground-muted hover:bg-interactive hover:text-foreground inline-flex size-7 items-center justify-center rounded-md transition-colors"
+          className="text-foreground-subtle hover:bg-interactive hover:text-foreground ml-auto inline-flex size-7 shrink-0 items-center justify-center rounded-md transition active:scale-[0.96]"
           aria-label="Remove draft comment"
         >
           <X size={14} />
         </button>
       </div>
-      <div className="px-4 py-4">
-        <MarkdownBody>{comment.body}</MarkdownBody>
+      <div className="px-3 py-3">
+        {body ? (
+          <MarkdownBody compact>{comment.body}</MarkdownBody>
+        ) : (
+          <p className="text-foreground-subtle text-xs italic">No comment body.</p>
+        )}
       </div>
+    </div>
+  )
+}
+
+// First non-empty line of a comment body, lightly de-marked, for collapsed
+// thread previews.
+function firstCommentLine(text: string): string {
+  const line = text.split('\n').find((entry) => entry.trim().length > 0) ?? ''
+  return line
+    .replace(/^#+\s*/, '')
+    .replace(/[*_`>#~]/g, '')
+    .trim()
+}
+
+// A single comment within a thread. The top-level comment and replies share
+// this body but differ in chrome (avatar size / density) so the hierarchy reads
+// clearly; replies are additionally nested under a connector rail by the parent.
+function ThreadComment({
+  comment,
+  thread,
+  replyTarget,
+  isReply,
+  editingId,
+  setEditingId,
+  onQuoteReply,
+  onFixWithClaude,
+  sessions,
+  onStopAgent,
+  onContinueAgent,
+  onPromoteAgent
+}: {
+  comment: PullRequestReviewComment
+  thread: PullRequestReviewThread
+  replyTarget: { owner: string; repo: string; number: number }
+  isReply: boolean
+  editingId: number | null
+  setEditingId: (id: number | null) => void
+  onQuoteReply: (quoted: string) => void
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
+  sessions: AgentSessionMeta[]
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
+}) {
+  const isTopLevel = comment.id === thread.topLevelComment.id
+  const wasEdited = comment.updated_at !== comment.created_at
+  const body = comment.body.trim()
+
+  return (
+    <div className={cn('px-3', isReply ? 'py-2.5' : 'py-3')}>
+      <div className="flex items-center gap-2">
+        <img
+          src={comment.user.avatar_url}
+          alt={comment.user.login}
+          className={cn(
+            'shrink-0 rounded-full outline outline-black/10 dark:outline-white/10',
+            isReply ? 'size-5' : 'size-6'
+          )}
+        />
+        <span className="text-foreground truncate text-xs font-semibold">{comment.user.login}</span>
+        <span className="text-foreground-subtle shrink-0 text-xs tabular-nums">
+          {formatRelativeTime(comment.created_at)}
+        </span>
+        {wasEdited ? <span className="text-foreground-subtle shrink-0 text-xs">· edited</span> : null}
+        <div className="ml-auto shrink-0">
+          <CommentActionsMenu
+            owner={replyTarget.owner}
+            repo={replyTarget.repo}
+            number={replyTarget.number}
+            commentType="pull-comment"
+            commentId={comment.id}
+            nodeId={comment.node_id}
+            htmlUrl={comment.html_url}
+            body={comment.body}
+            authorLogin={comment.user.login}
+            onStartEdit={() => setEditingId(comment.id)}
+            onQuoteReply={onQuoteReply}
+          />
+        </div>
+      </div>
+      <div className="mt-1.5">
+        {editingId === comment.id ? (
+          <CommentBodyEditor
+            owner={replyTarget.owner}
+            repo={replyTarget.repo}
+            number={replyTarget.number}
+            commentType="pull-comment"
+            commentId={comment.id}
+            initialBody={comment.body}
+            onCancel={() => setEditingId(null)}
+            onSaved={() => setEditingId(null)}
+          />
+        ) : body ? (
+          <MarkdownBody compact>{comment.body}</MarkdownBody>
+        ) : (
+          <p className="text-foreground-subtle text-xs italic">No comment body.</p>
+        )}
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <ReactionBar
+          owner={replyTarget.owner}
+          repo={replyTarget.repo}
+          commentId={comment.id}
+          commentType="pull-comment"
+        />
+        {onFixWithClaude ? (
+          <FixWithClaudeButton
+            onClick={() =>
+              onFixWithClaude({
+                commentId: comment.id,
+                body: comment.body,
+                author: comment.user.login,
+                filePath: thread.path,
+                line: thread.line,
+                diffHunk: comment.diff_hunk
+              })
+            }
+          />
+        ) : null}
+        {isTopLevel ? (
+          <ResolveThreadButton
+            threadId={thread.graphqlId}
+            isResolved={thread.isResolved}
+            owner={replyTarget.owner}
+            repo={replyTarget.repo}
+            number={replyTarget.number}
+          />
+        ) : null}
+      </div>
+      {sessions.map((session) => (
+        <div key={session.id} className="border-border mt-2 border-t pt-2">
+          <InlineAgentResponseCard
+            session={session}
+            variant="nested"
+            onStop={() => onStopAgent?.(session.id)}
+            onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
+            onOpenInChat={() => onPromoteAgent?.(session.id)}
+            compact
+          />
+          {session.status === 'completed' && isTopLevel && thread.graphqlId && !thread.isResolved ? (
+            <div className="border-border bg-background mt-2 flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+              <span className="text-foreground-muted text-xs">Claude is done. Mark resolved?</span>
+              <ResolveThreadButton
+                threadId={thread.graphqlId}
+                isResolved={thread.isResolved}
+                owner={replyTarget.owner}
+                repo={replyTarget.repo}
+                number={replyTarget.number}
+                variant="solid"
+              />
+            </div>
+          ) : null}
+        </div>
+      ))}
     </div>
   )
 }
@@ -1462,6 +1837,8 @@ function InlineDiffThread({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
+  // Resolved threads start collapsed to a one-line summary, expandable on click.
+  const [collapsed, setCollapsed] = useState(thread.isResolved)
   const queryClient = useQueryClient()
 
   const handleReply = async (): Promise<void> => {
@@ -1500,116 +1877,112 @@ function InlineDiffThread({
     return acc
   }, new Map())
 
-  const allComments = [thread.topLevelComment, ...thread.replies]
+  const replyCount = thread.replies.length
+  const commentCount = replyCount + 1
+
+  if (collapsed) {
+    const preview = firstCommentLine(thread.topLevelComment.body)
+    return (
+      <button
+        type="button"
+        onClick={() => setCollapsed(false)}
+        className={cn(
+          ANNOTATION_CARD,
+          'hover:bg-surface-hover flex items-center gap-2 px-3 py-2.5 text-left transition-colors'
+        )}
+      >
+        <CircleCheck size={15} className="text-success shrink-0" />
+        <img
+          src={thread.topLevelComment.user.avatar_url}
+          alt={thread.topLevelComment.user.login}
+          className="size-5 shrink-0 rounded-full outline outline-black/10 dark:outline-white/10"
+        />
+        <span className="text-foreground shrink-0 text-xs font-semibold">{thread.topLevelComment.user.login}</span>
+        <span className="text-foreground-muted min-w-0 flex-1 truncate text-xs">
+          {preview || 'Resolved conversation'}
+        </span>
+        <span className="text-foreground-subtle flex shrink-0 items-center gap-1 text-xs tabular-nums">
+          <MessageSquare size={12} />
+          {commentCount}
+        </span>
+        <ChevronDown size={14} className="text-foreground-subtle shrink-0" />
+      </button>
+    )
+  }
 
   return (
-    <div className="bg-surface border-border space-y-2 rounded-md border p-3">
-      {allComments.map((comment) => (
-        <div key={comment.id}>
-          <div className="flex items-center gap-2">
-            <img src={comment.user.avatar_url} alt={comment.user.login} className="size-5 rounded-full" />
-            <span className="text-foreground text-xs font-semibold">{comment.user.login}</span>
-            <span className="text-foreground-subtle text-xs">{formatRelativeTime(comment.created_at)}</span>
-            <div className="ml-auto">
-              <CommentActionsMenu
-                owner={replyTarget.owner}
-                repo={replyTarget.repo}
-                number={replyTarget.number}
-                commentType="pull-comment"
-                commentId={comment.id}
-                nodeId={comment.node_id}
-                htmlUrl={comment.html_url}
-                body={comment.body}
-                authorLogin={comment.user.login}
-                onStartEdit={() => setEditingId(comment.id)}
-                onQuoteReply={handleQuoteReply}
-              />
-            </div>
+    <div className={cn(ANNOTATION_CARD, thread.isResolved && 'border-success/40')}>
+      <div className="border-border flex items-center gap-2 border-b px-3 py-2">
+        {thread.isResolved ? (
+          <span className="text-success inline-flex shrink-0 items-center gap-1 text-xs font-semibold">
+            <CircleCheck size={13} /> Resolved
+          </span>
+        ) : (
+          <span className="text-foreground-muted inline-flex shrink-0 items-center gap-1 text-xs font-medium">
+            <MessageSquare size={13} /> Conversation
+          </span>
+        )}
+        <span className="text-foreground-subtle shrink-0 text-xs tabular-nums">
+          {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
+        </span>
+        {thread.isResolved ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            className="text-foreground-subtle hover:text-foreground ml-auto inline-flex shrink-0 items-center gap-1 text-xs transition-colors"
+          >
+            Hide <ChevronsDownUp size={13} />
+          </button>
+        ) : null}
+      </div>
+
+      <ThreadComment
+        comment={thread.topLevelComment}
+        thread={thread}
+        replyTarget={replyTarget}
+        isReply={false}
+        editingId={editingId}
+        setEditingId={setEditingId}
+        onQuoteReply={handleQuoteReply}
+        onFixWithClaude={onFixWithClaude}
+        sessions={sessionsByCommentId.get(thread.topLevelComment.id) ?? []}
+        onStopAgent={onStopAgent}
+        onContinueAgent={onContinueAgent}
+        onPromoteAgent={onPromoteAgent}
+      />
+
+      {replyCount > 0 ? (
+        <div className="border-border bg-background border-t">
+          <div className="border-border/60 ml-5 border-l">
+            {thread.replies.map((reply, index) => (
+              <div key={reply.id} className={cn(index > 0 && 'border-border/50 border-t')}>
+                <ThreadComment
+                  comment={reply}
+                  thread={thread}
+                  replyTarget={replyTarget}
+                  isReply
+                  editingId={editingId}
+                  setEditingId={setEditingId}
+                  onQuoteReply={handleQuoteReply}
+                  onFixWithClaude={onFixWithClaude}
+                  sessions={sessionsByCommentId.get(reply.id) ?? []}
+                  onStopAgent={onStopAgent}
+                  onContinueAgent={onContinueAgent}
+                  onPromoteAgent={onPromoteAgent}
+                />
+              </div>
+            ))}
           </div>
-          <div className="mt-2">
-            {editingId === comment.id ? (
-              <CommentBodyEditor
-                owner={replyTarget.owner}
-                repo={replyTarget.repo}
-                number={replyTarget.number}
-                commentType="pull-comment"
-                commentId={comment.id}
-                initialBody={comment.body}
-                onCancel={() => setEditingId(null)}
-                onSaved={() => setEditingId(null)}
-              />
-            ) : (
-              <MarkdownBody className="">{comment.body}</MarkdownBody>
-            )}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <ReactionBar
-              owner={replyTarget.owner}
-              repo={replyTarget.repo}
-              commentId={comment.id}
-              commentType="pull-comment"
-            />
-            {onFixWithClaude ? (
-              <FixWithClaudeButton
-                onClick={() =>
-                  onFixWithClaude({
-                    commentId: comment.id,
-                    body: comment.body,
-                    author: comment.user.login,
-                    filePath: thread.path,
-                    line: thread.line,
-                    diffHunk: comment.diff_hunk
-                  })
-                }
-              />
-            ) : null}
-            {comment.id === thread.topLevelComment.id ? (
-              <ResolveThreadButton
-                threadId={thread.graphqlId}
-                isResolved={thread.isResolved}
-                owner={replyTarget.owner}
-                repo={replyTarget.repo}
-                number={replyTarget.number}
-              />
-            ) : null}
-          </div>
-          {(sessionsByCommentId.get(comment.id) ?? []).map((session) => (
-            <div key={session.id} className="border-border mt-2 border-t pt-2">
-              <InlineAgentResponseCard
-                session={session}
-                variant="nested"
-                onStop={() => onStopAgent?.(session.id)}
-                onContinue={(prompt) => onContinueAgent?.(session.id, prompt)}
-                onOpenInChat={() => onPromoteAgent?.(session.id)}
-                compact
-              />
-              {session.status === 'completed' &&
-              comment.id === thread.topLevelComment.id &&
-              thread.graphqlId &&
-              !thread.isResolved ? (
-                <div className="border-border bg-background mt-2 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-                  <span className="text-foreground-muted text-xs">Claude is done. Mark resolved?</span>
-                  <ResolveThreadButton
-                    threadId={thread.graphqlId}
-                    isResolved={thread.isResolved}
-                    owner={replyTarget.owner}
-                    repo={replyTarget.repo}
-                    number={replyTarget.number}
-                    variant="solid"
-                  />
-                </div>
-              ) : null}
-            </div>
-          ))}
         </div>
-      ))}
-      <div className="">
+      ) : null}
+
+      <div className="border-border bg-surface border-t p-3">
         <textarea
           value={replyBody}
           onChange={(e) => setReplyBody(e.target.value)}
-          placeholder="Write a reply"
-          className="border-border bg-surface text-foreground placeholder:text-foreground-subtle focus:border-accent w-full resize-none rounded border px-2.5 py-1.5 text-xs focus:outline-none"
-          rows={1}
+          placeholder="Write a reply…"
+          className="border-border bg-background text-foreground placeholder:text-foreground-subtle focus:border-accent w-full resize-none rounded-lg border px-3 py-2 text-xs transition-colors focus:outline-none"
+          rows={replyBody.trim() ? 3 : 1}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault()
@@ -1619,14 +1992,15 @@ function InlineDiffThread({
         />
         {errorMessage ? <p className="text-danger mt-1 text-xs">{errorMessage}</p> : null}
         {replyBody.trim() ? (
-          <div className="mt-1.5 flex items-center justify-end">
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <span className="text-foreground-subtle mr-auto text-[11px]">⌘↵ to reply</span>
             <button
               type="button"
               onClick={handleReply}
               disabled={isSubmitting}
-              className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40"
+              className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition active:scale-[0.96] disabled:opacity-40"
             >
-              {isSubmitting ? 'Replying...' : 'Reply'}
+              {isSubmitting ? 'Replying…' : 'Reply'}
             </button>
           </div>
         ) : null}
@@ -1697,9 +2071,12 @@ function InlineDiffCommentComposer({
   }
 
   return (
-    <div className="border-border bg-surface rounded-xl border">
-      <div className="border-border text-foreground border-b px-4 py-3 text-sm font-medium">
-        Comment on {path}:{line}
+    <div className={ANNOTATION_CARD}>
+      <div className="border-border text-foreground flex items-center gap-2 border-b px-4 py-2.5 text-sm font-medium">
+        <MessageSquare size={14} className="text-foreground-subtle shrink-0" />
+        <span className="truncate">
+          Comment on {path}:<span className="tabular-nums">{line}</span>
+        </span>
       </div>
       <ClaudeMentionTextarea
         value={body}
@@ -1723,7 +2100,7 @@ function InlineDiffCommentComposer({
           <button
             type="button"
             onClick={onCancel}
-            className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+            className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition active:scale-[0.96]"
           >
             Cancel
           </button>
@@ -1736,7 +2113,7 @@ function InlineDiffCommentComposer({
                 setBody('')
               }}
               disabled={!body.trim() || isSubmitting}
-              className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-border bg-interactive text-foreground hover:bg-interactive-hover rounded-md border px-3 py-1.5 text-xs font-medium transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Add to review
             </button>
@@ -1745,9 +2122,9 @@ function InlineDiffCommentComposer({
             type="button"
             onClick={handleAddSingleComment}
             disabled={!body.trim() || isSubmitting}
-            className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isSubmitting ? 'Adding...' : claudeMention ? 'Ask Claude' : 'Add comment'}
+            {isSubmitting ? 'Adding…' : claudeMention ? 'Ask Claude' : 'Add comment'}
           </button>
         </div>
       </div>

@@ -2,8 +2,8 @@ import type { BaseCodeOptions, BaseDiffOptions, SupportedLanguages, ThemesType }
 import type { PullRequestFile } from '../../../shared/types'
 
 export const DIFFS_THEMES: ThemesType = {
-  dark: 'github-dark-default',
-  light: 'github-light-default'
+  dark: 'pierre-dark',
+  light: 'pierre-light'
 }
 
 const EXTENSION_TO_LANG: Record<string, SupportedLanguages> = {

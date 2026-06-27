@@ -7,11 +7,15 @@ import { FileIcon, FolderIcon } from './FileIcon'
 export default function ExplorerPanel({
   folderPath,
   selectedFilePath,
-  onSelectFile
+  onSelectFile,
+  onFileDragStart,
+  onDragEnd
 }: {
   folderPath: string
   selectedFilePath: string | null
   onSelectFile: (path: string) => void
+  onFileDragStart?: (path: string) => void
+  onDragEnd?: () => void
 }) {
   return (
     <div className="border-border bg-surface flex min-h-0 w-60 shrink-0 flex-col border-r">
@@ -19,7 +23,14 @@ export default function ExplorerPanel({
         <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Explorer</p>
       </div>
       <div className="flex-1 overflow-y-auto">
-        <FolderTree dirPath={folderPath} depth={0} selectedFilePath={selectedFilePath} onSelectFile={onSelectFile} />
+        <FolderTree
+          dirPath={folderPath}
+          depth={0}
+          selectedFilePath={selectedFilePath}
+          onSelectFile={onSelectFile}
+          onFileDragStart={onFileDragStart}
+          onDragEnd={onDragEnd}
+        />
       </div>
     </div>
   )
@@ -29,12 +40,16 @@ function FolderTree({
   dirPath,
   depth,
   selectedFilePath,
-  onSelectFile
+  onSelectFile,
+  onFileDragStart,
+  onDragEnd
 }: {
   dirPath: string
   depth: number
   selectedFilePath: string | null
   onSelectFile: (path: string) => void
+  onFileDragStart?: (path: string) => void
+  onDragEnd?: () => void
 }) {
   const {
     data: entries,
@@ -77,10 +92,19 @@ function FolderTree({
             depth={depth}
             selectedFilePath={selectedFilePath}
             onSelectFile={onSelectFile}
+            onFileDragStart={onFileDragStart}
+            onDragEnd={onDragEnd}
           />
         ) : (
           <button
             key={entry.path}
+            draggable={onFileDragStart != null}
+            onDragStart={(e) => {
+              onFileDragStart?.(entry.path)
+              e.dataTransfer.effectAllowed = 'copyMove'
+              e.dataTransfer.setData('text/plain', entry.path)
+            }}
+            onDragEnd={() => onDragEnd?.()}
             onClick={() => onSelectFile(entry.path)}
             className={cn(
               'flex w-full items-center gap-1.5 py-[3px] pr-2 text-left text-xs transition-colors',
@@ -103,12 +127,16 @@ function FolderNode({
   entry,
   depth,
   selectedFilePath,
-  onSelectFile
+  onSelectFile,
+  onFileDragStart,
+  onDragEnd
 }: {
   entry: { name: string; path: string }
   depth: number
   selectedFilePath: string | null
   onSelectFile: (path: string) => void
+  onFileDragStart?: (path: string) => void
+  onDragEnd?: () => void
 }) {
   const [open, setOpen] = useState(false)
 
@@ -132,6 +160,8 @@ function FolderNode({
           depth={depth + 1}
           selectedFilePath={selectedFilePath}
           onSelectFile={onSelectFile}
+          onFileDragStart={onFileDragStart}
+          onDragEnd={onDragEnd}
         />
       )}
     </>

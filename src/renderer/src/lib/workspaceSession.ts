@@ -5,6 +5,7 @@ import {
   createInitialWorkspaceSession,
   createWelcomeTab,
   getPullRequestTabId,
+  singleGroupLayout,
   type PullRequestSubview,
   type WorkspaceActiveView,
   type WorkspaceSidebarPanel,
@@ -12,6 +13,15 @@ import {
   type WorkspaceSidebarState,
   type WorkspaceTab
 } from './workspaceTabs'
+import {
+  collectGroups,
+  createGroupId,
+  createSplitId,
+  flattenLayout,
+  type EditorGroup,
+  type LayoutNode,
+  type SplitDirection
+} from './editorLayout'
 
 interface WorkspaceSessionStore {
   currentFolderPath: string | null
@@ -63,49 +73,135 @@ function parseWorkspaceSession(folderPath: string, value: unknown): WorkspaceSes
   const session = value as Partial<WorkspaceSession> & {
     explorerVisible?: boolean
     selectedFilePath?: string | null
+    tabs?: unknown
+    activeTabId?: unknown
   }
 
   const parsedFolderPath =
     typeof session.folderPath === 'string' && session.folderPath.length > 0 ? session.folderPath : folderPath
 
   const sidebar = parseWorkspaceSidebarState(session.sidebar, session.explorerVisible)
-  const hasTabsField = Array.isArray(session.tabs)
-  const tabs = parseWorkspaceTabs(session.tabs)
-  const activeTabId =
-    typeof session.activeTabId === 'string' && tabs.some((tab) => tab.id === session.activeTabId)
-      ? session.activeTabId
-      : (tabs[0]?.id ?? null)
   const rawActiveView = (session as { activeView?: unknown }).activeView
   const activeView: WorkspaceActiveView = rawActiveView === 'settings' ? 'settings' : 'workspace'
 
-  if (hasTabsField) {
-    return {
-      folderPath: parsedFolderPath,
-      sidebar,
-      tabs,
-      activeTabId,
-      activeView
-    }
-  }
-
-  if (typeof session.selectedFilePath === 'string' && session.selectedFilePath.length > 0) {
-    const fileTab = createFileTab(session.selectedFilePath)
-
-    return {
-      folderPath: parsedFolderPath,
-      sidebar,
-      tabs: [fileTab],
-      activeTabId: fileTab.id,
-      activeView
-    }
-  }
+  const { layout, activeGroupId } = parseWorkspaceLayout(session)
 
   return {
     folderPath: parsedFolderPath,
     sidebar,
-    tabs: [createWelcomeTab()],
-    activeTabId: 'welcome',
+    layout,
+    activeGroupId,
     activeView
+  }
+}
+
+/**
+ * Resolve a session's editor layout, supporting three persisted shapes:
+ *  - new format: a `layout` tree + `activeGroupId`
+ *  - legacy: a flat `tabs` array + `activeTabId` → migrated into one group
+ *  - oldest: a single `selectedFilePath` → migrated into one group
+ * Falls back to a single group with the Welcome tab when nothing is restorable.
+ */
+function parseWorkspaceLayout(session: {
+  layout?: unknown
+  activeGroupId?: unknown
+  tabs?: unknown
+  activeTabId?: unknown
+  selectedFilePath?: string | null
+}): { layout: LayoutNode; activeGroupId: string } {
+  if (session.layout && typeof session.layout === 'object') {
+    const parsed = parseLayoutNode(session.layout)
+    if (parsed) {
+      const layout = flattenLayout(parsed)
+      const groups = collectGroups(layout)
+      const activeGroupId =
+        typeof session.activeGroupId === 'string' && groups.some((group) => group.id === session.activeGroupId)
+          ? session.activeGroupId
+          : (groups[0]?.id ?? createGroupId())
+      return { layout, activeGroupId }
+    }
+  }
+
+  if (Array.isArray(session.tabs)) {
+    const tabs = parseWorkspaceTabs(session.tabs)
+    const activeTabId =
+      typeof session.activeTabId === 'string' && tabs.some((tab) => tab.id === session.activeTabId)
+        ? (session.activeTabId as WorkspaceTab['id'])
+        : (tabs[0]?.id ?? null)
+    return singleGroupLayout(tabs.length > 0 ? tabs : [createWelcomeTab()], tabs.length > 0 ? activeTabId : 'welcome')
+  }
+
+  if (typeof session.selectedFilePath === 'string' && session.selectedFilePath.length > 0) {
+    return singleGroupLayout([createFileTab(session.selectedFilePath)])
+  }
+
+  return singleGroupLayout([createWelcomeTab()])
+}
+
+function parseLayoutNode(value: unknown): LayoutNode | null {
+  if (!value || typeof value !== 'object') return null
+
+  const node = value as { type?: unknown }
+
+  if (node.type === 'group') {
+    const group = parseEditorGroup(value)
+    return group ? { type: 'group', group } : null
+  }
+
+  if (node.type === 'split') {
+    const split = value as { id?: unknown; direction?: unknown; children?: unknown; sizes?: unknown }
+    const rawChildren = Array.isArray(split.children) ? split.children : []
+    const rawSizes = Array.isArray(split.sizes) ? split.sizes : []
+
+    const children: LayoutNode[] = []
+    const sizes: number[] = []
+    rawChildren.forEach((child, index) => {
+      const parsedChild = parseLayoutNode(child)
+      if (parsedChild) {
+        children.push(parsedChild)
+        const size = rawSizes[index]
+        sizes.push(typeof size === 'number' && size > 0 ? size : 1)
+      }
+    })
+
+    if (children.length === 0) return null
+    if (children.length === 1) return children[0]
+
+    const direction: SplitDirection = split.direction === 'column' ? 'column' : 'row'
+    const total = sizes.reduce((sum, size) => sum + size, 0)
+    const normalized = total > 0 ? sizes.map((size) => size / total) : children.map(() => 1 / children.length)
+
+    return {
+      type: 'split',
+      id: typeof split.id === 'string' && split.id.length > 0 ? split.id : createSplitId(),
+      direction,
+      children,
+      sizes: normalized
+    }
+  }
+
+  return null
+}
+
+function parseEditorGroup(value: unknown): EditorGroup | null {
+  if (!value || typeof value !== 'object') return null
+
+  const group = value as { id?: unknown; tabs?: unknown; activeTabId?: unknown }
+  const tabs = parseWorkspaceTabs(group.tabs)
+
+  // Agent tabs are ephemeral and dropped on restore — a group left with no tabs
+  // is collapsed away rather than restored empty.
+  if (tabs.length === 0) return null
+
+  const activeTabId =
+    typeof group.activeTabId === 'string' && tabs.some((tab) => tab.id === group.activeTabId)
+      ? (group.activeTabId as WorkspaceTab['id'])
+      : tabs[tabs.length - 1].id
+
+  return {
+    id: typeof group.id === 'string' && group.id.length > 0 ? group.id : createGroupId(),
+    tabs,
+    activeTabId
   }
 }
 

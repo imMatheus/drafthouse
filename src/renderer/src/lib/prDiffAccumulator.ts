@@ -18,6 +18,14 @@ export interface PrDiffFileMeta {
   deletions: number
   /** github.com blob URL for the "View" link, built from the head SHA. */
   blobUrl: string
+  /**
+   * The raw per-file git patch this item was parsed from. Kept so the file can
+   * be re-parsed with full old/new contents later (`processFile(patch, { oldFile,
+   * newFile })`) to make a non-partial, *expandable* diff — GitHub's streamed
+   * `.diff` only carries changed regions, so the collapsed "N unmodified lines"
+   * bars aren't expandable until we enrich the patch with the surrounding lines.
+   */
+  patchText: string
 }
 
 export interface PrDiffDiffStats {
@@ -70,6 +78,8 @@ function uniqueItemId(itemIdCounts: Map<string, number>, path: string): string {
 interface AppendOptions {
   /** `https://github.com/{owner}/{repo}/blob/{headSha}` — filename is appended. */
   blobUrlBase: string
+  /** Raw git patch this file was parsed from, kept for later expansion. */
+  patchText: string
 }
 
 /**
@@ -107,7 +117,8 @@ export function appendFileDiff<TMeta>(
     status: mapStatus(fileDiff.type),
     additions,
     deletions,
-    blobUrl: `${options.blobUrlBase}/${filename}`
+    blobUrl: `${options.blobUrlBase}/${filename}`,
+    patchText: options.patchText
   })
 
   accumulator.diffStats.fileCount++

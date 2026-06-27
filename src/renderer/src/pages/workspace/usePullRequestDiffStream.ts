@@ -196,7 +196,7 @@ export function usePullRequestDiffStream<TMeta>({
     const ingestFile = async (fileText: string, cacheKeyIndex: number): Promise<void> => {
       const fileDiff = processFile(fileText, { cacheKey: `${cacheKeyPrefix}/${cacheKeyIndex}`, isGitDiff: true })
       if (!fileDiff || !isCurrent()) return
-      appendFileDiff(accumulator, fileDiff, { blobUrlBase })
+      appendFileDiff(accumulator, fileDiff, { blobUrlBase, patchText: fileText })
       pendingCount++
       await maybeFlush()
     }

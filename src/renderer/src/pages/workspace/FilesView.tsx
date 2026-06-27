@@ -73,7 +73,15 @@ export default function FilesView({ filePath, folderPath }: FilesViewProps) {
             <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>
           </div>
         ) : (
-          <File file={file} options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }} />
+          // Highlight on the main thread: the shared worker pool (added for the
+          // PR diff viewer) only applies highlights on its diff path, so routing
+          // single-file views through it leaves them as plain text. One file at a
+          // time is cheap to tokenize on the main thread.
+          <File
+            file={file}
+            options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }}
+            disableWorkerPool
+          />
         )}
       </div>
     </div>

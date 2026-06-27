@@ -10,7 +10,6 @@ import type {
   PullRequestDetail
 } from '../../../shared/types'
 import { prStateLabel } from '../lib/prMentions'
-import { cn } from '../lib/cn'
 import { getPathBasename } from '../lib/path'
 import ActivityBar from '../components/ActivityBar'
 import CommandPalette from '../components/CommandPalette'
@@ -20,7 +19,8 @@ import ExplorerPanel from '../components/ExplorerPanel'
 import SearchPanel from '../components/SearchPanel'
 import PullRequestsPanel from '../components/PullRequestsPanel'
 import SourceControlPanel from '../components/SourceControlPanel'
-import WorkspaceTabBar from '../components/WorkspaceTabBar'
+import EditorLayout from '../components/EditorLayout'
+import type { EditorGroupHandlers, EditorDropTarget } from '../components/EditorGroupView'
 import WorkspaceTopBar from '../components/WorkspaceTopBar'
 import type { WorkspaceSession } from '../lib/workspaceSession'
 import {
@@ -29,10 +29,28 @@ import {
   createDiffTab,
   createFileTab,
   createPullRequestTab,
+  getAgentTabId,
   type PullRequestSubview,
   type WorkspaceSidebarPanel,
   type WorkspaceTab
 } from '../lib/workspaceTabs'
+import {
+  addTabToGroup,
+  collectGroups,
+  countGroups,
+  createEditorGroup,
+  findGroup,
+  findGroupContainingTab,
+  firstGroupId,
+  mapAllGroups,
+  removeGroup,
+  removeTabAndCollapse,
+  removeTabFromGroup,
+  replaceGroup,
+  setSplitSizes,
+  splitWithGroup,
+  type LayoutNode
+} from '../lib/editorLayout'
 import AgentSessionTab from './workspace/AgentSessionTab'
 import SettingsView from './workspace/SettingsView'
 import DiffView from './workspace/DiffView'
@@ -88,9 +106,22 @@ interface WorkspaceProps {
 }
 
 export default function Workspace({ session, onCloseWorkspace, onUpdateSession }: WorkspaceProps) {
-  const { folderPath, sidebar, tabs, activeTabId, activeView } = session
-  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? null
+  const { folderPath, sidebar, layout, activeGroupId, activeView } = session
+  const activeGroup = findGroup(layout, activeGroupId)
+  const activeTabId = activeGroup?.activeTabId ?? null
+  const activeTab = activeGroup?.tabs.find((tab) => tab.id === activeTabId) ?? null
   const activeFilePath = activeTab?.kind === 'file' ? activeTab.path : null
+  const totalGroups = countGroups(layout)
+
+  // The thing currently being dragged. `fromGroupId` is the source group for an
+  // internal tab drag, or null for an external drag from the sidebar (a file,
+  // PR or agent session being dragged into the editor area).
+  const [pendingDrag, setPendingDrag] = useState<{ tab: WorkspaceTab; fromGroupId: string | null } | null>(null)
+
+  const findTabAnywhere = (tabId: WorkspaceTab['id']): WorkspaceTab | null =>
+    collectGroups(layout)
+      .flatMap((group) => group.tabs)
+      .find((tab) => tab.id === tabId) ?? null
 
   // Agent state: session metadata lives in React state (infrequent — only on
   // session start / status changes). Per-session stream events live in a
@@ -106,46 +137,71 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const [searchFocusNonce, setSearchFocusNonce] = useState(0)
 
   // Tab navigation history (back/forward buttons in the top bar). Tracks visited
-  // tab ids so the user can move through them like a browser. Local-only state —
-  // history doesn't persist across reloads.
-  const [navState, setNavState] = useState<{ history: Array<WorkspaceTab['id']>; index: number }>({
-    history: activeTabId ? [activeTabId] : [],
-    index: activeTabId ? 0 : -1
-  })
+  // {group, tab} locations so the user can move through them like a browser.
+  // Local-only state — history doesn't persist across reloads.
+  type NavLocation = { groupId: string; tabId: WorkspaceTab['id'] }
+  const [navState, setNavState] = useState<{ history: NavLocation[]; index: number }>(() =>
+    activeTabId ? { history: [{ groupId: activeGroupId, tabId: activeTabId }], index: 0 } : { history: [], index: -1 }
+  )
   const skipNextHistoryPushRef = useRef(false)
 
   useEffect(() => {
-    if (!activeTabId) return
+    if (!activeGroupId || !activeTabId) return
     if (skipNextHistoryPushRef.current) {
       skipNextHistoryPushRef.current = false
       return
     }
     setNavState((prev) => {
-      if (prev.history[prev.index] === activeTabId) return prev
+      const top = prev.history[prev.index]
+      if (top && top.groupId === activeGroupId && top.tabId === activeTabId) return prev
       const truncated = prev.history.slice(0, prev.index + 1)
-      return { history: [...truncated, activeTabId], index: truncated.length }
+      return { history: [...truncated, { groupId: activeGroupId, tabId: activeTabId }], index: truncated.length }
     })
-  }, [activeTabId])
+  }, [activeGroupId, activeTabId])
+
+  // Drop nav entries whose group no longer exists after a structural change.
+  const pruneNavHistory = (nextLayout: LayoutNode): void => {
+    const validGroupIds = new Set(collectGroups(nextLayout).map((group) => group.id))
+    setNavState((prev) => {
+      const history: NavLocation[] = []
+      let index = prev.index
+      prev.history.forEach((entry, i) => {
+        if (validGroupIds.has(entry.groupId)) {
+          history.push(entry)
+        } else if (i <= prev.index) {
+          index--
+        }
+      })
+      return { history, index: Math.max(index, history.length === 0 ? -1 : 0) }
+    })
+  }
 
   const canGoBack = navState.index > 0
   const canGoForward = navState.index < navState.history.length - 1
 
-  const handleGoBack = (): void => {
-    if (!canGoBack) return
-    const targetIndex = navState.index - 1
-    const targetTabId = navState.history[targetIndex]
+  const navigateTo = (targetIndex: number): void => {
+    const target = navState.history[targetIndex]
+    if (!target) return
+    const group = findGroup(layout, target.groupId)
+    if (!group) {
+      setNavState({ ...navState, index: targetIndex })
+      return
+    }
     skipNextHistoryPushRef.current = true
     setNavState({ ...navState, index: targetIndex })
-    onUpdateSession({ activeTabId: targetTabId })
+    const tabExists = group.tabs.some((tab) => tab.id === target.tabId)
+    onUpdateSession({
+      layout: tabExists ? replaceGroup(layout, target.groupId, (g) => ({ ...g, activeTabId: target.tabId })) : layout,
+      activeGroupId: target.groupId
+    })
+  }
+
+  const handleGoBack = (): void => {
+    if (canGoBack) navigateTo(navState.index - 1)
   }
 
   const handleGoForward = (): void => {
-    if (!canGoForward) return
-    const targetIndex = navState.index + 1
-    const targetTabId = navState.history[targetIndex]
-    skipNextHistoryPushRef.current = true
-    setNavState({ ...navState, index: targetIndex })
-    onUpdateSession({ activeTabId: targetTabId })
+    if (canGoForward) navigateTo(navState.index + 1)
   }
 
   const { data: gitInfo, isLoading: isLoadingGitInfo } = useQuery<GitRepoInfo | null, Error>({
@@ -216,81 +272,188 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }, [agentSessionsStore])
 
-  const openOrFocusTab = (nextTab: WorkspaceTab): void => {
-    const existingTab = tabs.find((tab) => tab.id === nextTab.id)
+  // Resolve which group new tabs should open into, falling back to the first
+  // group if the active group id is somehow stale.
+  const resolveActiveGroupId = (): string => (findGroup(layout, activeGroupId) ? activeGroupId : firstGroupId(layout))
 
+  // Open (or focus) a tab in the active group. Per the chosen behavior the same
+  // file may be open in multiple groups at once.
+  const openInActiveGroup = (nextTab: WorkspaceTab): void => {
+    const targetGroupId = resolveActiveGroupId()
     onUpdateSession({
-      tabs: existingTab ? tabs : [...tabs, nextTab],
-      activeTabId: nextTab.id
+      layout: replaceGroup(layout, targetGroupId, (group) => addTabToGroup(group, nextTab)),
+      activeGroupId: targetGroupId
     })
   }
 
-  const handleSelectTab = (tabId: WorkspaceTab['id']): void => {
-    if (tabId === activeTabId) return
+  // Focus an existing copy of a tab wherever it lives, else open it in the
+  // active group. Used for agent tabs to avoid duplicate live sessions.
+  const focusOrOpenTab = (nextTab: WorkspaceTab): void => {
+    const existingGroup = findGroupContainingTab(layout, nextTab.id)
+    if (existingGroup) {
+      onUpdateSession({
+        layout: replaceGroup(layout, existingGroup.id, (group) => ({ ...group, activeTabId: nextTab.id })),
+        activeGroupId: existingGroup.id
+      })
+      return
+    }
+    openInActiveGroup(nextTab)
+  }
 
-    // Sync active agent session when selecting an agent tab
-    const selectedTab = tabs.find((tab) => tab.id === tabId)
+  const handleSelectTab = (groupId: string, tabId: WorkspaceTab['id']): void => {
+    const group = findGroup(layout, groupId)
+    const selectedTab = group?.tabs.find((tab) => tab.id === tabId)
     if (selectedTab?.kind === 'agent') {
       setActiveAgentSessionId(selectedTab.sessionId)
     }
 
+    if (groupId === activeGroupId && group?.activeTabId === tabId) return
+
     onUpdateSession({
-      activeTabId: tabId
+      layout: replaceGroup(layout, groupId, (g) => ({ ...g, activeTabId: tabId })),
+      activeGroupId: groupId
     })
   }
 
-  const handleCloseTab = (tabId: WorkspaceTab['id']): void => {
-    const tabIndex = tabs.findIndex((tab) => tab.id === tabId)
+  const handleFocusGroup = (groupId: string): void => {
+    if (groupId === activeGroupId) return
+    const group = findGroup(layout, groupId)
+    const groupActiveTab = group?.tabs.find((tab) => tab.id === group.activeTabId)
+    if (groupActiveTab?.kind === 'agent') {
+      setActiveAgentSessionId(groupActiveTab.sessionId)
+    }
+    onUpdateSession({ activeGroupId: groupId })
+  }
 
-    if (tabIndex === -1) {
-      return
+  const handleCloseTab = (groupId: string, tabId: WorkspaceTab['id']): void => {
+    const group = findGroup(layout, groupId)
+    if (!group || !group.tabs.some((tab) => tab.id === tabId)) return
+
+    const updatedGroup = removeTabFromGroup(group, tabId)
+    let nextLayout: LayoutNode
+    let nextActiveGroupId = activeGroupId
+
+    if (updatedGroup.tabs.length === 0 && totalGroups > 1) {
+      // Collapse the now-empty group and reparent focus to a survivor.
+      nextLayout = removeGroup(layout, groupId) ?? layout
+      if (activeGroupId === groupId) nextActiveGroupId = firstGroupId(nextLayout)
+    } else {
+      nextLayout = replaceGroup(layout, groupId, () => updatedGroup)
     }
 
-    // Drop the closed tab from the nav history (and adjust index).
-    setNavState((prev) => {
-      const filtered: Array<WorkspaceTab['id']> = []
-      let newIndex = prev.index
-      for (let i = 0; i < prev.history.length; i++) {
-        if (prev.history[i] === tabId) {
-          if (i <= prev.index) newIndex--
-        } else {
-          filtered.push(prev.history[i])
-        }
+    pruneNavHistory(nextLayout)
+    onUpdateSession({ layout: nextLayout, activeGroupId: nextActiveGroupId })
+  }
+
+  const handleResizeSplit = (splitId: string, sizes: number[]): void => {
+    onUpdateSession({ layout: setSplitSizes(layout, splitId, sizes) })
+  }
+
+  // Sync the active agent session whenever an agent tab becomes the active tab.
+  const syncAgentSelection = (tab: WorkspaceTab): void => {
+    if (tab.kind === 'agent') setActiveAgentSessionId(tab.sessionId)
+  }
+
+  // Split button: move the active tab out into a new group to the right, so the
+  // source group keeps its other tabs (e.g. [1,2,3] active on 2 → [1,3] and [2]).
+  const handleSplitGroup = (groupId: string): void => {
+    const group = findGroup(layout, groupId)
+    const tabToMove = group?.tabs.find((tab) => tab.id === group.activeTabId)
+    // A single-tab group can't be split — moving its only tab would just relocate it.
+    if (!group || !tabToMove || group.tabs.length <= 1) return
+
+    const newGroup = createEditorGroup([tabToMove], tabToMove.id)
+    const afterRemoval = replaceGroup(layout, groupId, (g) => removeTabFromGroup(g, tabToMove.id))
+    onUpdateSession({
+      layout: splitWithGroup(afterRemoval, groupId, 'right', newGroup),
+      activeGroupId: newGroup.id
+    })
+  }
+
+  const handleTabDragStart = (tab: WorkspaceTab, fromGroupId: string): void => {
+    setPendingDrag({ tab, fromGroupId })
+  }
+
+  const handleDragEnd = (): void => {
+    setPendingDrag(null)
+  }
+
+  // Start an external drag of a sidebar item (file / PR / agent session).
+  const handleExternalDragStart = (tab: WorkspaceTab): void => {
+    setPendingDrag({ tab, fromGroupId: null })
+  }
+
+  const handleEditorDrop = ({ targetGroupId, position, index }: EditorDropTarget): void => {
+    const drag = pendingDrag
+    if (!drag) return
+
+    // External drag from the sidebar — nothing to remove from a source group.
+    if (drag.fromGroupId === null) {
+      if (position === 'center') {
+        const nextLayout = replaceGroup(layout, targetGroupId, (g) => addTabToGroup(g, drag.tab, index))
+        onUpdateSession({ layout: nextLayout, activeGroupId: targetGroupId })
+      } else {
+        const newGroup = createEditorGroup([drag.tab], drag.tab.id)
+        onUpdateSession({
+          layout: splitWithGroup(layout, targetGroupId, position, newGroup),
+          activeGroupId: newGroup.id
+        })
       }
-      return { history: filtered, index: Math.max(newIndex, filtered.length === 0 ? -1 : 0) }
-    })
-
-    const nextTabs = tabs.filter((tab) => tab.id !== tabId)
-
-    if (activeTabId !== tabId) {
-      onUpdateSession({
-        tabs: nextTabs
-      })
+      syncAgentSelection(drag.tab)
       return
     }
 
-    const nextActiveTabId = nextTabs[tabIndex - 1]?.id ?? nextTabs[tabIndex]?.id ?? null
+    const fromGroupId = drag.fromGroupId
+    const sourceGroup = findGroup(layout, fromGroupId)
+    const tab = sourceGroup?.tabs.find((t) => t.id === drag.tab.id)
+    if (!sourceGroup || !tab) return
 
-    onUpdateSession({
-      tabs: nextTabs,
-      activeTabId: nextActiveTabId
-    })
-  }
+    if (position === 'center') {
+      if (fromGroupId === targetGroupId) {
+        // A center drop on the group's own content (no target index) is a no-op;
+        // only strip drops (which carry an index) reorder.
+        if (index === undefined) return
+        const origIndex = sourceGroup.tabs.findIndex((t) => t.id === tab.id)
+        const without = sourceGroup.tabs.filter((t) => t.id !== tab.id)
+        let insertIndex = index
+        if (origIndex < insertIndex) insertIndex -= 1
+        insertIndex = Math.max(0, Math.min(insertIndex, without.length))
+        without.splice(insertIndex, 0, tab)
+        onUpdateSession({
+          layout: replaceGroup(layout, fromGroupId, (g) => ({ ...g, tabs: without, activeTabId: tab.id })),
+          activeGroupId: fromGroupId
+        })
+        return
+      }
 
-  const handleReorderTabs = (reorderedTabs: WorkspaceTab[]): void => {
-    onUpdateSession({ tabs: reorderedTabs })
+      // Move the tab into another existing group.
+      let nextLayout = removeTabAndCollapse(layout, fromGroupId, tab.id)
+      nextLayout = replaceGroup(nextLayout, targetGroupId, (g) => addTabToGroup(g, tab, index))
+      pruneNavHistory(nextLayout)
+      onUpdateSession({ layout: nextLayout, activeGroupId: targetGroupId })
+      return
+    }
+
+    // Edge drop → split. Dragging a group's only tab onto its own edge is a no-op.
+    if (fromGroupId === targetGroupId && sourceGroup.tabs.length <= 1) return
+
+    const newGroup = createEditorGroup([tab], tab.id)
+    const afterRemoval = removeTabAndCollapse(layout, fromGroupId, tab.id)
+    const nextLayout = splitWithGroup(afterRemoval, targetGroupId, position, newGroup)
+    pruneNavHistory(nextLayout)
+    onUpdateSession({ layout: nextLayout, activeGroupId: newGroup.id })
   }
 
   const handleOpenFile = (filePath: string): void => {
-    openOrFocusTab(createFileTab(filePath))
+    openInActiveGroup(createFileTab(filePath))
   }
 
   const handleOpenPullRequest = (number: number): void => {
-    openOrFocusTab(createPullRequestTab(number))
+    openInActiveGroup(createPullRequestTab(number))
   }
 
   const handleOpenCommit = (sha: string, title?: string): void => {
-    openOrFocusTab(createCommitTab(sha, title))
+    openInActiveGroup(createCommitTab(sha, title))
   }
 
   const handleToggleSidebar = (panel: WorkspaceSidebarPanel): void => {
@@ -361,6 +524,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
         e.preventDefault()
         handleToggleSidebar('explorer')
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
+        e.preventDefault()
+        handleSplitGroup(activeGroupId)
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -368,7 +535,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   }, [sidebar, session])
 
   const handleOpenDiff = (path: string, staged: boolean): void => {
-    openOrFocusTab(createDiffTab(path, staged))
+    openInActiveGroup(createDiffTab(path, staged))
   }
 
   const handleToggleSettings = (): void => {
@@ -401,11 +568,18 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
         ? prompt.slice(0, 30) + '...'
         : prompt
     const newTab = createAgentTab(sessionId, tabTitle)
-    const nextTabs = tabs.filter((tab) => !(tab.kind === 'agent' && tab.sessionId === 'new')).concat(newTab)
+    // Replace the "New Session" placeholder in whatever group holds it (else the
+    // active group), swapping it for the real agent tab.
+    const placeholderGroup = findGroupContainingTab(layout, getAgentTabId('new'))
+    const targetGroupId = placeholderGroup?.id ?? resolveActiveGroupId()
 
     onUpdateSession({
-      tabs: nextTabs,
-      activeTabId: newTab.id
+      layout: replaceGroup(layout, targetGroupId, (group) => ({
+        ...group,
+        tabs: group.tabs.filter((tab) => !(tab.kind === 'agent' && tab.sessionId === 'new')).concat(newTab),
+        activeTabId: newTab.id
+      })),
+      activeGroupId: targetGroupId
     })
   }
 
@@ -459,44 +633,39 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     if (agentSession) {
       const truncatedPrompt =
         agentSession.prompt.length > 30 ? agentSession.prompt.slice(0, 30) + '...' : agentSession.prompt
-      openOrFocusTab(createAgentTab(sessionId, truncatedPrompt))
+      focusOrOpenTab(createAgentTab(sessionId, truncatedPrompt))
     }
   }
 
   const handleNewAgentSession = (): void => {
     setActiveAgentSessionId(null)
-    openOrFocusTab(createAgentTab('new', 'New Session'))
+    focusOrOpenTab(createAgentTab('new', 'New Session'))
   }
 
   const handleAgentActivityClick = (): void => {
-    const emptyAgentTab = tabs.find((tab) => tab.kind === 'agent' && tab.sessionId === 'new')
-
     setActiveAgentSessionId(null)
 
-    if (activeView === 'settings') {
-      const tabToFocus = emptyAgentTab ?? createAgentTab('new', 'New Session')
+    const newTabId = getAgentTabId('new')
+    const placeholderGroup = findGroupContainingTab(layout, newTabId)
+    const sidebarPatch = { sidebar: { visible: true, activePanel: 'agent' as const } }
+
+    if (placeholderGroup) {
       onUpdateSession({
         activeView: 'workspace',
-        tabs: emptyAgentTab ? tabs : [...tabs, tabToFocus],
-        activeTabId: tabToFocus.id,
-        sidebar: { visible: true, activePanel: 'agent' }
-      })
-      return
-    }
-
-    if (emptyAgentTab) {
-      onUpdateSession({
-        activeTabId: emptyAgentTab.id,
-        sidebar: { visible: true, activePanel: 'agent' }
+        layout: replaceGroup(layout, placeholderGroup.id, (g) => ({ ...g, activeTabId: newTabId })),
+        activeGroupId: placeholderGroup.id,
+        ...sidebarPatch
       })
       return
     }
 
     const newTab = createAgentTab('new', 'New Session')
+    const targetGroupId = resolveActiveGroupId()
     onUpdateSession({
-      tabs: [...tabs, newTab],
-      activeTabId: newTab.id,
-      sidebar: { visible: true, activePanel: 'agent' }
+      activeView: 'workspace',
+      layout: replaceGroup(layout, targetGroupId, (g) => addTabToGroup(g, newTab)),
+      activeGroupId: targetGroupId,
+      ...sidebarPatch
     })
   }
 
@@ -506,21 +675,25 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'cancelled' as const } : s)))
   }
 
+  // PR/commit tabs may be open in more than one group; update every copy.
   const handlePullRequestSubviewChange = (tabId: WorkspaceTab['id'], subview: PullRequestSubview): void => {
     onUpdateSession({
-      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, subview } : tab))
+      layout: mapAllGroups(layout, (group) => ({
+        ...group,
+        tabs: group.tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, subview } : tab))
+      }))
     })
   }
 
   const handlePullRequestTitleChange = (tabId: WorkspaceTab['id'], title: string): void => {
-    const currentTab = tabs.find((tab) => tab.id === tabId)
-
-    if (!currentTab || currentTab.kind !== 'pull-request' || currentTab.title === title) {
-      return
-    }
+    const currentTab = findTabAnywhere(tabId)
+    if (!currentTab || currentTab.kind !== 'pull-request' || currentTab.title === title) return
 
     onUpdateSession({
-      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, title } : tab))
+      layout: mapAllGroups(layout, (group) => ({
+        ...group,
+        tabs: group.tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, title } : tab))
+      }))
     })
   }
 
@@ -528,26 +701,26 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     tabId: WorkspaceTab['id'],
     prState: 'open' | 'closed' | 'merged' | 'draft'
   ): void => {
-    const currentTab = tabs.find((tab) => tab.id === tabId)
-
-    if (!currentTab || currentTab.kind !== 'pull-request' || currentTab.prState === prState) {
-      return
-    }
+    const currentTab = findTabAnywhere(tabId)
+    if (!currentTab || currentTab.kind !== 'pull-request' || currentTab.prState === prState) return
 
     onUpdateSession({
-      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, prState } : tab))
+      layout: mapAllGroups(layout, (group) => ({
+        ...group,
+        tabs: group.tabs.map((tab) => (tab.id === tabId && tab.kind === 'pull-request' ? { ...tab, prState } : tab))
+      }))
     })
   }
 
   const handleCommitTitleChange = (tabId: WorkspaceTab['id'], title: string): void => {
-    const currentTab = tabs.find((tab) => tab.id === tabId)
-
-    if (!currentTab || currentTab.kind !== 'commit' || currentTab.title === title) {
-      return
-    }
+    const currentTab = findTabAnywhere(tabId)
+    if (!currentTab || currentTab.kind !== 'commit' || currentTab.title === title) return
 
     onUpdateSession({
-      tabs: tabs.map((tab) => (tab.id === tabId && tab.kind === 'commit' ? { ...tab, title } : tab))
+      layout: mapAllGroups(layout, (group) => ({
+        ...group,
+        tabs: group.tabs.map((tab) => (tab.id === tabId && tab.kind === 'commit' ? { ...tab, title } : tab))
+      }))
     })
   }
 
@@ -566,7 +739,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       : target.prompt.length > 30
         ? target.prompt.slice(0, 30) + '...'
         : target.prompt
-    openOrFocusTab(createAgentTab(sessionId, tabTitle))
+    focusOrOpenTab(createAgentTab(sessionId, tabTitle))
   }
 
   // Keep the latest close handler in a ref so the IPC listener subscribes once
@@ -574,11 +747,22 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   // the workspace re-renders on agent activity / git polling).
   const closeActiveTabRef = useRef<() => void>(() => {})
   closeActiveTabRef.current = () => {
-    if (activeTabId) handleCloseTab(activeTabId)
+    if (activeTabId) handleCloseTab(activeGroupId, activeTabId)
   }
   useEffect(() => {
     return window.api.fs.onCloseTab(() => closeActiveTabRef.current())
   }, [])
+
+  const editorHandlers: EditorGroupHandlers = {
+    onSelectTab: handleSelectTab,
+    onCloseTab: handleCloseTab,
+    onFocusGroup: handleFocusGroup,
+    onSplitGroup: handleSplitGroup,
+    onTabDragStart: handleTabDragStart,
+    onTabDragEnd: handleDragEnd,
+    onDrop: handleEditorDrop,
+    onResizeSplit: handleResizeSplit
+  }
 
   const changedFileCount = gitStatus?.length ?? 0
 
@@ -663,6 +847,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                       folderPath={folderPath}
                       selectedFilePath={activeFilePath}
                       onSelectFile={handleOpenFile}
+                      onFileDragStart={(path) => handleExternalDragStart(createFileTab(path))}
+                      onDragEnd={handleDragEnd}
                     />
                   ) : null}
 
@@ -685,6 +871,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                       isLoadingGitInfo={isLoadingGitInfo}
                       onOpenPullRequest={handleOpenPullRequest}
                       activePRNumber={activeTab?.kind === 'pull-request' ? activeTab.number : null}
+                      onPullRequestDragStart={(number) => handleExternalDragStart(createPullRequestTab(number))}
+                      onDragEnd={handleDragEnd}
                     />
                   ) : null}
 
@@ -694,44 +882,45 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                       activeSessionId={activeAgentSessionId}
                       onSelectSession={handleSelectAgentSession}
                       onNewSession={handleNewAgentSession}
+                      onSessionDragStart={(session) =>
+                        handleExternalDragStart(
+                          createAgentTab(
+                            session.id,
+                            session.prompt.length > 30 ? session.prompt.slice(0, 30) + '...' : session.prompt
+                          )
+                        )
+                      }
+                      onDragEnd={handleDragEnd}
                     />
                   ) : null}
 
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <WorkspaceTabBar
-                      tabs={tabs}
-                      activeTabId={activeTabId}
-                      onSelectTab={handleSelectTab}
-                      onCloseTab={handleCloseTab}
-                      onReorderTabs={handleReorderTabs}
+                  <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    <EditorLayout
+                      node={layout}
+                      activeGroupId={activeGroupId}
+                      totalGroups={totalGroups}
+                      dragActive={pendingDrag !== null}
+                      handlers={editorHandlers}
+                      renderContent={(tab) =>
+                        renderWorkspaceTabContent({
+                          activeTab: tab,
+                          folderPath,
+                          gitInfo,
+                          isLoadingGitInfo,
+                          agentSessions: sessionMetas,
+                          onOpenFile: handleOpenFile,
+                          onOpenCommit: handleOpenCommit,
+                          onStartAgent: handleStartAgent,
+                          onContinueAgent: handleContinueAgent,
+                          onStopAgent: handleStopAgent,
+                          onPromoteAgent: handlePromoteAgentSession,
+                          onPullRequestSubviewChange: handlePullRequestSubviewChange,
+                          onPullRequestTitleChange: handlePullRequestTitleChange,
+                          onPullRequestStateChange: handlePullRequestStateChange,
+                          onCommitTitleChange: handleCommitTitleChange
+                        })
+                      }
                     />
-
-                    <main
-                      className={cn(
-                        'min-h-0 flex-1',
-                        activeTab?.kind === 'file' || activeTab?.kind === 'diff' || activeTab?.kind === 'agent'
-                          ? 'overflow-hidden'
-                          : 'overflow-y-auto p-5'
-                      )}
-                    >
-                      {renderWorkspaceTabContent({
-                        activeTab,
-                        folderPath,
-                        gitInfo,
-                        isLoadingGitInfo,
-                        agentSessions: sessionMetas,
-                        onOpenFile: handleOpenFile,
-                        onOpenCommit: handleOpenCommit,
-                        onStartAgent: handleStartAgent,
-                        onContinueAgent: handleContinueAgent,
-                        onStopAgent: handleStopAgent,
-                        onPromoteAgent: handlePromoteAgentSession,
-                        onPullRequestSubviewChange: handlePullRequestSubviewChange,
-                        onPullRequestTitleChange: handlePullRequestTitleChange,
-                        onPullRequestStateChange: handlePullRequestStateChange,
-                        onCommitTitleChange: handleCommitTitleChange
-                      })}
-                    </main>
                   </div>
                 </>
               )}

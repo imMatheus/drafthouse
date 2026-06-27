@@ -9,6 +9,8 @@ interface AgentPanelProps {
   activeSessionId: string | null
   onSelectSession: (id: string) => void
   onNewSession: () => void
+  onSessionDragStart?: (session: AgentSessionMeta) => void
+  onDragEnd?: () => void
 }
 
 function StatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {
@@ -27,7 +29,14 @@ function StatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {
   return null
 }
 
-export default function AgentPanel({ sessions, activeSessionId, onSelectSession, onNewSession }: AgentPanelProps) {
+export default function AgentPanel({
+  sessions,
+  activeSessionId,
+  onSelectSession,
+  onNewSession,
+  onSessionDragStart,
+  onDragEnd
+}: AgentPanelProps) {
   const sortedSessions = [...sessions].reverse()
 
   return (
@@ -52,6 +61,13 @@ export default function AgentPanel({ sessions, activeSessionId, onSelectSession,
           sortedSessions.map((session) => (
             <button
               key={session.id}
+              draggable={onSessionDragStart != null}
+              onDragStart={(e) => {
+                onSessionDragStart?.(session)
+                e.dataTransfer.effectAllowed = 'copyMove'
+                e.dataTransfer.setData('text/plain', session.prompt)
+              }}
+              onDragEnd={() => onDragEnd?.()}
               onClick={() => onSelectSession(session.id)}
               className={cn(
                 'flex w-full items-center gap-2 px-4 py-[3px] text-left transition-colors',

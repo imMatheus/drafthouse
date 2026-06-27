@@ -13,13 +13,17 @@ interface PullRequestsPanelProps {
   isLoadingGitInfo: boolean
   onOpenPullRequest: (number: number) => void
   activePRNumber?: number | null
+  onPullRequestDragStart?: (number: number) => void
+  onDragEnd?: () => void
 }
 
 export default function PullRequestsPanel({
   gitInfo,
   isLoadingGitInfo,
   onOpenPullRequest,
-  activePRNumber
+  activePRNumber,
+  onPullRequestDragStart,
+  onDragEnd
 }: PullRequestsPanelProps) {
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open')
   const [searchQuery, setSearchQuery] = useState('')
@@ -146,6 +150,13 @@ export default function PullRequestsPanel({
             return (
               <button
                 key={pr.number}
+                draggable={onPullRequestDragStart != null}
+                onDragStart={(e) => {
+                  onPullRequestDragStart?.(pr.number)
+                  e.dataTransfer.effectAllowed = 'copyMove'
+                  e.dataTransfer.setData('text/plain', `#${pr.number}`)
+                }}
+                onDragEnd={() => onDragEnd?.()}
                 onClick={() => onOpenPullRequest(pr.number)}
                 className={cn(
                   'flex w-full items-center gap-2 px-4 py-[5px] text-left transition-colors',
