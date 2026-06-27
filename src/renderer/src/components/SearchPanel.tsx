@@ -64,7 +64,7 @@ export default function SearchPanel({ folderPath, onOpenFile, focusNonce }: Sear
   }
 
   return (
-    <div className="border-border bg-surface flex min-h-0 w-72 shrink-0 flex-col border-r">
+    <div className="border-border bg-surface flex min-h-0 w-60 shrink-0 flex-col border-r">
       <div className="px-4 py-3">
         <p className="text-foreground-muted text-[10px] font-semibold tracking-wider uppercase">Search</p>
       </div>
