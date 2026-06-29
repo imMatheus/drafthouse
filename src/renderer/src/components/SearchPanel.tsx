@@ -10,7 +10,7 @@ import Tooltip from './Tooltip'
 
 interface SearchPanelProps {
   folderPath: string
-  onOpenFile: (path: string) => void
+  onOpenFile: (path: string, line?: number) => void
   /** Bumped by the parent (Cmd+Shift+F) to re-focus the input. */
   focusNonce: number
 }
@@ -150,7 +150,7 @@ export default function SearchPanel({ folderPath, onOpenFile, focusNonce }: Sear
                         <MatchRow
                           key={`${match.line}-${match.matchStart}-${i}`}
                           match={match}
-                          onClick={() => onOpenFile(`${folderPath}/${file.path}`)}
+                          onClick={() => onOpenFile(`${folderPath}/${file.path}`, match.line)}
                         />
                       ))
                     : null}

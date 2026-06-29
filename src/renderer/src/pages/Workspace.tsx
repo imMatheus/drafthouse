@@ -31,6 +31,7 @@ import {
   createPullRequestFileTab,
   createPullRequestTab,
   getAgentTabId,
+  getFileTabId,
   type PullRequestFileTabInput,
   type PullRequestSubview,
   type WorkspaceSidebarPanel,
@@ -56,7 +57,7 @@ import {
 import AgentSessionTab from './workspace/AgentSessionTab'
 import SettingsView from './workspace/SettingsView'
 import DiffView from './workspace/DiffView'
-import FilesView from './workspace/FilesView'
+import FilesView, { type FileReveal } from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
 import PullRequestDetailView from './workspace/PullRequestDetailView'
 import PullRequestFileView from './workspace/PullRequestFileView'
@@ -144,6 +145,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
   const [activePalette, setActivePalette] = useState<'command' | 'file' | null>(null)
   const [searchFocusNonce, setSearchFocusNonce] = useState(0)
+
+  // A one-shot request to scroll a file tab to a given line (e.g. a search hit).
+  // Transient (not persisted): only the matching active file view consumes it.
+  // The globally-monotonic nonce lets re-clicking the same result re-trigger it.
+  const [pendingReveal, setPendingReveal] = useState<{ tabId: WorkspaceTab['id']; reveal: FileReveal } | null>(null)
+  const revealCounterRef = useRef(0)
 
   // Tab navigation history (back/forward buttons in the top bar). Tracks visited
   // {group, tab} locations so the user can move through them like a browser.
@@ -453,8 +460,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     onUpdateSession({ layout: nextLayout, activeGroupId: newGroup.id })
   }
 
-  const handleOpenFile = (filePath: string): void => {
+  const handleOpenFile = (filePath: string, line?: number): void => {
     openInActiveGroup(createFileTab(filePath))
+    if (line != null) {
+      setPendingReveal({ tabId: getFileTabId(filePath), reveal: { line, nonce: ++revealCounterRef.current } })
+    }
   }
 
   const handleOpenPullRequest = (number: number): void => {
@@ -922,6 +932,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                           gitInfo,
                           isLoadingGitInfo,
                           agentSessions: sessionMetas,
+                          fileReveal:
+                            pendingReveal && pendingReveal.tabId === tab?.id ? pendingReveal.reveal : undefined,
                           onOpenFile: handleOpenFile,
                           onOpenPullRequestFile: handleOpenPullRequestFile,
                           onOpenCommit: handleOpenCommit,
@@ -975,6 +987,7 @@ function renderWorkspaceTabContent({
   gitInfo,
   isLoadingGitInfo,
   agentSessions,
+  fileReveal,
   onOpenFile,
   onOpenPullRequestFile,
   onOpenCommit,
@@ -992,7 +1005,8 @@ function renderWorkspaceTabContent({
   gitInfo: GitRepoInfo | null | undefined
   isLoadingGitInfo: boolean
   agentSessions: AgentSessionMeta[]
-  onOpenFile: (path: string) => void
+  fileReveal: FileReveal | undefined
+  onOpenFile: (path: string, line?: number) => void
   onOpenPullRequestFile: (input: PullRequestFileTabInput) => void
   onOpenCommit: (sha: string, title?: string) => void
   onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
@@ -1024,7 +1038,7 @@ function renderWorkspaceTabContent({
     case 'welcome':
       return <WelcomeView />
     case 'file':
-      return <FilesView filePath={activeTab.path} folderPath={folderPath} />
+      return <FilesView filePath={activeTab.path} folderPath={folderPath} reveal={fileReveal} />
     case 'pull-request-file':
       return (
         <PullRequestFileView
