@@ -22,7 +22,6 @@ import {
   GitCompare,
   Hash,
   ListTree,
-  Loader2,
   MessageSquare,
   Rows3,
   Search,
@@ -48,6 +47,7 @@ import type {
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
 import { FolderIcon } from '../../components/FileIcon'
+import { LoadingIndicator } from '../../components/Loading'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
@@ -1592,7 +1592,9 @@ function DiffStatusPanel({
         {isError ? (
           <TriangleAlert aria-hidden className="text-foreground-subtle mx-auto mb-3 size-5" />
         ) : (
-          <Loader2 aria-hidden className="text-foreground-subtle mx-auto mb-3 size-5 animate-spin" />
+          <div className="mb-3 flex justify-center">
+            <LoadingIndicator size="lg" />
+          </div>
         )}
         <h2 className="text-foreground text-sm font-medium">{title}</h2>
         <p className="text-foreground-muted mt-1 text-sm text-pretty">{message}</p>
