@@ -1,4 +1,4 @@
-import { LogOut, Moon, Sun } from 'lucide-react'
+import { LogOut, Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../hooks/useTheme'
@@ -6,12 +6,8 @@ import { useSettings } from '../../hooks/useSettings'
 
 export default function SettingsView() {
   const { user, logout } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { preference, systemTheme, setPreference } = useTheme()
   const { settings, updateSettings } = useSettings()
-
-  const selectTheme = (target: 'dark' | 'light'): void => {
-    if (theme !== target) toggleTheme()
-  }
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -44,20 +40,27 @@ export default function SettingsView() {
         {/* Appearance */}
         <section className="mt-8">
           <h2 className="text-foreground-muted text-xs font-medium tracking-wide uppercase">Appearance</h2>
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <ThemeCard
-              label="Light theme"
+              label="Light"
               icon={<Sun size={16} />}
               themeClass="light"
-              active={theme === 'light'}
-              onSelect={() => selectTheme('light')}
+              active={preference === 'light'}
+              onSelect={() => setPreference('light')}
             />
             <ThemeCard
-              label="Dark theme"
+              label="Dark"
               icon={<Moon size={16} />}
               themeClass="dark"
-              active={theme === 'dark'}
-              onSelect={() => selectTheme('dark')}
+              active={preference === 'dark'}
+              onSelect={() => setPreference('dark')}
+            />
+            <ThemeCard
+              label="System"
+              icon={<Monitor size={16} />}
+              themeClass={systemTheme}
+              active={preference === 'system'}
+              onSelect={() => setPreference('system')}
             />
           </div>
         </section>
@@ -106,18 +109,22 @@ function ThemeCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'border-border bg-surface flex flex-col overflow-hidden rounded-xl border p-4 text-left transition-colors',
-        active ? 'border-accent ring-accent/30 ring-1' : 'hover:bg-surface-hover'
+        'border-border bg-surface flex flex-col overflow-hidden rounded-xl border p-4 text-left outline-2 outline-transparent transition-colors',
+        active ? 'outline-accent' : 'hover:bg-surface-hover'
       )}
     >
       <div className="flex items-center gap-2">
         <span className={cn('shrink-0', active ? 'text-accent' : 'text-foreground-muted')}>{icon}</span>
         <span className="text-foreground text-sm font-semibold">{label}</span>
-        {active ? (
-          <span className="border-accent text-accent ml-auto rounded-full border px-2 py-0.5 text-[10px] font-medium">
-            Active
-          </span>
-        ) : null}
+        <span
+          aria-hidden={!active}
+          className={cn(
+            'border-accent text-accent ml-auto rounded-full border px-2 py-0.5 text-[10px] font-medium',
+            !active && 'invisible'
+          )}
+        >
+          Active
+        </span>
       </div>
 
       <div className={cn('mt-4', themeClass)}>
@@ -215,8 +222,8 @@ function DiffViewCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        'border-border bg-surface flex flex-col overflow-hidden rounded-xl border text-left transition-colors',
-        active ? 'border-accent ring-accent/30 ring-1' : 'hover:bg-surface-hover'
+        'border-border bg-surface flex flex-col overflow-hidden rounded-xl border text-left outline-2 outline-transparent transition-colors',
+        active ? 'outline-accent' : 'hover:bg-surface-hover'
       )}
     >
       <div className="p-4">{preview}</div>
