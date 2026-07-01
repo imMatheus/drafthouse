@@ -98,7 +98,7 @@ export default function WorkspaceTabBar({
                   setDropIndex(null)
                 }}
                 className={cn(
-                  'group flex max-w-52 min-w-0 shrink-0 cursor-pointer items-stretch transition-colors',
+                  'group flex max-w-52 min-w-0 shrink-0 cursor-pointer items-center transition-colors',
                   isActive ? 'bg-surface' : 'bg-surface/40 hover:bg-surface-hover',
                   showBar && 'border-l-accent border-l-2'
                 )}
@@ -122,7 +122,7 @@ export default function WorkspaceTabBar({
                   <button
                     onClick={() => onCloseTab(tab.id)}
                     className={cn(
-                      'text-foreground-subtle hover:bg-interactive hover:text-foreground my-1 mr-1 flex items-center justify-center rounded px-1 transition-[opacity,background-color,color]',
+                      'text-foreground-subtle size-4 hover:bg-interactive hover:text-foreground my-1 mr-1 flex items-center justify-center rounded px-1 transition-[opacity,background-color,color]',
                       isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     )}
                     aria-label={`Close ${label}`}

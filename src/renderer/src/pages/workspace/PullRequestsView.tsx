@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import {
   ArrowDownUp,
   Check,
@@ -14,6 +13,7 @@ import {
 import { cn } from '../../lib/cn'
 import type { GitRepoInfo, PullRequest } from '../../../../shared/types'
 import { filterPullRequests } from '../../lib/pullRequestFilter'
+import { usePullRequestList } from '../../hooks/usePullRequests'
 import { formatRelativeTime } from './pullRequestShared'
 import * as DropdownMenu from '../../components/DropdownMenu'
 import PlaceholderView from './PlaceholderView'
@@ -39,17 +39,7 @@ export default function PullRequestsView({
   const [searchQuery, setSearchQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('newest')
 
-  const {
-    data: prs,
-    isLoading,
-    error
-  } = useQuery<PullRequest[], Error>({
-    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, stateFilter],
-    queryFn: () =>
-      window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: stateFilter as 'open' | 'closed' | 'all' }),
-    enabled: gitInfo != null,
-    retry: false
-  })
+  const { data: prs, isLoading, error } = usePullRequestList(gitInfo, { state: stateFilter })
 
   if (isLoadingGitInfo) {
     return <Loading label="Checking repository metadata..." />

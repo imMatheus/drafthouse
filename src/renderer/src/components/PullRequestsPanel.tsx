@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Check, GitPullRequest, Search, X } from 'lucide-react'
 import { cn } from '../lib/cn'
-import type { GitRepoInfo, PullRequest } from '../../../shared/types'
+import type { GitRepoInfo } from '../../../shared/types'
 import PRStateIcon from './PRStateIcon'
 import { prStateLabel } from '../lib/prMentions'
 import { filterPullRequests } from '../lib/pullRequestFilter'
+import { usePullRequestList, usePullRequestSearch } from '../hooks/usePullRequests'
 import Loading from './Loading'
 
 interface PullRequestsPanelProps {
@@ -27,45 +27,19 @@ export default function PullRequestsPanel({
 }: PullRequestsPanelProps) {
   const [stateFilter, setStateFilter] = useState<'open' | 'closed'>('open')
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const trimmedQuery = searchQuery.trim()
 
-  useEffect(() => {
-    const trimmed = searchQuery.trim()
-    if (trimmed === '') {
-      setDebouncedQuery('')
-      return
-    }
-    const timer = setTimeout(() => setDebouncedQuery(trimmed), 250)
-    return () => clearTimeout(timer)
-  }, [searchQuery])
-
-  const isSearching = debouncedQuery !== ''
-
+  const { data: prs, isLoading, error } = usePullRequestList(gitInfo, { state: stateFilter })
   const {
-    data: prs,
-    isLoading,
-    isFetching,
-    error
-  } = useQuery<PullRequest[], Error>({
-    queryKey: isSearching
-      ? ['pull-requests-search', gitInfo?.owner, gitInfo?.repo, stateFilter, debouncedQuery]
-      : ['pull-requests', gitInfo?.owner, gitInfo?.repo, stateFilter],
-    queryFn: () =>
-      isSearching
-        ? window.api.github.pulls.search(gitInfo!.owner, gitInfo!.repo, {
-            query: debouncedQuery,
-            state: stateFilter
-          })
-        : window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: stateFilter }),
-    enabled: gitInfo != null,
-    retry: false
-  })
+    results: searchResults,
+    isSearching,
+    error: searchError
+  } = usePullRequestSearch(gitInfo, searchQuery, { state: stateFilter })
 
-  // While the user is typing (searchQuery differs from debounced) or the remote
-  // search is in-flight, fall back to a cheap local filter over the last list
+  // Prefer remote search results; while they're still debouncing, loading for
+  // the first time, or failed, fall back to a local filter over the last list
   // result so the sidebar doesn't go blank.
-  const displayedPRs =
-    isSearching && searchQuery.trim() !== debouncedQuery ? filterPullRequests(prs ?? [], searchQuery) : (prs ?? [])
+  const displayedPRs = trimmedQuery === '' ? (prs ?? []) : (searchResults ?? filterPullRequests(prs ?? [], searchQuery))
 
   const noResults = !isLoading && displayedPRs.length === 0
 
@@ -105,7 +79,7 @@ export default function PullRequestsPanel({
         >
           <GitPullRequest size={11} />
           Open
-          {stateFilter === 'open' && !isSearching && prs ? (
+          {stateFilter === 'open' && trimmedQuery === '' && prs ? (
             <span className="text-foreground-subtle">{prs.length}</span>
           ) : null}
         </button>
@@ -118,12 +92,14 @@ export default function PullRequestsPanel({
         >
           <Check size={11} />
           Closed
-          {stateFilter === 'closed' && !isSearching && prs ? (
+          {stateFilter === 'closed' && trimmedQuery === '' && prs ? (
             <span className="text-foreground-subtle">{prs.length}</span>
           ) : null}
         </button>
-        {isSearching && isFetching ? (
-          <span className="text-foreground-subtle ml-auto text-[10px]">Searching…</span>
+        {searchError ? (
+          <span className="text-danger ml-auto text-[10px]">Search failed</span>
+        ) : isSearching ? (
+          <Loading size="sm" label="Searching…" className="ml-auto text-[10px]" />
         ) : null}
       </div>
 
@@ -142,7 +118,7 @@ export default function PullRequestsPanel({
           <p className="text-foreground-subtle px-4 py-4 text-xs">{error.message}</p>
         ) : noResults ? (
           <p className="text-foreground-subtle px-4 py-4 text-xs">
-            {isSearching ? 'No matches' : `No ${stateFilter} pull requests`}
+            {trimmedQuery !== '' ? 'No matches' : `No ${stateFilter} pull requests`}
           </p>
         ) : (
           displayedPRs.map((pr) => {

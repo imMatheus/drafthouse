@@ -23,6 +23,7 @@ import type {
   PullRequest
 } from '../../../shared/types'
 import { cn } from '../lib/cn'
+import { prQueryKeys } from '../hooks/usePullRequests'
 import Tooltip from './Tooltip'
 import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
@@ -498,7 +499,7 @@ function CreatePullRequestDialog({
         body: body || undefined,
         draft
       })
-      await queryClient.invalidateQueries({ queryKey: ['pull-requests'] })
+      await queryClient.invalidateQueries({ queryKey: prQueryKeys.all })
       onCreated(pr.number)
     } catch (e) {
       const raw = e instanceof Error ? e.message : 'Failed to create pull request.'

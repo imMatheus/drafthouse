@@ -38,6 +38,7 @@ import {
   type FixWithClaudeInput
 } from '../../lib/agentContext'
 import { cn } from '../../lib/cn'
+import { prQueryKeys } from '../../hooks/usePullRequests'
 import type { PullRequestFileTabInput, PullRequestSubview } from '../../lib/workspaceTabs'
 import ClaudeMentionTextarea, { extractClaudePrompt, isClaudeMention } from '../../components/ClaudeMentionTextarea'
 import InlineAgentResponseCard from '../../components/InlineAgentResponseCard'
@@ -1215,7 +1216,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
   const invalidateAfterAction = async (): Promise<void> => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['pull-request', owner, repo, pr.number] }),
-      queryClient.invalidateQueries({ queryKey: ['pull-requests', owner, repo] })
+      queryClient.invalidateQueries({ queryKey: prQueryKeys.repo(owner, repo) })
     ])
   }
 

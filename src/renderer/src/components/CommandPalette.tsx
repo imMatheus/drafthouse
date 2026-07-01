@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Command } from 'cmdk'
-import { useQuery } from '@tanstack/react-query'
 import { Check, GitPullRequest, Plus, Terminal, X } from 'lucide-react'
-import type { AgentSessionMeta, GitRepoInfo, PullRequest } from '../../../shared/types'
+import type { AgentSessionMeta, GitRepoInfo } from '../../../shared/types'
 import { cn } from '../lib/cn'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
+import Loading from './Loading'
 import PRStateIcon from './PRStateIcon'
 import { prStateLabel } from '../lib/prMentions'
+import { filterPullRequests } from '../lib/pullRequestFilter'
+import { usePullRequestList, usePullRequestSearch } from '../hooks/usePullRequests'
 
 function matchesQuery(text: string, query: string): boolean {
   if (!query) return true
@@ -48,13 +50,19 @@ export default function CommandPalette({
   const [filter, setFilter] = useState<ResourceFilter>('all')
   const [search, setSearch] = useState('')
 
-  const { data: prs, isLoading: prsLoading } = useQuery<PullRequest[]>({
-    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, 'open'],
-    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: 'open' }),
-    enabled: open && gitInfo != null,
-    staleTime: 30_000,
-    retry: false
-  })
+  const {
+    data: prs,
+    isLoading: prsLoading,
+    error: prsError
+  } = usePullRequestList(gitInfo, { state: 'open', enabled: open })
+
+  // Remote search over the whole repo (all states) — surfaces PRs that aren't
+  // in the locally cached open set.
+  const {
+    results: remotePrs,
+    isSearching: remoteSearching,
+    error: searchError
+  } = usePullRequestSearch(gitInfo, search, { enabled: open })
 
   const sessions = [...agentSessions].sort((a, b) => b.startedAt - a.startedAt)
 
@@ -62,9 +70,11 @@ export default function CommandPalette({
   const showAgents = filter === 'all' || filter === 'agents'
   const showNewAgent = showAgents && matchesQuery('new agent', search)
 
-  const matchedPrs = (prs ?? []).filter(
-    (pr) => matchesQuery(pr.title, search) || matchesQuery(pr.user.login, search) || String(pr.number).includes(search)
-  )
+  const localMatchedPrs = filterPullRequests(prs ?? [], search)
+
+  // Merge local matches with remote results, local first, deduped by number.
+  const seenPrNumbers = new Set(localMatchedPrs.map((pr) => pr.number))
+  const matchedPrs = [...localMatchedPrs, ...(remotePrs ?? []).filter((pr) => !seenPrNumbers.has(pr.number))]
 
   const matchedSessions = sessions
     .filter((s) => matchesQuery(s.prompt, search) || matchesQuery(s.context?.label ?? '', search))
@@ -99,7 +109,13 @@ export default function CommandPalette({
 
       <Command.List className="max-h-[340px] overflow-y-auto p-2">
         <Command.Empty className="text-foreground-subtle py-6 text-center text-xs">
-          {prsLoading ? 'Loading…' : 'No results found.'}
+          {prsLoading || remoteSearching ? (
+            <Loading size="sm" label="Searching…" />
+          ) : prsError || searchError ? (
+            "Couldn't load pull requests from GitHub."
+          ) : (
+            'No results found.'
+          )}
         </Command.Empty>
 
         {showNewAgent ? (

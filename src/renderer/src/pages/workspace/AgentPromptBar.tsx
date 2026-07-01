@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQueries } from '@tanstack/react-query'
 import { ArrowUp, FileText, GitPullRequest, Plus, Square, X } from 'lucide-react'
 import type { GitRepoInfo, PullRequest, PullRequestDetail } from '../../../../shared/types'
 import { cn } from '../../lib/cn'
@@ -13,6 +13,7 @@ import {
 } from '../../lib/prMentions'
 import { getPathBasename, isImageFile } from '../../lib/path'
 import PRStateIcon from '../../components/PRStateIcon'
+import { usePullRequestList } from '../../hooks/usePullRequests'
 import Tooltip from '../../components/Tooltip'
 
 interface AgentPromptBarProps {
@@ -61,12 +62,7 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
 
   // Fetch all PRs (open/closed/merged) for the mention dropdown. Sorted by
   // updated_at desc on the backend so the most relevant ones surface first.
-  const { data: allPRs } = useQuery<PullRequest[], Error>({
-    queryKey: ['pull-requests', gitInfo?.owner, gitInfo?.repo, 'all'],
-    queryFn: () => window.api.github.pulls.list(gitInfo!.owner, gitInfo!.repo, { state: 'all', perPage: 100 }),
-    enabled: gitInfo != null,
-    retry: false
-  })
+  const { data: allPRs } = usePullRequestList(gitInfo, { state: 'all', perPage: 100 })
 
   // Resolve full `PullRequestDetail` for every `@prN` in the draft so pills
   // and the on-submit context have body / additions / deletions / branches.
