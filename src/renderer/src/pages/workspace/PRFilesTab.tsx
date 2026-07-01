@@ -99,6 +99,18 @@ const ANNOTATION_CARD =
 // virtualizer reserves the right amount of space for our custom file header.
 const DIFF_HEADER_HEIGHT = 44
 
+// Remembers the read position per PR so switching editor tabs and coming back
+// lands you where you left off. Module-level so it survives the tab's unmount
+// (only the active editor tab is mounted at a time). Anchored to the topmost
+// visible file plus an intra-file pixel offset, which stays accurate even as
+// the streamed diff's heights change when files lazily expand.
+interface PrScrollAnchor {
+  path: string
+  offset: number
+}
+const prScrollMemory = new Map<string, PrScrollAnchor>()
+const prScrollKey = (owner: string, repo: string, number: number): string => `${owner}/${repo}/${number}`
+
 // Floats the annotation card inside the row the package gives us. The package
 // already paints the row with its own context background (`--diffs-bg-context`),
 // so — like diffshub — we keep this wrapper transparent and just add breathing
@@ -378,6 +390,13 @@ export default function PRFilesTab({
 
   const viewerRef = useRef<CodeViewHandle<InlineAnnotationMeta> | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  // Key under which this PR's scroll position is remembered. Kept in a ref so
+  // the stable scroll closure always reads the current PR.
+  const scrollKeyRef = useRef('')
+  scrollKeyRef.current = prScrollKey(owner, repo, pr.number)
+  // Guards the one-shot scroll restore so it runs once per (re)mount, not on
+  // every render after the diff becomes ready.
+  const didRestoreScrollRef = useRef(false)
   // itemId -> last applied annotation signature, so the reconcile effect can
   // skip files whose annotations are unchanged.
   const annotationSigRef = useRef(new Map<string, string>())
@@ -630,13 +649,21 @@ export default function PRFilesTab({
           scrollRafRef.current = null
           const metas = fileMetaByItemId.current
           let current: string | null = null
+          let currentTop = 0
           for (const [itemId, file] of metas) {
             const top = viewer.getTopForItem(itemId)
             if (top == null) continue
-            if (top <= scrollTop + DIFF_HEADER_HEIGHT + 1) current = file.filename
-            else break
+            if (top <= scrollTop + DIFF_HEADER_HEIGHT + 1) {
+              current = file.filename
+              currentTop = top
+            } else break
           }
-          if (current) setActiveFilePath(current)
+          if (current) {
+            setActiveFilePath(current)
+            // Remember the position relative to the topmost file's top, so the
+            // restore survives the diff's heights changing as files expand.
+            prScrollMemory.set(scrollKeyRef.current, { path: current, offset: scrollTop - currentTop })
+          }
         })
       }
   )
@@ -646,6 +673,37 @@ export default function PRFilesTab({
     },
     []
   )
+
+  // A fresh request (new PR, new head SHA, retry) re-arms the one-shot restore.
+  useEffect(() => {
+    didRestoreScrollRef.current = false
+  }, [viewerKey])
+
+  // Restore the remembered scroll position once the diff is fully ready (a cache
+  // hit makes this immediate). Only when still at the top, so we never yank a
+  // reader who already started scrolling while the diff was still streaming.
+  useEffect(() => {
+    if (loadState !== 'ready' || didRestoreScrollRef.current) return
+    didRestoreScrollRef.current = true
+    const saved = prScrollMemory.get(scrollKeyRef.current)
+    if (!saved) return
+    if (scrollRef.current && scrollRef.current.scrollTop > 0) return
+    const raf = window.requestAnimationFrame(() => {
+      const viewer = viewerRef.current
+      const itemId = itemIdByFilename.current.get(saved.path)
+      if (!viewer || itemId == null) return
+      viewer.scrollTo({ type: 'item', id: itemId, align: 'start' })
+      if (saved.offset) {
+        // Second frame: the item is now at the top, so nudge into it by the
+        // remembered intra-file offset.
+        window.requestAnimationFrame(() => {
+          const el = scrollRef.current
+          if (el) el.scrollTop = Math.max(0, el.scrollTop + saved.offset)
+        })
+      }
+    })
+    return () => window.cancelAnimationFrame(raf)
+  }, [loadState, viewerKey])
 
   // Jump to a thread requested from the conversation tab. Self-heals through
   // the filter: if the file isn't in the current filter we clear it (the tree

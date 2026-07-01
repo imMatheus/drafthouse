@@ -20,7 +20,6 @@ interface WorkspaceTabBarProps {
   tabs: WorkspaceTab[]
   activeTabId: WorkspaceTab['id'] | null
   isActiveGroup: boolean
-  showActiveIndicator: boolean
   // True while any tab (in this or another group) is being dragged.
   isDragActive: boolean
   onSelectTab: (tabId: WorkspaceTab['id']) => void
@@ -36,7 +35,6 @@ export default function WorkspaceTabBar({
   tabs,
   activeTabId,
   isActiveGroup,
-  showActiveIndicator,
   isDragActive,
   onSelectTab,
   onCloseTab,
@@ -53,10 +51,9 @@ export default function WorkspaceTabBar({
 
   return (
     <div className={cn('border-border bg-background relative border-b', !isActiveGroup && 'opacity-80')}>
-      {showActiveIndicator ? <div className="bg-accent absolute inset-x-0 top-0 z-10 h-0.5" /> : null}
       <div className="flex min-h-9 items-stretch">
         <div
-          className="flex flex-1 items-stretch gap-1 overflow-x-auto px-2 pt-1"
+          className="flex flex-1 items-stretch gap-px overflow-x-auto px-2"
           onDragOver={(e) => {
             if (!isDragActive) return
             e.preventDefault()
@@ -101,14 +98,14 @@ export default function WorkspaceTabBar({
                   setDropIndex(null)
                 }}
                 className={cn(
-                  'group flex max-w-52 min-w-0 shrink-0 cursor-pointer items-stretch rounded-t-md border border-b-0 transition-colors',
-                  isActive ? 'border-border bg-surface' : 'hover:bg-surface-hover border-transparent',
+                  'group flex max-w-52 min-w-0 shrink-0 cursor-pointer items-stretch transition-colors',
+                  isActive ? 'bg-surface' : 'bg-surface/40 hover:bg-surface-hover',
                   showBar && 'border-l-accent border-l-2'
                 )}
               >
                 <button
                   onClick={() => onSelectTab(tab.id)}
-                  className="flex min-w-0 flex-1 items-center gap-1.5 pr-1.5 pl-2.5 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-1 pr-1.5 pl-1.5 text-left"
                 >
                   <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
                   <span

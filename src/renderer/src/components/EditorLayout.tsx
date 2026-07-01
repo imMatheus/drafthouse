@@ -7,7 +7,6 @@ import EditorGroupView, { type EditorGroupHandlers } from './EditorGroupView'
 interface EditorLayoutProps {
   node: LayoutNode
   activeGroupId: string
-  totalGroups: number
   dragActive: boolean
   handlers: EditorGroupHandlers
   renderContent: (tab: WorkspaceTab | null) => ReactNode
@@ -21,7 +20,6 @@ export default function EditorLayout(props: EditorLayoutProps) {
       <EditorGroupView
         group={node.group}
         isActiveGroup={node.group.id === rest.activeGroupId}
-        totalGroups={rest.totalGroups}
         dragActive={rest.dragActive}
         handlers={rest.handlers}
         renderContent={rest.renderContent}

@@ -922,7 +922,6 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                     <EditorLayout
                       node={layout}
                       activeGroupId={activeGroupId}
-                      totalGroups={totalGroups}
                       dragActive={pendingDrag !== null}
                       handlers={editorHandlers}
                       renderContent={(tab) =>

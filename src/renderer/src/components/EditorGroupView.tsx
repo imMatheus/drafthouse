@@ -27,7 +27,6 @@ export interface EditorGroupHandlers {
 interface EditorGroupViewProps {
   group: EditorGroup
   isActiveGroup: boolean
-  totalGroups: number
   // True while any drag (internal tab or external sidebar item) is in progress.
   dragActive: boolean
   handlers: EditorGroupHandlers
@@ -37,7 +36,6 @@ interface EditorGroupViewProps {
 export default function EditorGroupView({
   group,
   isActiveGroup,
-  totalGroups,
   dragActive,
   handlers,
   renderContent
@@ -67,7 +65,6 @@ export default function EditorGroupView({
         tabs={group.tabs}
         activeTabId={group.activeTabId}
         isActiveGroup={isActiveGroup}
-        showActiveIndicator={isActiveGroup && totalGroups > 1}
         isDragActive={dragActive}
         onSelectTab={(tabId) => handlers.onSelectTab(group.id, tabId)}
         onCloseTab={(tabId) => handlers.onCloseTab(group.id, tabId)}
