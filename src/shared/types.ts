@@ -105,6 +105,42 @@ export interface GitHubRepo {
   }
 }
 
+export interface GitHubRepoDetails {
+  name: string
+  full_name: string
+  description: string | null
+  html_url: string
+  default_branch: string
+  stargazers_count: number
+  forks_count: number
+  open_issues_count: number
+  language: string | null
+  pushed_at: string
+  created_at: string
+}
+
+export interface CommitActivityWeek {
+  // Unix timestamp (seconds) of the week's start (Sunday).
+  week: number
+  total: number
+  // Commit counts per day, Sunday through Saturday.
+  days: number[]
+}
+
+export interface RepoCommitActivity {
+  // GitHub computes these stats lazily and answers 202 until they're ready.
+  pending: boolean
+  weeks: CommitActivityWeek[]
+}
+
+export interface RepoDailyCommits {
+  // Commit counts keyed by local calendar day (YYYY-MM-DD).
+  days: Record<string, number>
+  // True when the page cap was hit, meaning counts cover only the most
+  // recent commits in the range.
+  truncated: boolean
+}
+
 // ============================================================
 // Branches
 // ============================================================
@@ -581,12 +617,41 @@ export interface AgentContext {
   commentId?: number
 }
 
-export type AgentSessionStatus = 'running' | 'completed' | 'error' | 'cancelled'
+export type AgentSessionStatus =
+  | 'running'
+  | 'completed'
+  | 'error'
+  | 'cancelled'
+  /** Was running when the app quit or the process died between persisted turns */
+  | 'interrupted'
+
+/** Permission modes understood by the claude CLI (--permission-mode / set_permission_mode). */
+export type AgentPermissionMode = 'bypassPermissions' | 'default' | 'acceptEdits' | 'plan'
 
 // Content blocks within assistant messages
 export interface AgentContentBlockText {
   type: 'text'
   text: string
+}
+
+export interface AgentContentBlockThinking {
+  type: 'thinking'
+  thinking: string
+  signature?: string
+}
+
+export interface AgentContentBlockRedactedThinking {
+  type: 'redacted_thinking'
+  data?: string
+}
+
+export interface AgentContentBlockImage {
+  type: 'image'
+  source: {
+    type: 'base64'
+    media_type: string
+    data: string
+  }
 }
 
 export interface AgentContentBlockToolUse {
@@ -599,13 +664,29 @@ export interface AgentContentBlockToolUse {
   partialJson?: string
 }
 
+/**
+ * Tool results come back as a plain string, or as a list of blocks (text,
+ * image — e.g. reading an image file — or tool-specific shapes). Anything
+ * unrecognized must render via a safe fallback, never crash.
+ */
+export type AgentToolResultContent =
+  | string
+  | Array<AgentContentBlockText | AgentContentBlockImage | { type: string; [key: string]: unknown }>
+
 export interface AgentContentBlockToolResult {
   type: 'tool_result'
   tool_use_id: string
-  content: string
+  content?: AgentToolResultContent
+  is_error?: boolean
 }
 
-export type AgentContentBlock = AgentContentBlockText | AgentContentBlockToolUse | AgentContentBlockToolResult
+export type AgentContentBlock =
+  | AgentContentBlockText
+  | AgentContentBlockThinking
+  | AgentContentBlockRedactedThinking
+  | AgentContentBlockImage
+  | AgentContentBlockToolUse
+  | AgentContentBlockToolResult
 
 // Stream events from claude CLI --output-format stream-json
 export interface AgentStreamInit {
@@ -614,6 +695,7 @@ export interface AgentStreamInit {
   session_id: string
   tools: string[]
   model: string
+  permissionMode?: string
 }
 
 export interface AgentStreamSystem {
@@ -629,14 +711,19 @@ export interface AgentStreamAssistant {
     id?: string
     role: 'assistant'
     content: AgentContentBlock[]
-    stop_reason: string | null
+    stop_reason?: string | null
     usage?: {
       input_tokens: number
       output_tokens: number
     }
   }
+  /** Set on sub-agent (Task tool) messages; null/absent on the main thread. */
+  parent_tool_use_id?: string | null
   session_id: string
+  /** True while this message is being accumulated from partial stream events. */
   streaming?: boolean
+  /** Set once a streamed message got its message_stop — used to dedupe the CLI's per-block final events. */
+  streamed?: boolean
 }
 
 export type AgentPartialMessageSubEvent =
@@ -646,7 +733,7 @@ export type AgentPartialMessageSubEvent =
         id: string
         role: 'assistant'
         content: AgentContentBlock[]
-        stop_reason: string | null
+        stop_reason?: string | null
         usage?: { input_tokens: number; output_tokens: number }
       }
     }
@@ -661,7 +748,7 @@ export type AgentPartialMessageSubEvent =
         | { type: string; [key: string]: unknown }
     }
   | { type: 'content_block_stop'; index: number }
-  | { type: 'message_delta'; delta: { stop_reason: string | null }; usage?: { output_tokens: number } }
+  | { type: 'message_delta'; delta: { stop_reason?: string | null }; usage?: { output_tokens: number } }
   | { type: 'message_stop' }
 
 export interface AgentStreamPartialMessage {
@@ -675,20 +762,63 @@ export interface AgentStreamUser {
   type: 'user'
   message: {
     role: 'user'
-    content: AgentContentBlock[]
+    /** The CLI can emit either a block list or a bare string. */
+    content: AgentContentBlock[] | string
   }
+  /** Set on sub-agent (Task tool) tool results. */
+  parent_tool_use_id?: string | null
   session_id: string
+  /** Local echo of a prompt we sent (not emitted by the CLI). */
+  synthetic?: boolean
+  /** File paths attached alongside a synthetic prompt echo. */
+  attachedFiles?: string[]
 }
 
 export interface AgentStreamResult {
   type: 'result'
-  subtype: 'success' | 'error'
+  subtype: 'success' | 'error_max_turns' | 'error_during_execution' | string
   is_error: boolean
-  result: string
+  result?: string
   duration_ms: number
   num_turns: number
-  total_cost_usd: number
+  total_cost_usd?: number
+  usage?: { input_tokens?: number; output_tokens?: number; [key: string]: unknown }
   session_id: string
+}
+
+/**
+ * Synthesized by the main process (not the CLI): process lifecycle problems
+ * the conversation must surface — spawn failures, missing binary, dirty exits.
+ */
+export interface AgentStreamLifecycle {
+  type: 'lifecycle'
+  subtype: 'spawn_error' | 'binary_missing' | 'exit'
+  message: string
+  exitCode?: number | null
+  stderrTail?: string
+  /** True when the process died mid-turn: the renderer marks the session errored. */
+  failedTurn?: boolean
+}
+
+/**
+ * Synthesized by the main process from a `can_use_tool` control request: the
+ * CLI is waiting for an allow/deny decision (permission prompts, plan approval).
+ */
+export interface AgentStreamPermissionRequest {
+  type: 'permission_request'
+  requestId: string
+  toolName: string
+  input: Record<string, unknown>
+  toolUseId?: string
+  description?: string
+}
+
+export interface AgentStreamPermissionResolved {
+  type: 'permission_resolved'
+  requestId: string
+  behavior: 'allow' | 'deny'
+  /** Input the request was allowed with — e.g. AskUserQuestion `answers`, so the UI can show what was chosen. */
+  updatedInput?: Record<string, unknown>
 }
 
 export type AgentStreamEvent =
@@ -698,10 +828,20 @@ export type AgentStreamEvent =
   | AgentStreamUser
   | AgentStreamResult
   | AgentStreamPartialMessage
+  | AgentStreamLifecycle
+  | AgentStreamPermissionRequest
+  | AgentStreamPermissionResolved
 
 export interface AgentEvent {
   sessionId: string
   event: AgentStreamEvent
+}
+
+export interface AgentPermissionResponse {
+  behavior: 'allow' | 'deny'
+  /** Shown to the model when denying. */
+  message?: string
+  updatedInput?: Record<string, unknown>
 }
 
 // Session metadata — everything except the per-token events list. Event-free
@@ -712,7 +852,46 @@ export interface AgentSessionMeta {
   prompt: string
   status: AgentSessionStatus
   startedAt: number
+  lastActivityAt: number
   cliSessionId: string | null
   files: string[]
   context?: AgentContext
+  permissionMode: AgentPermissionMode
+  /** Model override for the session; null follows the CLI default. */
+  model: string | null
+  /** Model the CLI reported in its init event, e.g. "claude-opus-4-8". */
+  initModel?: string
+  totalCostUsd?: number
+  cwd: string
+}
+
+export interface AgentStartRequest {
+  cwd: string
+  prompt: string
+  files?: string[]
+  permissionMode: AgentPermissionMode
+  model?: string | null
+  context?: AgentContext
+}
+
+/** Per-session options the UI can choose when starting a session (mode selector, model picker). */
+export interface AgentStartOptions {
+  permissionMode?: AgentPermissionMode
+  model?: string | null
+}
+
+export interface AgentSendRequest {
+  sessionId: string
+  /** The text shown in the UI bubble. */
+  prompt: string
+  /** The text actually sent to the CLI when extra context is injected (falls back to `prompt`). */
+  cliPrompt?: string
+  files?: string[]
+}
+
+/** What `agent:list` returns for one persisted or live session. */
+export interface AgentSessionSnapshot {
+  meta: AgentSessionMeta
+  /** Whether the main process currently has a live child for this session. */
+  live: boolean
 }

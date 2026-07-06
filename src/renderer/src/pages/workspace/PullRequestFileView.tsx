@@ -1,10 +1,11 @@
 import { Fragment } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronRight, GitPullRequest } from 'lucide-react'
-import { File, type FileContents } from '@pierre/diffs/react'
+import type { FileContents } from '@pierre/diffs'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
 import { BASE_CODE_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { FileCodeBlock } from '../../components/CodeViewBlock'
 import { LoadingView } from '../../components/Loading'
 
 interface PullRequestFileViewProps {
@@ -66,11 +67,7 @@ export default function PullRequestFileView({ owner, repo, number, filePath, git
             <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>
           </div>
         ) : (
-          <File
-            file={file}
-            options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }}
-            disableWorkerPool
-          />
+          <FileCodeBlock file={file} options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }} />
         )}
       </div>
     </div>

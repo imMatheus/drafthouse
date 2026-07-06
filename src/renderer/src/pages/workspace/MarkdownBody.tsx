@@ -2,11 +2,12 @@ import { type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
-import { File, type FileContents } from '@pierre/diffs/react'
+import type { FileContents } from '@pierre/diffs'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
 import { BASE_CODE_OPTIONS, syntheticFilenameForLang } from '../../lib/diffs'
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
+import { FileCodeBlock } from '../../components/CodeViewBlock'
 import PRPill, { parsePRUrl } from '../../components/PRPill'
 
 interface MarkdownBodyProps {
@@ -28,7 +29,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
 
   return (
     <div className="bg-interactive overflow-hidden rounded-md">
-      <File
+      <FileCodeBlock
         file={file}
         options={{
           ...BASE_CODE_OPTIONS,

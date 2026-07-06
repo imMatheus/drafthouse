@@ -35,7 +35,7 @@ async function readGitHubErrorMessage(response: Response): Promise<string> {
   return `GitHub returned ${response.status}`
 }
 
-async function throwGitHubError(response: Response, errorContext: string): Promise<never> {
+export async function throwGitHubError(response: Response, errorContext: string): Promise<never> {
   const githubMessage = await readGitHubErrorMessage(response)
 
   if (response.status === 401) {

@@ -1,5 +1,5 @@
 import { ipcMain, dialog, app, BrowserWindow, type WebContents } from 'electron'
-import { join, relative, resolve, isAbsolute } from 'path'
+import { dirname, join, relative, resolve, isAbsolute } from 'path'
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync, realpathSync, watch, type FSWatcher } from 'fs'
 import type {
   FileEntry,
@@ -375,12 +375,41 @@ function readDirectory(dirPath: string): FileEntry[] {
   }
 }
 
+// Locate the git config holding the remote URLs, starting at `dirPath` and
+// walking up — git commands work from subdirectories, so the opened folder is
+// often below the repo root. When `.git` is a pointer file (linked worktrees,
+// submodules) the `gitdir:` reference is followed, and for linked worktrees
+// the `commondir` file leads back to the shared .git directory that owns the
+// config.
+function findGitConfigPath(dirPath: string): string | null {
+  let current = resolve(dirPath)
+  while (true) {
+    const dotGit = join(current, '.git')
+    if (existsSync(dotGit)) {
+      if (statSync(dotGit).isDirectory()) return join(dotGit, 'config')
+      const pointer = readFileSync(dotGit, 'utf-8').match(/^gitdir:\s*(.+)$/m)
+      if (!pointer) return null
+      const gitDir = resolve(current, pointer[1].trim())
+      const commonDirFile = join(gitDir, 'commondir')
+      if (existsSync(commonDirFile)) {
+        return join(resolve(gitDir, readFileSync(commonDirFile, 'utf-8').trim()), 'config')
+      }
+      return join(gitDir, 'config')
+    }
+    const parent = dirname(current)
+    if (parent === current) return null
+    current = parent
+  }
+}
+
 function getGitRepoInfo(dirPath: string): GitRepoInfo | null {
-  const configPath = join(dirPath, '.git', 'config')
-  if (!existsSync(configPath)) return null
+  const configPath = findGitConfigPath(dirPath)
+  if (!configPath || !existsSync(configPath)) return null
   const config = readFileSync(configPath, 'utf-8')
+  // Repo names may contain dots (next.js), so only a literal trailing `.git`
+  // is stripped; https, scp-style, and ssh:// GitHub remotes all match.
   const match = config.match(
-    /url\s*=\s*(?:https?:\/\/github\.com\/|git@github\.com:)([^/]+)\/([^/\s.]+?)(?:\.git)?\s*$/m
+    /url\s*=\s*(?:https?:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?\s*$/m
   )
   if (!match) return null
   return { owner: match[1], repo: match[2] }

@@ -151,8 +151,8 @@ export const BASE_CODE_OPTIONS: BaseCodeOptions = {
 
 /**
  * GitHub's REST API returns `file.patch` as bare hunks (no `diff --git` header).
- * `@pierre/diffs`'s `PatchDiff` expects a full git-style patch with filename
- * headers, so wrap the bare patch before passing it in.
+ * `@pierre/diffs`'s patch parsing expects a full git-style patch with filename
+ * headers, so wrap the bare patch before passing it in (e.g. to PatchCodeBlock).
  */
 export function wrapGitPatch(filename: string, patch: string): string {
   return `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n${patch}`

@@ -208,6 +208,7 @@ function FilterChip({
 function AgentStatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {
   if (status === 'running') return <AgentSpinner />
   if (status === 'completed') return <Check size={12} className="text-success shrink-0" />
-  if (status === 'error' || status === 'cancelled') return <X size={12} className="text-foreground-subtle shrink-0" />
+  if (status === 'error' || status === 'cancelled' || status === 'interrupted')
+    return <X size={12} className="text-foreground-subtle shrink-0" />
   return null
 }

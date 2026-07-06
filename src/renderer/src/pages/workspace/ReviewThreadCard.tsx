@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Reply } from 'lucide-react'
-import { PatchDiff } from '@pierre/diffs/react'
+import { PatchCodeBlock } from '../../components/CodeViewBlock'
 import type { PullRequestReviewComment } from '../../../../shared/types'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
@@ -258,7 +258,7 @@ function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment 
 
   return (
     <div className="border-border border-b">
-      <PatchDiff
+      <PatchCodeBlock
         patch={wrapGitPatch(comment.path, comment.diff_hunk)}
         options={{
           ...BASE_DIFF_OPTIONS,

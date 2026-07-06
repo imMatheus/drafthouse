@@ -1,8 +1,15 @@
-import { LogOut, Monitor, Moon, Sun } from 'lucide-react'
+import { LogOut, Minus, Monitor, Moon, Plus, RotateCcw, Sun } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import Tooltip from '../../components/Tooltip'
 import { useAuth } from '../../hooks/useAuth'
 import { useTheme } from '../../hooks/useTheme'
-import { useSettings } from '../../hooks/useSettings'
+import {
+  codeLineHeight,
+  DEFAULT_CODE_FONT_SIZE,
+  MAX_CODE_FONT_SIZE,
+  MIN_CODE_FONT_SIZE,
+  useSettings
+} from '../../hooks/useSettings'
 
 export default function SettingsView() {
   const { user, logout } = useAuth()
@@ -65,6 +72,29 @@ export default function SettingsView() {
           </div>
         </section>
 
+        {/* Agent */}
+        <section className="mt-8">
+          <h2 className="text-foreground-muted text-xs font-medium tracking-wide uppercase">Agent</h2>
+          <p className="text-foreground-muted mt-3 text-xs">What Claude is allowed to do without asking.</p>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <PermissionCardOption
+              label="Full access"
+              description="Claude runs commands, edits files and pushes without asking. Fastest, and how sessions ran before this setting existed."
+              active={settings.agentFullAccess}
+              onSelect={() => updateSettings({ agentFullAccess: true })}
+            />
+            <PermissionCardOption
+              label="Ask for approval"
+              description="Claude pauses and asks in the conversation before running tools. Plan mode always asks before leaving planning."
+              active={!settings.agentFullAccess}
+              onSelect={() => updateSettings({ agentFullAccess: false })}
+            />
+          </div>
+          <p className="text-foreground-subtle mt-2 text-xs">
+            Applies to new sessions. Existing sessions keep the mode they were started with.
+          </p>
+        </section>
+
         {/* Editor */}
         <section className="mt-8">
           <h2 className="text-foreground-muted text-xs font-medium tracking-wide uppercase">Editor</h2>
@@ -85,6 +115,11 @@ export default function SettingsView() {
               onSelect={() => updateSettings({ diffViewMode: 'split' })}
             />
           </div>
+
+          <CodeFontSizeSetting
+            fontSize={settings.codeFontSize}
+            onChange={(codeFontSize) => updateSettings({ codeFontSize })}
+          />
         </section>
       </div>
     </div>
@@ -199,6 +234,126 @@ function CommentMock({ bodyWidths, withReaction }: { bodyWidths: string[]; withR
             <div className="border-border bg-accent/15 h-2.5 w-6 rounded-full border" />
           </div>
         ) : null}
+      </div>
+    </div>
+  )
+}
+
+function PermissionCardOption({
+  label,
+  description,
+  active,
+  onSelect
+}: {
+  label: string
+  description: string
+  active: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'border-border bg-surface flex items-start gap-3 rounded-xl border px-4 py-3 text-left outline-2 outline-transparent transition-colors',
+        active ? 'outline-accent' : 'hover:bg-surface-hover'
+      )}
+    >
+      <RadioDot active={active} />
+      <div className="min-w-0 flex-1">
+        <p className="text-foreground text-sm font-semibold">{label}</p>
+        <p className="text-foreground-muted mt-0.5 text-xs">{description}</p>
+      </div>
+    </button>
+  )
+}
+
+const PREVIEW_LINES: { indent: number; tokens: { text: string; className: string }[] }[] = [
+  {
+    indent: 0,
+    tokens: [
+      { text: 'export function ', className: 'text-purple' },
+      { text: 'greet', className: 'text-accent' },
+      { text: '(name) {', className: 'text-foreground-muted' }
+    ]
+  },
+  {
+    indent: 1,
+    tokens: [
+      { text: 'return ', className: 'text-purple' },
+      { text: '`Hello, ${name}`', className: 'text-success' }
+    ]
+  },
+  { indent: 0, tokens: [{ text: '}', className: 'text-foreground-muted' }] }
+]
+
+function CodeFontSizeSetting({ fontSize, onChange }: { fontSize: number; onChange: (fontSize: number) => void }) {
+  const setClamped = (next: number): void => {
+    const clamped = Math.min(MAX_CODE_FONT_SIZE, Math.max(MIN_CODE_FONT_SIZE, next))
+    if (clamped !== fontSize) onChange(clamped)
+  }
+
+  return (
+    <div className="border-border bg-surface mt-3 rounded-xl border p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-foreground text-sm font-semibold">Code font size</p>
+          <p className="text-foreground-muted mt-0.5 text-xs">
+            Applies to file views, diffs, and code blocks across the app.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {fontSize !== DEFAULT_CODE_FONT_SIZE ? (
+            <Tooltip label="Reset to default" side="top">
+              <button
+                type="button"
+                onClick={() => setClamped(DEFAULT_CODE_FONT_SIZE)}
+                className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground mr-1 flex size-7 items-center justify-center rounded-md transition-colors"
+                aria-label="Reset code font size to default"
+              >
+                <RotateCcw size={13} />
+              </button>
+            </Tooltip>
+          ) : null}
+          <div className="border-border bg-background flex items-center gap-1 rounded-lg border p-1">
+            <button
+              type="button"
+              onClick={() => setClamped(fontSize - 1)}
+              disabled={fontSize <= MIN_CODE_FONT_SIZE}
+              className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex size-7 items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              aria-label="Decrease code font size"
+            >
+              <Minus size={14} />
+            </button>
+            <span className="text-foreground w-12 text-center text-sm font-medium tabular-nums">{fontSize}px</span>
+            <button
+              type="button"
+              onClick={() => setClamped(fontSize + 1)}
+              disabled={fontSize >= MAX_CODE_FONT_SIZE}
+              className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex size-7 items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              aria-label="Increase code font size"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-border bg-background mt-3 overflow-hidden rounded-lg border">
+        <pre
+          className="overflow-x-auto p-3"
+          style={{ fontSize: `${fontSize}px`, lineHeight: `${codeLineHeight(fontSize)}px` }}
+        >
+          {PREVIEW_LINES.map((line, i) => (
+            <div key={i} style={{ paddingLeft: `${line.indent * 2}ch` }} className="font-mono">
+              {line.tokens.map((token, j) => (
+                <span key={j} className={token.className}>
+                  {token.text}
+                </span>
+              ))}
+            </div>
+          ))}
+        </pre>
       </div>
     </div>
   )

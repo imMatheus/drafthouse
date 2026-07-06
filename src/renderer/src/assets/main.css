@@ -14,6 +14,7 @@ body {
     Arial,
     sans-serif;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
 }
 
 :root,
@@ -92,6 +93,34 @@ body {
     var(--color-interactive) var(--viewed-progress)
   );
   transition: --viewed-progress 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Subtle 1px inset outline for images/avatars. Pure white/black (not the
+   tinted foreground token) so the edge never reads as dirt on the image.
+   `outline` (not inset box-shadow) because shadows paint underneath an
+   <img>'s content and would be invisible. */
+.image-outline {
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+  outline-offset: -1px;
+}
+
+.light .image-outline {
+  outline-color: rgba(0, 0, 0, 0.1);
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-card-in {
+  animation: card-in 300ms cubic-bezier(0.2, 0, 0, 1) both;
 }
 
 @theme {

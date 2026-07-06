@@ -1,5 +1,7 @@
 import {
+  createAgentTab,
   createCommitTab,
+  createDashboardTab,
   createDiffTab,
   createFileTab,
   createInitialWorkspaceSession,
@@ -246,6 +248,8 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
   switch (tab.kind) {
     case 'welcome':
       return createWelcomeTab()
+    case 'dashboard':
+      return createDashboardTab()
     case 'file':
       return typeof tab.path === 'string' && tab.path.length > 0 ? createFileTab(tab.path) : null
     case 'diff':
@@ -281,9 +285,12 @@ function parseWorkspaceTab(value: unknown): WorkspaceTab | null {
         return null
       }
       return createCommitTab(tab.sha, typeof tab.title === 'string' && tab.title.length > 0 ? tab.title : undefined)
-    case 'agent':
-      // Agent tabs are ephemeral — don't restore from session
-      return null
+    case 'agent': {
+      // Sessions persist on disk (main process), so their tabs restore too.
+      // The "new session" placeholder is the exception — it holds no state.
+      if (typeof tab.sessionId !== 'string' || tab.sessionId.length === 0 || tab.sessionId === 'new') return null
+      return createAgentTab(tab.sessionId, typeof tab.title === 'string' && tab.title.length > 0 ? tab.title : 'Agent')
+    }
     case 'pull-request': {
       if (typeof tab.number !== 'number' || Number.isNaN(tab.number)) {
         return null

@@ -3,6 +3,44 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 let diffStreamCounter = 0
 
+interface DiffStreamCallbacks {
+  onChunk: (chunk: Uint8Array) => void
+  onEnd: () => void
+  onError: (message: string, tooLarge: boolean) => void
+}
+
+// Pull-request and commit diffs stream over the same chunk/end/error channels,
+// disambiguated by streamId; only the start invocation differs.
+function startDiffStream(startChannel: string, startArgs: unknown[], callbacks: DiffStreamCallbacks): () => void {
+  const streamId = `diff-${++diffStreamCounter}`
+  const cleanup = (): void => {
+    ipcRenderer.removeListener('github:pull-diff-chunk', onChunk)
+    ipcRenderer.removeListener('github:pull-diff-end', onEnd)
+    ipcRenderer.removeListener('github:pull-diff-error', onError)
+  }
+  const onChunk = (_event: IpcRendererEvent, data: { streamId: string; chunk: Uint8Array }): void => {
+    if (data.streamId === streamId) callbacks.onChunk(data.chunk)
+  }
+  const onEnd = (_event: IpcRendererEvent, data: { streamId: string }): void => {
+    if (data.streamId !== streamId) return
+    cleanup()
+    callbacks.onEnd()
+  }
+  const onError = (_event: IpcRendererEvent, data: { streamId: string; message: string; tooLarge: boolean }): void => {
+    if (data.streamId !== streamId) return
+    cleanup()
+    callbacks.onError(data.message, data.tooLarge)
+  }
+  ipcRenderer.on('github:pull-diff-chunk', onChunk)
+  ipcRenderer.on('github:pull-diff-end', onEnd)
+  ipcRenderer.on('github:pull-diff-error', onError)
+  void ipcRenderer.invoke(startChannel, streamId, ...startArgs)
+  return () => {
+    cleanup()
+    void ipcRenderer.invoke('github:pulls:cancel-diff', streamId)
+  }
+}
+
 const api = {
   auth: {
     login: (): Promise<unknown> => ipcRenderer.invoke('auth:login'),
@@ -17,6 +55,11 @@ const api = {
   github: {
     repos: {
       list: (query?: string): Promise<unknown> => ipcRenderer.invoke('github:repos:list', query),
+      get: (owner: string, repo: string): Promise<unknown> => ipcRenderer.invoke('github:repos:get', owner, repo),
+      commitActivity: (owner: string, repo: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:repos:commit-activity', owner, repo),
+      dailyCommits: (owner: string, repo: string, since: string, until: string): Promise<unknown> =>
+        ipcRenderer.invoke('github:repos:daily-commits', owner, repo, since, until),
       getContent: (owner: string, repo: string, path: string, ref: string): Promise<unknown> =>
         ipcRenderer.invoke('github:repos:get-content', owner, repo, path, ref)
     },
@@ -89,7 +132,9 @@ const api = {
         repo: string,
         commitSha: string,
         options?: { perPage?: number; page?: number }
-      ): Promise<unknown> => ipcRenderer.invoke('github:commits:list-pull-requests', owner, repo, commitSha, options)
+      ): Promise<unknown> => ipcRenderer.invoke('github:commits:list-pull-requests', owner, repo, commitSha, options),
+      streamDiff: (owner: string, repo: string, ref: string, callbacks: DiffStreamCallbacks): (() => void) =>
+        startDiffStream('github:commits:stream-diff', [owner, repo, ref], callbacks)
     },
     commitComments: {
       listForRepo: (owner: string, repo: string, options?: { perPage?: number; page?: number }): Promise<unknown> =>
@@ -191,47 +236,8 @@ const api = {
         ipcRenderer.invoke('github:pulls:update-branch', owner, repo, number, expectedHeadSha),
       convertToDraft: (nodeId: string): Promise<unknown> => ipcRenderer.invoke('github:pulls:convert-to-draft', nodeId),
       markReady: (nodeId: string): Promise<unknown> => ipcRenderer.invoke('github:pulls:mark-ready', nodeId),
-      streamDiff: (
-        owner: string,
-        repo: string,
-        number: number,
-        callbacks: {
-          onChunk: (chunk: Uint8Array) => void
-          onEnd: () => void
-          onError: (message: string, tooLarge: boolean) => void
-        }
-      ): (() => void) => {
-        const streamId = `pr-diff-${++diffStreamCounter}`
-        const cleanup = (): void => {
-          ipcRenderer.removeListener('github:pull-diff-chunk', onChunk)
-          ipcRenderer.removeListener('github:pull-diff-end', onEnd)
-          ipcRenderer.removeListener('github:pull-diff-error', onError)
-        }
-        const onChunk = (_event: IpcRendererEvent, data: { streamId: string; chunk: Uint8Array }): void => {
-          if (data.streamId === streamId) callbacks.onChunk(data.chunk)
-        }
-        const onEnd = (_event: IpcRendererEvent, data: { streamId: string }): void => {
-          if (data.streamId !== streamId) return
-          cleanup()
-          callbacks.onEnd()
-        }
-        const onError = (
-          _event: IpcRendererEvent,
-          data: { streamId: string; message: string; tooLarge: boolean }
-        ): void => {
-          if (data.streamId !== streamId) return
-          cleanup()
-          callbacks.onError(data.message, data.tooLarge)
-        }
-        ipcRenderer.on('github:pull-diff-chunk', onChunk)
-        ipcRenderer.on('github:pull-diff-end', onEnd)
-        ipcRenderer.on('github:pull-diff-error', onError)
-        void ipcRenderer.invoke('github:pulls:stream-diff', streamId, owner, repo, number)
-        return () => {
-          cleanup()
-          void ipcRenderer.invoke('github:pulls:cancel-diff', streamId)
-        }
-      }
+      streamDiff: (owner: string, repo: string, number: number, callbacks: DiffStreamCallbacks): (() => void) =>
+        startDiffStream('github:pulls:stream-diff', [owner, repo, number], callbacks)
     },
     pullComments: {
       listIssueComments: (owner: string, repo: string, number: number): Promise<unknown> =>
@@ -359,18 +365,22 @@ const api = {
     }
   },
   agent: {
-    start: (cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string): Promise<unknown> =>
-      ipcRenderer.invoke('agent:start', cwd, prompt, files ?? null, appendSystemPrompt ?? null),
-    continue: (
-      sessionId: string,
-      cliSessionId: string,
-      cwd: string,
-      prompt: string,
-      files?: string[]
-    ): Promise<unknown> => ipcRenderer.invoke('agent:continue', sessionId, cliSessionId, cwd, prompt, files),
+    start: (request: unknown): Promise<unknown> => ipcRenderer.invoke('agent:start', request),
+    send: (request: unknown): Promise<unknown> => ipcRenderer.invoke('agent:send', request),
     stop: (sessionId: string): Promise<unknown> => ipcRenderer.invoke('agent:stop', sessionId),
-    onEvent: (callback: (data: { sessionId: string; event: unknown }) => void): (() => void) => {
-      const listener = (_event: IpcRendererEvent, data: { sessionId: string; event: unknown }): void => callback(data)
+    delete: (sessionId: string): Promise<unknown> => ipcRenderer.invoke('agent:delete', sessionId),
+    list: (cwd: string): Promise<unknown> => ipcRenderer.invoke('agent:list', cwd),
+    events: (sessionId: string): Promise<unknown> => ipcRenderer.invoke('agent:events', sessionId),
+    respondPermission: (sessionId: string, requestId: string, response: unknown): Promise<unknown> =>
+      ipcRenderer.invoke('agent:respond-permission', sessionId, requestId, response),
+    setPermissionMode: (sessionId: string, mode: string): Promise<unknown> =>
+      ipcRenderer.invoke('agent:set-permission-mode', sessionId, mode),
+    setModel: (sessionId: string, model: string | null): Promise<unknown> =>
+      ipcRenderer.invoke('agent:set-model', sessionId, model),
+    doctor: (): Promise<unknown> => ipcRenderer.invoke('agent:doctor'),
+    onEvent: (callback: (data: { sessionId: string; seq: number; event: unknown }) => void): (() => void) => {
+      const listener = (_event: IpcRendererEvent, data: { sessionId: string; seq: number; event: unknown }): void =>
+        callback(data)
       ipcRenderer.on('agent:event', listener)
       return () => ipcRenderer.removeListener('agent:event', listener)
     }

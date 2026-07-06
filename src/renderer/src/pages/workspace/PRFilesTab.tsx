@@ -11,7 +11,6 @@ import {
   CircleCheck,
   Columns2,
   Copy,
-  ExternalLink,
   EyeOff,
   FileDiff,
   FileMinus,
@@ -30,14 +29,13 @@ import {
   WrapText,
   X
 } from 'lucide-react'
-import { CodeView, PatchDiff, useWorkerPool, type CodeViewHandle, type DiffLineAnnotation } from '@pierre/diffs/react'
+import { CodeView, useWorkerPool, type CodeViewHandle, type DiffLineAnnotation } from '@pierre/diffs/react'
 import { processFile, type CodeViewDiffItem } from '@pierre/diffs'
 import * as DropdownMenu from '../../components/DropdownMenu'
 import type {
   AgentSessionMeta,
   AuthData,
   PullRequestDetail,
-  PullRequestFile,
   PullRequestReviewComment,
   PullRequestReviewDraftComment,
   PullRequestReviewEvent,
@@ -58,11 +56,11 @@ import type { FixWithClaudeInput } from '../../lib/agentContext'
 import type { PullRequestFileTabInput } from '../../lib/workspaceTabs'
 import Tooltip from '../../components/Tooltip'
 import { cn } from '../../lib/cn'
-import { useSettings, type DiffIndicatorStyle, type UserSettings } from '../../hooks/useSettings'
+import { codeLineHeight, useSettings, type DiffIndicatorStyle, type UserSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_DIFF_OPTIONS, wrapGitPatch } from '../../lib/diffs'
+import { BASE_DIFF_OPTIONS } from '../../lib/diffs'
 import type { PrDiffDiffStats, PrDiffFileMeta } from '../../lib/prDiffAccumulator'
-import { usePullRequestDiffStream, type PrDiffLoadState } from './usePullRequestDiffStream'
+import { useDiffStream, type DiffStreamSource, type PrDiffLoadState } from './useDiffStream'
 import MarkdownBody from './MarkdownBody'
 import {
   buildPullRequestReviewThreads,
@@ -109,7 +107,6 @@ interface PrScrollAnchor {
   offset: number
 }
 const prScrollMemory = new Map<string, PrScrollAnchor>()
-const prScrollKey = (owner: string, repo: string, number: number): string => `${owner}/${repo}/${number}`
 
 // Floats the annotation card inside the row the package gives us. The package
 // already paints the row with its own context background (`--diffs-bg-context`),
@@ -327,24 +324,9 @@ function getStableFileTree(ref: React.MutableRefObject<FileTreeCache>, files: Pr
   return ref.current.tree
 }
 
-export default function PRFilesTab({
-  pr,
-  owner,
-  repo,
-  draftReviewComments,
-  onDraftReviewCommentsChange,
-  threadJumpTarget,
-  agentSessions,
-  onOpenPullRequestFile,
-  onAskClaude,
-  onFixWithClaude,
-  onContinueAgent,
-  onStopAgent,
-  onPromoteAgent
-}: {
+/** PR review machinery layered onto the generic viewer. Absent = read-only. */
+export interface PRReviewIntegration {
   pr: PullRequestDetail
-  owner: string
-  repo: string
   draftReviewComments: PullRequestReviewDraftComment[]
   onDraftReviewCommentsChange: (comments: PullRequestReviewDraftComment[]) => void
   threadJumpTarget: { path: string; commentId: number; nonce: number } | null
@@ -361,7 +343,39 @@ export default function PRFilesTab({
   onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
   onStopAgent?: (sessionId: string) => Promise<void>
   onPromoteAgent?: (sessionId: string) => void
+}
+
+const EMPTY_DRAFTS: PullRequestReviewDraftComment[] = []
+
+/**
+ * The streamed changed-files viewer (sidebar, virtualized diff, unchanged-region
+ * expansion, viewed/collapse marks, scroll memory) shared by the PR files tab
+ * and the commit view. `review` layers on the PR-only machinery: inline
+ * threads, drafts, the comment gutter, the Comments sidebar tab and review
+ * submission.
+ */
+export function ChangedFilesViewer({
+  owner,
+  repo,
+  source,
+  headSha,
+  baseSha,
+  review
+}: {
+  owner: string
+  repo: string
+  source: DiffStreamSource
+  /** Content ref of the diff's new side (PR head SHA / commit SHA). */
+  headSha: string
+  /** Old-side ref for expanding unchanged regions; null disables expansion. */
+  baseSha: string | null
+  review?: PRReviewIntegration
 }) {
+  const draftReviewComments = review?.draftReviewComments ?? EMPTY_DRAFTS
+  const agentSessions = review?.agentSessions
+  const threadJumpTarget = review?.threadJumpTarget ?? null
+  const reviewNumber = review?.pr.number ?? null
+  const sourceKey = source.kind === 'pull' ? `pull-${source.number}` : `commit-${source.sha}`
   const { theme } = useTheme()
   const { settings, updateSettings } = useSettings()
   const workerReady = useWorkerReady()
@@ -393,7 +407,7 @@ export default function PRFilesTab({
   // Key under which this PR's scroll position is remembered. Kept in a ref so
   // the stable scroll closure always reads the current PR.
   const scrollKeyRef = useRef('')
-  scrollKeyRef.current = prScrollKey(owner, repo, pr.number)
+  scrollKeyRef.current = `${owner}/${repo}/${sourceKey}`
   // Guards the one-shot scroll restore so it runs once per (re)mount, not on
   // every render after the diff becomes ready.
   const didRestoreScrollRef = useRef(false)
@@ -402,18 +416,21 @@ export default function PRFilesTab({
   const annotationSigRef = useRef(new Map<string, string>())
 
   const { data: reviewComments } = useQuery<PullRequestReviewComment[], Error>({
-    queryKey: ['pull-request-review-comments', owner, repo, pr.number],
-    queryFn: () => window.api.github.pullComments.listForPull(owner, repo, pr.number),
+    queryKey: ['pull-request-review-comments', owner, repo, reviewNumber],
+    queryFn: () => window.api.github.pullComments.listForPull(owner, repo, reviewNumber!),
+    enabled: reviewNumber != null,
     retry: false
   })
   const { data: auth } = useQuery<AuthData | null, Error>({
     queryKey: ['auth-user'],
     queryFn: () => window.api.auth.getUser(),
+    enabled: review != null,
     retry: false
   })
   const { data: reviewThreadSummaries } = useQuery<PullRequestReviewThreadSummary[], Error>({
-    queryKey: ['pull-request-review-threads', owner, repo, pr.number],
-    queryFn: () => window.api.github.pullComments.listReviewThreads(owner, repo, pr.number),
+    queryKey: ['pull-request-review-threads', owner, repo, reviewNumber],
+    queryFn: () => window.api.github.pullComments.listReviewThreads(owner, repo, reviewNumber!),
+    enabled: reviewNumber != null,
     retry: false
   })
 
@@ -439,47 +456,47 @@ export default function PRFilesTab({
   const renderCtxRef = useRef({
     owner,
     repo,
-    number: pr.number,
-    commitId: pr.head.sha,
+    number: reviewNumber ?? 0,
+    commitId: headSha,
     auth,
     agentSessions,
-    onAskClaude,
-    onFixWithClaude,
-    onContinueAgent,
-    onStopAgent,
-    onPromoteAgent,
-    onDraftReviewCommentsChange,
+    onAskClaude: review?.onAskClaude,
+    onFixWithClaude: review?.onFixWithClaude,
+    onContinueAgent: review?.onContinueAgent,
+    onStopAgent: review?.onStopAgent,
+    onPromoteAgent: review?.onPromoteAgent,
+    onDraftReviewCommentsChange: review?.onDraftReviewCommentsChange,
     draftReviewComments
   })
   renderCtxRef.current = {
     owner,
     repo,
-    number: pr.number,
-    commitId: pr.head.sha,
+    number: reviewNumber ?? 0,
+    commitId: headSha,
     auth,
     agentSessions,
-    onAskClaude,
-    onFixWithClaude,
-    onContinueAgent,
-    onStopAgent,
-    onPromoteAgent,
-    onDraftReviewCommentsChange,
+    onAskClaude: review?.onAskClaude,
+    onFixWithClaude: review?.onFixWithClaude,
+    onContinueAgent: review?.onContinueAgent,
+    onStopAgent: review?.onStopAgent,
+    onPromoteAgent: review?.onPromoteAgent,
+    onDraftReviewCommentsChange: review?.onDraftReviewCommentsChange,
     draftReviewComments
   }
 
   const fileOpenCtxRef = useRef({
     owner,
     repo,
-    number: pr.number,
-    headSha: pr.head.sha,
-    onOpenPullRequestFile
+    number: reviewNumber,
+    headSha,
+    onOpenPullRequestFile: review?.onOpenPullRequestFile
   })
   fileOpenCtxRef.current = {
     owner,
     repo,
-    number: pr.number,
-    headSha: pr.head.sha,
-    onOpenPullRequestFile
+    number: reviewNumber,
+    headSha,
+    onOpenPullRequestFile: review?.onOpenPullRequestFile
   }
 
   // Stable item-annotator handed to the loader: brand-new streamed items pick
@@ -496,11 +513,11 @@ export default function PRFilesTab({
   })
 
   const { viewerKey, initialItems, fileMetas, diffStats, loadState, errorMessage, retry } =
-    usePullRequestDiffStream<InlineAnnotationMeta>({
+    useDiffStream<InlineAnnotationMeta>({
       owner,
       repo,
-      number: pr.number,
-      headSha: pr.head.sha,
+      source,
+      refKey: headSha,
       viewerRef,
       prepareItems
     })
@@ -538,11 +555,11 @@ export default function PRFilesTab({
     }
   }, [threadsByFile, draftsByFile, inlineSessionsByFile, openCommentKey, fileMetas])
 
-  // Drop viewed marks when switching to a different PR — filenames can collide
-  // across PRs, so a stale mark would otherwise carry over.
+  // Drop viewed marks when switching to a different PR/commit — filenames can
+  // collide across sources, so a stale mark would otherwise carry over.
   useEffect(() => {
     setViewedFiles(new Set())
-  }, [owner, repo, pr.number])
+  }, [owner, repo, sourceKey])
 
   // Default the active file to the first one once files arrive.
   useEffect(() => {
@@ -565,13 +582,13 @@ export default function PRFilesTab({
   const expansionStateRef = useRef(new Map<string, 'loading' | 'done' | 'error'>())
 
   useEffect(() => {
-    // Switching PRs remounts the viewer; drop stale upgrade caches.
+    // Switching sources remounts the viewer; drop stale upgrade caches.
     expansionContentRef.current.clear()
     expansionStateRef.current.clear()
-  }, [owner, repo, pr.number, pr.head.sha])
+  }, [owner, repo, sourceKey, headSha])
 
   useEffect(() => {
-    if (!activeFilePath) return
+    if (!activeFilePath || baseSha == null) return
     const activeIndex = fileMetas.findIndex((file) => file.filename === activeFilePath)
     if (activeIndex < 0) return
 
@@ -599,8 +616,8 @@ export default function PRFilesTab({
       const newPath = meta.filename
       const oldPath = meta.previousFilename ?? meta.filename
       const [oldContents, newContents] = await Promise.all([
-        meta.status === 'added' ? Promise.resolve('') : fetchContents(oldPath, pr.base.sha),
-        meta.status === 'removed' ? Promise.resolve('') : fetchContents(newPath, pr.head.sha)
+        meta.status === 'added' ? Promise.resolve('') : fetchContents(oldPath, baseSha),
+        meta.status === 'removed' ? Promise.resolve('') : fetchContents(newPath, headSha)
       ])
       // A failed fetch (file too large / 404) leaves the file partial rather than
       // re-parsing against empty contents, which would render a bogus diff.
@@ -609,7 +626,7 @@ export default function PRFilesTab({
         return
       }
       const fileDiff = processFile(meta.patchText, {
-        cacheKey: `${owner}/${repo}/${pr.number}/${pr.head.sha}/${itemId}/full`,
+        cacheKey: `${owner}/${repo}/${sourceKey}/${headSha}/${itemId}/full`,
         isGitDiff: true,
         oldFile: { name: oldPath, contents: oldContents },
         newFile: { name: newPath, contents: newContents }
@@ -636,7 +653,7 @@ export default function PRFilesTab({
     for (let i = activeIndex; i < Math.min(activeIndex + 3, fileMetas.length); i++) {
       void upgrade(fileMetas[i])
     }
-  }, [activeFilePath, fileMetas, owner, repo, pr.number, pr.base.sha, pr.head.sha])
+  }, [activeFilePath, fileMetas, owner, repo, sourceKey, baseSha, headSha])
 
   // Track the topmost visible file for the sidebar highlight. Throttled to one
   // computation per animation frame.
@@ -709,7 +726,7 @@ export default function PRFilesTab({
   // the filter: if the file isn't in the current filter we clear it (the tree
   // narrows but the diff is always present in the viewer).
   useEffect(() => {
-    if (!threadJumpTarget) return
+    if (!review || !threadJumpTarget) return
     if (handledJumpNonceRef.current === threadJumpTarget.nonce) return
     const thread = threadsByCommentId.get(threadJumpTarget.commentId)
     const nextPath = thread?.path ?? threadJumpTarget.path
@@ -808,6 +825,7 @@ export default function PRFilesTab({
 
   const [handleOpenPrFile] = useState(() => (file: PrDiffFileMeta): void => {
     const ctx = fileOpenCtxRef.current
+    if (!ctx.onOpenPullRequestFile || ctx.number == null) return
     ctx.onOpenPullRequestFile({
       owner: ctx.owner,
       repo: ctx.repo,
@@ -853,12 +871,12 @@ export default function PRFilesTab({
     },
     onAddDraftComment: (comment: PullRequestReviewDraftComment) => {
       const ctx = renderCtxRef.current
-      ctx.onDraftReviewCommentsChange([...ctx.draftReviewComments, comment])
+      ctx.onDraftReviewCommentsChange?.([...ctx.draftReviewComments, comment])
       setOpenCommentKey(null)
     },
     onRemoveDraftComment: (index: number) => {
       const ctx = renderCtxRef.current
-      ctx.onDraftReviewCommentsChange(ctx.draftReviewComments.filter((_comment, i) => i !== index))
+      ctx.onDraftReviewCommentsChange?.(ctx.draftReviewComments.filter((_comment, i) => i !== index))
     },
     onInlineCommentPosted: async () => {
       const ctx = renderCtxRef.current
@@ -954,7 +972,7 @@ export default function PRFilesTab({
         viewed={viewedFilesRef.current.has(file.filename)}
         onToggleCollapse={() => handleToggleCollapse(item.id)}
         onToggleViewed={() => handleToggleViewed(item.id, file.filename)}
-        onOpenFile={() => handleOpenPrFile(file)}
+        onOpenFile={fileOpenCtxRef.current.onOpenPullRequestFile ? () => handleOpenPrFile(file) : undefined}
       />
     )
   })
@@ -1023,7 +1041,8 @@ export default function PRFilesTab({
     key: string
     value: React.ComponentProps<typeof CodeView<InlineAnnotationMeta>>['options']
   } | null>(null)
-  const optionsKey = `${theme}|${diffStyle}|${overflow}|${settings.diffIndicators}|${settings.diffLineNumbers ? '1' : '0'}`
+  const allowCommenting = review != null
+  const optionsKey = `${theme}|${diffStyle}|${overflow}|${settings.diffIndicators}|${settings.diffLineNumbers ? '1' : '0'}|${allowCommenting ? '1' : '0'}|${settings.codeFontSize}`
   if (!optionsRef.current || optionsRef.current.key !== optionsKey) {
     optionsRef.current = {
       key: optionsKey,
@@ -1035,14 +1054,18 @@ export default function PRFilesTab({
         diffIndicators: settings.diffIndicators,
         disableLineNumbers: !settings.diffLineNumbers,
         stickyHeaders: true,
+        // The font size itself is applied via the inherited `--diffs-font-size`
+        // CSS variable (see SettingsProvider); feed the virtualizer the matching
+        // line height so its pre-measurement scroll estimates stay accurate.
+        itemMetrics: { lineHeight: codeLineHeight(settings.codeFontSize) },
         // Collapse unchanged runs into expandable "N unmodified lines" bars
         // (keeping GitHub's 3 lines of context around each change) rather than
         // dumping the whole file. The bars only become *clickable* once a file
         // is upgraded to a non-partial diff — see useExpandableDiffOnView.
         expandUnchanged: false,
         collapsedContextThreshold: 3,
-        enableGutterUtility: true,
-        onGutterUtilityClick: stableGutterClick
+        enableGutterUtility: allowCommenting,
+        onGutterUtilityClick: allowCommenting ? stableGutterClick : undefined
       }
     }
   }
@@ -1082,6 +1105,7 @@ export default function PRFilesTab({
           <>
             <DiffSidebar
               className="flex w-[280px] shrink-0"
+              showComments={allowCommenting}
               sidebarTab={sidebarTab}
               onSidebarTabChange={setSidebarTab}
               filterValue={filterValue}
@@ -1131,24 +1155,88 @@ export default function PRFilesTab({
         )}
       </div>
 
-      <SubmitReviewDialog
-        open={isSubmitReviewOpen}
-        draftReviewComments={draftReviewComments}
-        owner={owner}
-        repo={repo}
-        number={pr.number}
-        commitId={pr.head.sha}
-        onClose={() => setIsSubmitReviewOpen(false)}
-        onSubmitted={async () => {
-          onDraftReviewCommentsChange([])
-          setIsSubmitReviewOpen(false)
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['pull-request-review-comments', owner, repo, pr.number] }),
-            queryClient.invalidateQueries({ queryKey: ['pull-request-reviews', owner, repo, pr.number] })
-          ])
-        }}
-      />
+      {review ? (
+        <SubmitReviewDialog
+          open={isSubmitReviewOpen}
+          draftReviewComments={draftReviewComments}
+          owner={owner}
+          repo={repo}
+          number={review.pr.number}
+          commitId={headSha}
+          onClose={() => setIsSubmitReviewOpen(false)}
+          onSubmitted={async () => {
+            review.onDraftReviewCommentsChange([])
+            setIsSubmitReviewOpen(false)
+            await Promise.all([
+              queryClient.invalidateQueries({
+                queryKey: ['pull-request-review-comments', owner, repo, review.pr.number]
+              }),
+              queryClient.invalidateQueries({ queryKey: ['pull-request-reviews', owner, repo, review.pr.number] })
+            ])
+          }}
+        />
+      ) : null}
     </>
+  )
+}
+
+/** The PR files tab: the shared viewer with full review integration. */
+export default function PRFilesTab({
+  pr,
+  owner,
+  repo,
+  draftReviewComments,
+  onDraftReviewCommentsChange,
+  threadJumpTarget,
+  agentSessions,
+  onOpenPullRequestFile,
+  onAskClaude,
+  onFixWithClaude,
+  onContinueAgent,
+  onStopAgent,
+  onPromoteAgent
+}: {
+  pr: PullRequestDetail
+  owner: string
+  repo: string
+  draftReviewComments: PullRequestReviewDraftComment[]
+  onDraftReviewCommentsChange: (comments: PullRequestReviewDraftComment[]) => void
+  threadJumpTarget: { path: string; commentId: number; nonce: number } | null
+  agentSessions?: AgentSessionMeta[]
+  onOpenPullRequestFile: (input: PullRequestFileTabInput) => void
+  onAskClaude?: (
+    prompt: string,
+    filePath: string,
+    lineNumber: number,
+    lineContent: string,
+    side: PullRequestReviewLineSide
+  ) => Promise<void>
+  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
+  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
+  onStopAgent?: (sessionId: string) => Promise<void>
+  onPromoteAgent?: (sessionId: string) => void
+}) {
+  return (
+    <ChangedFilesViewer
+      owner={owner}
+      repo={repo}
+      source={{ kind: 'pull', number: pr.number }}
+      headSha={pr.head.sha}
+      baseSha={pr.base.sha}
+      review={{
+        pr,
+        draftReviewComments,
+        onDraftReviewCommentsChange,
+        threadJumpTarget,
+        agentSessions,
+        onOpenPullRequestFile,
+        onAskClaude,
+        onFixWithClaude,
+        onContinueAgent,
+        onStopAgent,
+        onPromoteAgent
+      }}
+    />
   )
 }
 
@@ -1318,6 +1406,8 @@ function SettingToggleRow({
 
 interface DiffSidebarProps {
   className?: string
+  /** Show the Comments tab (PR review mode). */
+  showComments: boolean
   sidebarTab: 'files' | 'comments'
   onSidebarTabChange: (tab: 'files' | 'comments') => void
   filterValue: string
@@ -1347,6 +1437,7 @@ interface DiffSidebarProps {
 
 function DiffSidebar({
   className,
+  showComments,
   sidebarTab,
   onSidebarTabChange,
   filterValue,
@@ -1383,18 +1474,20 @@ function DiffSidebar({
         <SidebarTabButton active={sidebarTab === 'files'} label="Files" onClick={() => onSidebarTabChange('files')}>
           <ListTree size={15} />
         </SidebarTabButton>
-        <SidebarTabButton
-          active={sidebarTab === 'comments'}
-          label="Comments"
-          onClick={() => onSidebarTabChange('comments')}
-        >
-          <MessageSquare size={15} />
-          {totalComments > 0 ? (
-            <span className="bg-interactive text-foreground-muted inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium tabular-nums">
-              {totalComments}
-            </span>
-          ) : null}
-        </SidebarTabButton>
+        {showComments ? (
+          <SidebarTabButton
+            active={sidebarTab === 'comments'}
+            label="Comments"
+            onClick={() => onSidebarTabChange('comments')}
+          >
+            <MessageSquare size={15} />
+            {totalComments > 0 ? (
+              <span className="bg-interactive text-foreground-muted inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium tabular-nums">
+                {totalComments}
+              </span>
+            ) : null}
+          </SidebarTabButton>
+        ) : null}
         <div className="ml-auto flex items-center gap-0.5">
           <ToolbarButton
             title={diffStyle === 'split' ? 'Unified view' : 'Split view'}
@@ -1413,7 +1506,7 @@ function DiffSidebar({
         </div>
       </div>
 
-      {sidebarTab === 'files' ? (
+      {sidebarTab === 'files' || !showComments ? (
         <div className="flex items-center gap-2 px-2 pb-1.5">
           <Search size={14} className="text-foreground-subtle shrink-0" />
           <input
@@ -1436,7 +1529,7 @@ function DiffSidebar({
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {sidebarTab === 'files' ? (
+        {sidebarTab === 'files' || !showComments ? (
           !hasFiles ? (
             <div className="text-foreground-muted px-3 py-4 text-xs">
               {trimmedFilter ? 'No files match this filter.' : 'No changed files.'}
@@ -1683,7 +1776,7 @@ function FileDiffHeader({
   viewed: boolean
   onToggleCollapse: () => void
   onToggleViewed: () => void
-  onOpenFile: () => void
+  onOpenFile?: () => void
 }) {
   const { copied: pathCopied, copy: copyPath } = useCopyToClipboard()
   const handleCopyPath = (): void => copyPath(file.filename)
@@ -1733,14 +1826,16 @@ function FileDiffHeader({
           </span>
           Viewed
         </button>
-        <button
-          type="button"
-          onClick={onOpenFile}
-          className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96]"
-        >
-          <FileText size={12} />
-          View
-        </button>
+        {onOpenFile ? (
+          <button
+            type="button"
+            onClick={onOpenFile}
+            className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96]"
+          >
+            <FileText size={12} />
+            View
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -2606,270 +2701,4 @@ function fileStatusTextClass(status: string): string {
     default:
       return ''
   }
-}
-
-interface ChangedFileDiffCardProps {
-  owner: string
-  repo: string
-  number: number
-  commitId: string
-  file: PullRequestFile
-  auth: AuthData | null | undefined
-  fileThreads: readonly PullRequestReviewThread[]
-  fileDrafts: readonly PreparedDraftEntry[]
-  openCommentKey: string | null
-  onOpenComment: (value: string | null) => void
-  onAskClaude?: (
-    prompt: string,
-    filePath: string,
-    lineNumber: number,
-    lineContent: string,
-    side: PullRequestReviewLineSide
-  ) => Promise<void>
-  onFixWithClaude?: (input: FixWithClaudeInput) => Promise<void>
-  agentSessions: AgentSessionMeta[]
-  fileInlineSessions: readonly AgentSessionMeta[]
-  onContinueAgent?: (sessionId: string, prompt: string, files?: string[]) => Promise<void>
-  onStopAgent?: (sessionId: string) => Promise<void>
-  onPromoteAgent?: (sessionId: string) => void
-  onAddDraftComment: (comment: PullRequestReviewDraftComment) => void
-  onRemoveDraftComment: (index: number) => void
-  onInlineCommentPosted: () => Promise<void>
-  allowCommenting?: boolean
-  threadRef: (commentId: number, element: HTMLElement | null) => void
-}
-
-/**
- * Standalone per-file diff card backed by a single `<PatchDiff>`. The streaming
- * PR Files tab renders into one shared `CodeView`, but the commit detail view
- * still renders an independent card per file, so this stays as a reusable unit.
- */
-export const ChangedFileDiffCard = ChangedFileDiffCardInner
-
-function ChangedFileDiffCardInner({
-  owner,
-  repo,
-  number,
-  commitId,
-  file,
-  auth,
-  fileThreads,
-  fileDrafts,
-  openCommentKey,
-  onOpenComment,
-  onAskClaude,
-  onFixWithClaude,
-  agentSessions,
-  fileInlineSessions,
-  onContinueAgent,
-  onStopAgent,
-  onPromoteAgent,
-  onAddDraftComment,
-  onRemoveDraftComment,
-  onInlineCommentPosted,
-  allowCommenting = true,
-  threadRef
-}: ChangedFileDiffCardProps) {
-  const { settings } = useSettings()
-  const { theme } = useTheme()
-
-  const [isCollapsed, setIsCollapsed] = useState(false)
-  const { copied: pathCopied, copy: copyPath } = useCopyToClipboard()
-  const handleCopyPath = (): void => copyPath(file.filename)
-
-  const hasRenderablePatch = !!file.patch
-
-  const replyTarget = { owner, repo, number }
-
-  const anchoredAnnotations: DiffLineAnnotation<InlineAnnotationMeta>[] = []
-
-  for (const thread of fileThreads) {
-    if (thread.side == null || thread.line == null || thread.isOutdated) continue
-    anchoredAnnotations.push({
-      side: thread.side === 'LEFT' ? 'deletions' : 'additions',
-      lineNumber: thread.line,
-      metadata: { kind: 'thread', thread }
-    })
-  }
-
-  for (const draft of fileDrafts) {
-    anchoredAnnotations.push({
-      side: draft.comment.side === 'LEFT' ? 'deletions' : 'additions',
-      lineNumber: draft.comment.line,
-      metadata: { kind: 'draft', draft }
-    })
-  }
-
-  for (const session of fileInlineSessions) {
-    const ctx = session.context
-    if (!ctx || !ctx.inline || typeof ctx.lineNumber !== 'number') continue
-    anchoredAnnotations.push({
-      side: ctx.side === 'LEFT' ? 'deletions' : 'additions',
-      lineNumber: ctx.lineNumber,
-      metadata: { kind: 'agent', session }
-    })
-  }
-
-  if (openCommentKey && openCommentKey.startsWith(`${file.filename}::`)) {
-    const [, sideStr, lineStr] = openCommentKey.split('::')
-    const line = Number(lineStr)
-    if (!Number.isNaN(line)) {
-      const side: PullRequestReviewLineSide = sideStr === 'LEFT' ? 'LEFT' : 'RIGHT'
-      anchoredAnnotations.push({
-        side: side === 'LEFT' ? 'deletions' : 'additions',
-        lineNumber: line,
-        metadata: { kind: 'composer', line, side, lineContent: '' }
-      })
-    }
-  }
-
-  const renderAnnotation = (annotation: DiffLineAnnotation<InlineAnnotationMeta>) => {
-    const meta = annotation.metadata
-    if (!meta) return null
-    if (meta.kind === 'thread') {
-      return (
-        <AnnotationWrapper side={annotation.side} elementRef={(el) => threadRef(meta.thread.id, el)}>
-          <InlineDiffThread
-            thread={meta.thread}
-            replyTarget={replyTarget}
-            onFixWithClaude={onFixWithClaude}
-            agentSessions={agentSessions}
-            onStopAgent={onStopAgent}
-            onContinueAgent={onContinueAgent}
-            onPromoteAgent={onPromoteAgent}
-          />
-        </AnnotationWrapper>
-      )
-    }
-    if (meta.kind === 'draft') {
-      return (
-        <AnnotationWrapper side={annotation.side}>
-          <DraftCommentCard
-            comment={meta.draft.comment}
-            auth={auth}
-            onRemove={() => onRemoveDraftComment(meta.draft.index)}
-          />
-        </AnnotationWrapper>
-      )
-    }
-    if (meta.kind === 'agent') {
-      return (
-        <AnnotationWrapper side={annotation.side}>
-          <InlineAgentResponseCard
-            session={meta.session}
-            onStop={() => onStopAgent?.(meta.session.id)}
-            onContinue={(prompt) => onContinueAgent?.(meta.session.id, prompt)}
-            onOpenInChat={() => onPromoteAgent?.(meta.session.id)}
-            compact
-          />
-        </AnnotationWrapper>
-      )
-    }
-    if (meta.kind === 'composer' && allowCommenting) {
-      return (
-        <AnnotationWrapper side={annotation.side}>
-          <InlineDiffCommentComposer
-            owner={owner}
-            repo={repo}
-            number={number}
-            commitId={commitId}
-            path={file.filename}
-            line={meta.line}
-            lineContent={meta.lineContent}
-            side={meta.side}
-            onCancel={() => onOpenComment(null)}
-            onAddDraftComment={onAddDraftComment}
-            onInlineCommentPosted={onInlineCommentPosted}
-            onAskClaude={onAskClaude}
-          />
-        </AnnotationWrapper>
-      )
-    }
-    return null
-  }
-
-  const gutterRef = useRef({ filename: file.filename, openCommentKey, onOpenComment })
-  gutterRef.current = { filename: file.filename, openCommentKey, onOpenComment }
-  const [stableGutterClick] = useState(() => (range: { start: number; side?: 'deletions' | 'additions' }): void => {
-    const side: PullRequestReviewLineSide = range.side === 'deletions' ? 'LEFT' : 'RIGHT'
-    const g = gutterRef.current
-    const rowKey = `${g.filename}::${side}::${range.start}`
-    g.onOpenComment(g.openCommentKey === rowKey ? null : rowKey)
-  })
-
-  const optionsRef = useRef<{
-    key: string
-    value: React.ComponentProps<typeof PatchDiff<InlineAnnotationMeta>>['options']
-  } | null>(null)
-  const diffStyle = settings.diffViewMode === 'split' ? 'split' : 'unified'
-  const optionsKey = `${theme}|${diffStyle}|${allowCommenting ? '1' : '0'}`
-  if (!optionsRef.current || optionsRef.current.key !== optionsKey) {
-    optionsRef.current = {
-      key: optionsKey,
-      value: {
-        ...BASE_DIFF_OPTIONS,
-        themeType: theme,
-        diffStyle,
-        disableFileHeader: true,
-        enableGutterUtility: allowCommenting,
-        onGutterUtilityClick: allowCommenting ? stableGutterClick : undefined
-      }
-    }
-  }
-
-  return (
-    <>
-      <header className={cn('flex items-center gap-2 px-3 py-1.5', !isCollapsed && 'border-border border-b')}>
-        <button
-          type="button"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
-          aria-label={isCollapsed ? 'Expand file' : 'Collapse file'}
-        >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-        </button>
-        <FileStatusIcon status={file.status} />
-        <FileHeaderName name={file.filename} previousName={file.previous_filename} />
-        <Tooltip label={pathCopied ? 'Copied' : 'Copy file path'} side="top">
-          <button
-            type="button"
-            onClick={handleCopyPath}
-            className="text-foreground-subtle hover:bg-interactive hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded transition-colors"
-            aria-label="Copy file path"
-          >
-            {pathCopied ? <Check size={13} className="text-success" /> : <Copy size={13} />}
-          </button>
-        </Tooltip>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <DiffStat additions={file.additions} deletions={file.deletions} />
-          <a
-            href={file.blob_url}
-            target="_blank"
-            rel="noreferrer"
-            className="border-border bg-interactive text-foreground hover:bg-interactive-hover inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors"
-          >
-            View
-            <ExternalLink size={12} />
-          </a>
-        </div>
-      </header>
-
-      {isCollapsed ? null : (
-        <>
-          {hasRenderablePatch ? (
-            <PatchDiff<InlineAnnotationMeta>
-              patch={wrapGitPatch(file.filename, file.patch!)}
-              options={optionsRef.current!.value}
-              lineAnnotations={anchoredAnnotations}
-              renderAnnotation={renderAnnotation}
-            />
-          ) : (
-            <div className="text-foreground-muted px-4 py-6 text-sm">
-              GitHub did not return a renderable patch for this file.
-            </div>
-          )}
-        </>
-      )}
-    </>
-  )
 }

@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { ArrowUp, FileText, GitPullRequest, Plus, Square, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Cpu, FileText, GitPullRequest, ListTodo, Plus, Square, X } from 'lucide-react'
 import type { GitRepoInfo, PullRequest, PullRequestDetail } from '../../../../shared/types'
 import { cn } from '../../lib/cn'
 import {
@@ -15,6 +15,42 @@ import { getPathBasename, isImageFile } from '../../lib/path'
 import PRStateIcon from '../../components/PRStateIcon'
 import { usePullRequestList } from '../../hooks/usePullRequests'
 import Tooltip from '../../components/Tooltip'
+import * as DropdownMenu from '../../components/DropdownMenu'
+import QueuedPromptList from '../../components/QueuedPromptList'
+import type { QueuedAgentPrompt } from '../../contexts/WorkspaceContext'
+
+export type AgentPromptMode = 'agent' | 'plan'
+
+interface ModelOption {
+  value: string
+  label: string
+}
+
+const PRIMARY_MODELS: ModelOption[] = [
+  { value: 'claude-fable-5', label: 'Fable 5' },
+  { value: 'claude-opus-4-8', label: 'Opus 4.8' },
+  { value: 'claude-sonnet-5', label: 'Sonnet 5' },
+  { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' }
+]
+
+const MORE_MODELS: ModelOption[] = [
+  { value: 'claude-opus-4-7', label: 'Opus 4.7' },
+  { value: 'claude-opus-4-6', label: 'Opus 4.6' },
+  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' }
+]
+
+const ALL_MODELS = [...PRIMARY_MODELS, ...MORE_MODELS]
+
+/** Date suffixes differ between the ids we send and what the CLI reports back. */
+function normalizeModelId(id: string): string {
+  return id.replace(/-\d{8}$/, '')
+}
+
+function findModelOption(id: string | null | undefined): ModelOption | null {
+  if (!id) return null
+  const normalized = normalizeModelId(id)
+  return ALL_MODELS.find((option) => normalizeModelId(option.value) === normalized) ?? null
+}
 
 interface AgentPromptBarProps {
   onSubmit: (prompt: string, files?: string[], mentionedPRs?: PullRequestDetail[]) => Promise<void>
@@ -23,6 +59,15 @@ interface AgentPromptBarProps {
   gitInfo?: GitRepoInfo | null
   text: string
   onTextChange: (text: string) => void
+  mode: AgentPromptMode
+  onModeChange: (mode: AgentPromptMode) => void
+  model: string | null
+  onModelChange: (model: string | null) => void
+  /** Model the CLI reported for the session; shown when no override is picked. */
+  detectedModel?: string | null
+  /** Follow-ups waiting for the running turn to finish; shown above the bar. */
+  queued?: QueuedAgentPrompt[]
+  onCancelQueued?: (promptId: string) => void
 }
 
 export interface AgentPromptBarHandle {
@@ -30,7 +75,21 @@ export interface AgentPromptBarHandle {
 }
 
 const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(function AgentPromptBar(
-  { onSubmit, onStop, isRunning, gitInfo, text, onTextChange },
+  {
+    onSubmit,
+    onStop,
+    isRunning,
+    gitInfo,
+    text,
+    onTextChange,
+    mode,
+    onModeChange,
+    model,
+    onModelChange,
+    detectedModel,
+    queued,
+    onCancelQueued
+  },
   ref
 ) {
   const [files, setFiles] = useState<string[]>([])
@@ -104,7 +163,8 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
   const segments = splitTextIntoMentionSegments(text)
   const hasMentions = segments.some((s) => s.type === 'mention')
 
-  const canSubmit = (text.trim().length > 0 || files.length > 0) && !isRunning && !isSubmitting
+  // Submitting while a turn runs is allowed — the message steers the agent.
+  const canSubmit = (text.trim().length > 0 || files.length > 0) && !isSubmitting
 
   const handleSubmit = async (): Promise<void> => {
     if (!canSubmit) return
@@ -174,6 +234,12 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
       }
     }
 
+    if (e.key === 'Escape' && isRunning) {
+      e.preventDefault()
+      onStop()
+      return
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       void handleSubmit()
@@ -233,6 +299,11 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
 
   return (
     <div className="px-6 pt-2 pb-4">
+      {queued && queued.length > 0 && onCancelQueued && (
+        <div className="mx-auto mb-2 max-w-3xl">
+          <QueuedPromptList items={queued} onCancel={onCancelQueued} />
+        </div>
+      )}
       <div
         className={cn(
           'border-border bg-surface relative mx-auto max-w-3xl rounded-xl border transition-colors',
@@ -267,7 +338,7 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
           </div>
         )}
 
-        <div className="flex items-end gap-2 p-3">
+        <div className="flex items-end gap-2 p-3 pb-1.5">
           <Tooltip label="Attach files" side="top">
             <button
               onClick={() => {
@@ -277,8 +348,7 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
                   }
                 })
               }}
-              disabled={isRunning}
-              className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors disabled:opacity-50"
+              className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors"
               aria-label="Attach files"
             >
               <Plus size={16} />
@@ -319,18 +389,23 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
               onSelect={syncCursor}
               onInput={handleInput}
               onScroll={handleScroll}
-              placeholder={isDragOver ? 'Drop files here...' : 'Reply...'}
+              placeholder={
+                isDragOver
+                  ? 'Drop files here...'
+                  : isRunning
+                    ? 'Queue a follow-up — sends when this turn finishes...'
+                    : 'Reply...'
+              }
               rows={1}
-              disabled={isRunning}
               className={cn(
-                'placeholder:text-foreground-subtle relative block min-h-[24px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 focus:ring-0 focus:outline-none disabled:opacity-50',
+                'placeholder:text-foreground-subtle relative block min-h-[24px] w-full resize-none border-0 bg-transparent p-0 text-sm leading-5 focus:ring-0 focus:outline-none',
                 hasMentions ? 'caret-foreground text-transparent' : 'text-foreground'
               )}
             />
           </div>
 
-          {isRunning ? (
-            <Tooltip label="Stop agent" side="top">
+          {isRunning && (
+            <Tooltip label="Stop agent" shortcut={['Esc']} side="top">
               <button
                 onClick={onStop}
                 className="bg-danger text-danger-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-90"
@@ -339,21 +414,53 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
                 <Square size={14} />
               </button>
             </Tooltip>
-          ) : (
-            <Tooltip
-              label={canSubmit ? 'Send' : 'Type a message to send'}
-              shortcut={canSubmit ? ['↵'] : undefined}
-              side="top"
+          )}
+          <Tooltip
+            label={canSubmit ? (isRunning ? 'Queue message' : 'Send') : 'Type a message to send'}
+            shortcut={canSubmit ? ['↵'] : undefined}
+            side="top"
+          >
+            <button
+              onClick={() => void handleSubmit()}
+              disabled={!canSubmit}
+              className="bg-foreground text-background flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-80 disabled:opacity-30"
+              aria-label="Send"
             >
-              <button
-                onClick={() => void handleSubmit()}
-                disabled={!canSubmit}
-                className="bg-foreground text-background flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-80 disabled:opacity-30"
-                aria-label="Send"
-              >
-                <ArrowUp size={14} strokeWidth={2.5} />
-              </button>
-            </Tooltip>
+              <ArrowUp size={14} strokeWidth={2.5} />
+            </button>
+          </Tooltip>
+        </div>
+
+        {/* Mode + model controls */}
+        <div className="flex items-center gap-1.5 px-3 pb-2">
+          <div className="bg-interactive flex items-center rounded-md p-0.5">
+            <button
+              onClick={() => onModeChange('agent')}
+              className={cn(
+                'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                mode === 'agent'
+                  ? 'bg-surface text-foreground shadow-sm'
+                  : 'text-foreground-subtle hover:text-foreground'
+              )}
+            >
+              Agent
+            </button>
+            <button
+              onClick={() => onModeChange('plan')}
+              className={cn(
+                'flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
+                mode === 'plan' ? 'bg-surface text-accent shadow-sm' : 'text-foreground-subtle hover:text-foreground'
+              )}
+            >
+              <ListTodo size={11} className="shrink-0" />
+              Plan
+            </button>
+          </div>
+
+          <ModelMenu model={model} detectedModel={detectedModel} onModelChange={onModelChange} />
+
+          {mode === 'plan' && (
+            <span className="text-foreground-subtle text-[11px]">Claude proposes a plan before making changes</span>
           )}
         </div>
 
@@ -381,6 +488,73 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
 })
 
 export default AgentPromptBar
+
+function ModelMenu({
+  model,
+  detectedModel,
+  onModelChange
+}: {
+  model: string | null
+  detectedModel?: string | null
+  onModelChange: (model: string | null) => void
+}) {
+  const selectedId = model ?? detectedModel ?? null
+  const selectedOption = findModelOption(selectedId)
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors">
+          <Cpu size={11} className="shrink-0" />
+          <span className="max-w-[160px] truncate">{selectedOption?.label ?? selectedId ?? 'Model'}</span>
+          <ChevronDown size={10} className="shrink-0" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="start" className="min-w-[11rem]">
+        <DropdownMenu.Label>Models</DropdownMenu.Label>
+        {PRIMARY_MODELS.map((option) => (
+          <ModelMenuItem
+            key={option.value}
+            option={option}
+            selected={selectedOption?.value === option.value}
+            onSelect={() => onModelChange(option.value)}
+          />
+        ))}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger>More models</DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent>
+            {MORE_MODELS.map((option) => (
+              <ModelMenuItem
+                key={option.value}
+                option={option}
+                selected={selectedOption?.value === option.value}
+                onSelect={() => onModelChange(option.value)}
+              />
+            ))}
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  )
+}
+
+function ModelMenuItem({
+  option,
+  selected,
+  onSelect
+}: {
+  option: ModelOption
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <DropdownMenu.Item onSelect={onSelect} className="gap-2">
+      <span className="min-w-0 flex-1 truncate">{option.label}</span>
+      {selected && <Check size={12} className="text-foreground shrink-0" />}
+    </DropdownMenu.Item>
+  )
+}
 
 function PRMentionPill({
   prNumber,

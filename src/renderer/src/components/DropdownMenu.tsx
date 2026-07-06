@@ -1,10 +1,12 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from 'react'
 import * as RadixDropdownMenu from '@radix-ui/react-dropdown-menu'
+import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/cn'
 
 export const Root = RadixDropdownMenu.Root
 export const Trigger = RadixDropdownMenu.Trigger
 export const Portal = RadixDropdownMenu.Portal
+export const Sub = RadixDropdownMenu.Sub
 
 type ContentProps = ComponentPropsWithoutRef<typeof RadixDropdownMenu.Content>
 
@@ -35,7 +37,7 @@ export const Item = forwardRef<ElementRef<typeof RadixDropdownMenu.Item>, ItemPr
     <RadixDropdownMenu.Item
       ref={ref}
       className={cn(
-        'flex w-full rounded-sm cursor-pointer items-center px-3 py-1.5 text-left text-xs transition-colors outline-none select-none',
+        'flex w-full cursor-pointer items-center rounded-sm px-3 py-1.5 text-left text-xs transition-colors outline-none select-none',
         'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50',
         variant === 'danger'
           ? 'text-danger data-[highlighted]:bg-surface-hover'
@@ -47,6 +49,45 @@ export const Item = forwardRef<ElementRef<typeof RadixDropdownMenu.Item>, ItemPr
   )
 )
 Item.displayName = 'DropdownMenu.Item'
+
+type SubTriggerProps = ComponentPropsWithoutRef<typeof RadixDropdownMenu.SubTrigger>
+
+export const SubTrigger = forwardRef<ElementRef<typeof RadixDropdownMenu.SubTrigger>, SubTriggerProps>(
+  ({ className, children, ...props }, ref) => (
+    <RadixDropdownMenu.SubTrigger
+      ref={ref}
+      className={cn(
+        'text-foreground flex w-full cursor-pointer items-center rounded-sm px-3 py-1.5 text-left text-xs transition-colors outline-none select-none',
+        'data-[highlighted]:bg-surface-hover data-[state=open]:bg-surface-hover',
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <ChevronRight size={12} className="text-foreground-subtle ml-auto shrink-0" />
+    </RadixDropdownMenu.SubTrigger>
+  )
+)
+SubTrigger.displayName = 'DropdownMenu.SubTrigger'
+
+type SubContentProps = ComponentPropsWithoutRef<typeof RadixDropdownMenu.SubContent>
+
+export const SubContent = forwardRef<ElementRef<typeof RadixDropdownMenu.SubContent>, SubContentProps>(
+  ({ className, sideOffset = 6, ...props }, ref) => (
+    <RadixDropdownMenu.Portal>
+      <RadixDropdownMenu.SubContent
+        ref={ref}
+        sideOffset={sideOffset}
+        className={cn(
+          'border-border bg-surface z-30 min-w-[8rem] overflow-hidden rounded-lg border py-1 shadow-lg',
+          className
+        )}
+        {...props}
+      />
+    </RadixDropdownMenu.Portal>
+  )
+)
+SubContent.displayName = 'DropdownMenu.SubContent'
 
 type SeparatorProps = ComponentPropsWithoutRef<typeof RadixDropdownMenu.Separator>
 

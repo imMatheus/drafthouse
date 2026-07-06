@@ -1,7 +1,46 @@
-import type { AgentStreamAssistant, AgentStreamEvent, AgentStreamPartialMessage } from '../../../shared/types'
+import type {
+  AgentContentBlock,
+  AgentStreamAssistant,
+  AgentStreamEvent,
+  AgentStreamPartialMessage
+} from '../../../shared/types'
 
-function isStreamingAssistant(event: AgentStreamEvent | undefined): event is AgentStreamAssistant {
-  return event?.type === 'assistant' && event.streaming === true
+function sameParent(a: string | null | undefined, b: string | null | undefined): boolean {
+  return (a ?? null) === (b ?? null)
+}
+
+function isStreamingAssistant(event: AgentStreamEvent): event is AgentStreamAssistant {
+  return event.type === 'assistant' && event.streaming === true
+}
+
+/**
+ * Find the in-flight streaming message for a given sub-agent thread (or the
+ * main thread when parentToolUseId is null). Searched from the end — streams
+ * are interleaved but each thread has at most one open message.
+ */
+function findStreamingIndex(events: AgentStreamEvent[], parentToolUseId: string | null): number {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i]
+    if (isStreamingAssistant(event) && sameParent(event.parent_tool_use_id, parentToolUseId)) return i
+  }
+  return -1
+}
+
+/** Parse any tool_use blocks whose streamed JSON never got finalized. */
+function finalizeBlocks(content: AgentContentBlock[]): AgentContentBlock[] {
+  return content.map((block) => {
+    if (block.type !== 'tool_use' || block.partialJson === undefined) return block
+    try {
+      return {
+        type: 'tool_use',
+        id: block.id,
+        name: block.name,
+        input: JSON.parse(block.partialJson) as Record<string, unknown>
+      }
+    } catch {
+      return block
+    }
+  })
 }
 
 export function mergePartialMessage(
@@ -9,11 +48,13 @@ export function mergePartialMessage(
   partial: AgentStreamPartialMessage
 ): AgentStreamEvent[] {
   const sub = partial.event
+  const parentToolUseId = partial.parent_tool_use_id ?? null
 
   if (sub.type === 'message_start') {
     const streamingEvent: AgentStreamAssistant = {
       type: 'assistant',
       session_id: partial.session_id,
+      parent_tool_use_id: parentToolUseId,
       streaming: true,
       message: {
         id: sub.message.id,
@@ -26,60 +67,96 @@ export function mergePartialMessage(
     return [...events, streamingEvent]
   }
 
-  const lastIdx = events.length - 1
-  const last = events[lastIdx]
-  if (!isStreamingAssistant(last)) return events
+  const idx = findStreamingIndex(events, parentToolUseId)
+  if (idx === -1) return events
+  const current = events[idx] as AgentStreamAssistant
 
-  const content = [...last.message.content]
+  const content = [...current.message.content]
+  let updated: AgentStreamAssistant
 
   if (sub.type === 'content_block_start') {
     content[sub.index] = sub.content_block
+    updated = { ...current, message: { ...current.message, content } }
   } else if (sub.type === 'content_block_delta') {
     const existing = content[sub.index]
     if (sub.delta.type === 'text_delta' && existing?.type === 'text') {
-      content[sub.index] = { ...existing, text: existing.text + sub.delta.text }
+      content[sub.index] = { ...existing, text: existing.text + (sub.delta as { text: string }).text }
+    } else if (sub.delta.type === 'thinking_delta' && existing?.type === 'thinking') {
+      content[sub.index] = { ...existing, thinking: existing.thinking + (sub.delta as { thinking: string }).thinking }
     } else if (sub.delta.type === 'input_json_delta' && existing?.type === 'tool_use') {
       // Tool inputs stream as JSON fragments; buffer them and parse at block stop.
-      content[sub.index] = { ...existing, partialJson: (existing.partialJson ?? '') + sub.delta.partial_json }
-    }
-  } else if (sub.type === 'message_delta') {
-    const updated: AgentStreamAssistant = {
-      ...last,
-      message: { ...last.message, content, stop_reason: sub.delta.stop_reason }
-    }
-    return [...events.slice(0, lastIdx), updated]
-  } else if (sub.type === 'content_block_stop') {
-    const existing = content[sub.index]
-    if (existing?.type !== 'tool_use' || existing.partialJson === undefined) return events
-    try {
       content[sub.index] = {
-        type: 'tool_use',
-        id: existing.id,
-        name: existing.name,
-        input: JSON.parse(existing.partialJson) as Record<string, unknown>
+        ...existing,
+        partialJson: (existing.partialJson ?? '') + (sub.delta as { partial_json: string }).partial_json
       }
-    } catch {
+    } else {
       return events
     }
+    updated = { ...current, message: { ...current.message, content } }
+  } else if (sub.type === 'content_block_stop') {
+    const existing = content[sub.index]
+    if (existing?.type === 'tool_use' && existing.partialJson !== undefined) {
+      try {
+        content[sub.index] = {
+          type: 'tool_use',
+          id: existing.id,
+          name: existing.name,
+          input: JSON.parse(existing.partialJson) as Record<string, unknown>
+        }
+      } catch {
+        return events
+      }
+      updated = { ...current, message: { ...current.message, content } }
+    } else {
+      return events
+    }
+  } else if (sub.type === 'message_delta') {
+    updated = { ...current, message: { ...current.message, content, stop_reason: sub.delta.stop_reason ?? null } }
   } else if (sub.type === 'message_stop') {
+    // Finalize: the CLI re-emits this message as per-block `assistant` events,
+    // which appendAssistantEvent dedupes against the `streamed` flag.
+    updated = {
+      ...current,
+      streaming: undefined,
+      streamed: true,
+      message: { ...current.message, content: finalizeBlocks(content) }
+    }
+  } else {
     return events
   }
 
-  const updated: AgentStreamAssistant = {
-    ...last,
-    message: { ...last.message, content }
-  }
-  return [...events.slice(0, lastIdx), updated]
+  const next = [...events]
+  next[idx] = updated
+  return next
 }
 
-export function appendOrReplaceAssistant(
-  events: AgentStreamEvent[],
-  finalEvent: AgentStreamAssistant
-): AgentStreamEvent[] {
-  const lastIdx = events.length - 1
-  const last = events[lastIdx]
-  if (isStreamingAssistant(last) && last.message.id && last.message.id === finalEvent.message.id) {
-    return [...events.slice(0, lastIdx), finalEvent]
+/**
+ * Merge a final `assistant` event into the list. The CLI emits one final
+ * assistant event per content block (all sharing message.id):
+ * - the message was accumulated from partials → drop the duplicate,
+ * - a previous per-block final exists → append this block to it,
+ * - otherwise → append as a new event.
+ */
+export function appendAssistantEvent(events: AgentStreamEvent[], finalEvent: AgentStreamAssistant): AgentStreamEvent[] {
+  const messageId = finalEvent.message.id
+  if (messageId) {
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i]
+      if (event.type !== 'assistant' || event.message.id !== messageId) continue
+      if (!sameParent(event.parent_tool_use_id, finalEvent.parent_tool_use_id)) continue
+
+      if (event.streamed || event.streaming) {
+        // Already have richer content from the partial stream.
+        return events
+      }
+
+      const next = [...events]
+      next[i] = {
+        ...event,
+        message: { ...event.message, content: [...event.message.content, ...finalEvent.message.content] }
+      }
+      return next
+    }
   }
   return [...events, finalEvent]
 }

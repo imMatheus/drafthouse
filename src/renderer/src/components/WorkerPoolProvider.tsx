@@ -7,9 +7,9 @@ import type { ReactNode } from 'react'
 import { DIFFS_THEMES } from '../lib/diffs'
 
 // Off-main-thread syntax highlighting for every @pierre/diffs surface beneath
-// this provider (the streaming PR CodeView, plus the MultiFileDiff/PatchDiff
-// views). Without it, shiki tokenization runs on the main thread and janks
-// scrolling on large diffs.
+// this provider (the streaming PR CodeView, FilesView, and the CodeViewBlock
+// components). Without it, shiki tokenization runs on the main thread and
+// janks scrolling on large diffs.
 
 // Cap the pool: a couple of workers is plenty and avoids spawning one per core
 // on big machines.

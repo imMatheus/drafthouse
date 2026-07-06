@@ -28,9 +28,9 @@ class DiffStreamError extends Error {
   }
 }
 
-// Module-level cache of fully-loaded diffs, so navigating away from a PR and
-// back doesn't re-stream and re-parse the whole patch. Keyed by
-// owner/repo/number/headSha, so a new push (new head SHA) naturally misses and
+// Module-level cache of fully-loaded diffs, so navigating away from a PR or
+// commit and back doesn't re-stream and re-parse the whole patch. Keyed by
+// owner/repo/source/refKey, so a new push (new head SHA) naturally misses and
 // refetches. Bounded with simple LRU eviction to cap memory for large diffs.
 interface CachedDiff {
   items: CodeViewDiffItem<unknown>[]
@@ -60,11 +60,19 @@ function writeDiffCache(key: string, entry: CachedDiff): void {
   }
 }
 
-interface UsePullRequestDiffStreamArgs<TMeta> {
+/** What to stream: a pull request's cumulative diff, or a single commit's. */
+export type DiffStreamSource = { kind: 'pull'; number: number } | { kind: 'commit'; sha: string }
+
+function sourceId(source: DiffStreamSource): string {
+  return source.kind === 'pull' ? `pull-${source.number}` : `commit-${source.sha}`
+}
+
+interface UseDiffStreamArgs<TMeta> {
   owner: string
   repo: string
-  number: number
-  headSha: string
+  source: DiffStreamSource
+  /** Cache discriminator for the source's content (PR head SHA / commit SHA). */
+  refKey: string
   viewerRef: RefObject<CodeViewHandle<TMeta> | null>
   /**
    * Called for each freshly parsed batch right before it is handed to the
@@ -74,7 +82,7 @@ interface UsePullRequestDiffStreamArgs<TMeta> {
   prepareItems: (items: CodeViewDiffItem<TMeta>[]) => void
 }
 
-interface UsePullRequestDiffStreamResult<TMeta> {
+interface UseDiffStreamResult<TMeta> {
   /** Remount key for the CodeView — changes per request so a new PR mounts fresh. */
   viewerKey: number
   /**
@@ -92,14 +100,14 @@ interface UsePullRequestDiffStreamResult<TMeta> {
   retry: () => void
 }
 
-export function usePullRequestDiffStream<TMeta>({
+export function useDiffStream<TMeta>({
   owner,
   repo,
-  number,
-  headSha,
+  source,
+  refKey,
   viewerRef,
   prepareItems
-}: UsePullRequestDiffStreamArgs<TMeta>): UsePullRequestDiffStreamResult<TMeta> {
+}: UseDiffStreamArgs<TMeta>): UseDiffStreamResult<TMeta> {
   const [viewerKey, setViewerKey] = useState(0)
   const [initialItems, setInitialItems] = useState<CodeViewDiffItem<TMeta>[]>([])
   const [fileMetas, setFileMetas] = useState<PrDiffFileMeta[]>([])
@@ -111,11 +119,16 @@ export function usePullRequestDiffStream<TMeta>({
   const requestIdRef = useRef(0)
   const prepareItemsRef = useRef(prepareItems)
   prepareItemsRef.current = prepareItems
+  // The source object is rebuilt per render; the effect keys off its identity
+  // string and reads the latest value through this ref.
+  const sourceRef = useRef(source)
+  sourceRef.current = source
+  const sourceKey = sourceId(source)
 
   useEffect(() => {
     const requestId = ++requestIdRef.current
     const isCurrent = (): boolean => requestIdRef.current === requestId
-    const cacheKeyPrefix = `${owner}/${repo}/${number}/${headSha}`
+    const cacheKeyPrefix = `${owner}/${repo}/${sourceKey}/${refKey}`
     setViewerKey(requestId)
     setErrorMessage(null)
 
@@ -204,7 +217,16 @@ export function usePullRequestDiffStream<TMeta>({
       new ReadableStream<Uint8Array>({
         start(controller) {
           streamController = controller
-          cancelStream = window.api.github.pulls.streamDiff(owner, repo, number, {
+          const src = sourceRef.current
+          const startStream = (callbacks: {
+            onChunk: (chunk: Uint8Array) => void
+            onEnd: () => void
+            onError: (message: string, tooLarge: boolean) => void
+          }): (() => void) =>
+            src.kind === 'pull'
+              ? window.api.github.pulls.streamDiff(owner, repo, src.number, callbacks)
+              : window.api.github.commits.streamDiff(owner, repo, src.sha, callbacks)
+          cancelStream = startStream({
             onChunk: (chunk) => {
               try {
                 controller.enqueue(chunk)
@@ -236,7 +258,11 @@ export function usePullRequestDiffStream<TMeta>({
 
     // Per-file REST fallback for diffs GitHub refuses to render in one stream.
     const runRestFallback = async (): Promise<void> => {
-      const files = await window.api.github.pulls.listFiles(owner, repo, number)
+      const src = sourceRef.current
+      const files =
+        src.kind === 'pull'
+          ? await window.api.github.pulls.listFiles(owner, repo, src.number)
+          : ((await window.api.github.commits.get(owner, repo, src.sha, { perPage: 100 })).files ?? [])
       if (!isCurrent()) return
       for (const file of files) {
         const patchText = buildGitPatchFromRestFile(file)
@@ -259,7 +285,7 @@ export function usePullRequestDiffStream<TMeta>({
       } catch (error) {
         if (!isCurrent()) return
         if (error instanceof DiffStreamError && error.tooLarge) {
-          console.info('[pr-diff] raw .diff too large — falling back to REST listFiles for', cacheKeyPrefix)
+          console.info('[diff-stream] raw .diff too large — falling back to per-file REST for', cacheKeyPrefix)
           try {
             await runRestFallback()
           } catch (fallbackError) {
@@ -287,7 +313,7 @@ export function usePullRequestDiffStream<TMeta>({
         // Already closed/errored.
       }
     }
-  }, [owner, repo, number, headSha, loadAttempt, viewerRef])
+  }, [owner, repo, sourceKey, refKey, loadAttempt, viewerRef])
 
   return {
     viewerKey,
@@ -298,7 +324,7 @@ export function usePullRequestDiffStream<TMeta>({
     loadState,
     errorMessage,
     retry: () => {
-      diffCache.delete(`${owner}/${repo}/${number}/${headSha}`)
+      diffCache.delete(`${owner}/${repo}/${sourceId(source)}/${refKey}`)
       setLoadAttempt((attempt) => attempt + 1)
     }
   }

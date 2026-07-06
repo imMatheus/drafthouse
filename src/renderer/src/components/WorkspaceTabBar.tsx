@@ -6,6 +6,7 @@ import {
   GitPullRequestClosed,
   GitPullRequestDraft,
   Home,
+  LayoutDashboard,
   SplitSquareHorizontal,
   Terminal,
   X
@@ -181,6 +182,11 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
       return {
         icon: <Home size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-foreground-subtle" />,
         label: 'Welcome'
+      }
+    case 'dashboard':
+      return {
+        icon: <LayoutDashboard size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-accent" />,
+        label: 'Dashboard'
       }
     case 'file':
       return {

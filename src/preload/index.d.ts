@@ -1,6 +1,12 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
   AgentEvent,
+  AgentPermissionMode,
+  AgentPermissionResponse,
+  AgentSendRequest,
+  AgentSessionSnapshot,
+  AgentStartRequest,
+  AgentStreamEvent,
   AuthData,
   FileEntry,
   GitHubRepo,
@@ -45,7 +51,9 @@ import type {
   PullRequestReview,
   PullRequestReviewEvent,
   SubmitPullRequestReviewInput,
-  ReviewRequestsResult
+  ReviewRequestsResult,
+  GitHubRepoDetails,
+  RepoCommitActivity
 } from '../shared/types'
 
 // ============================================================
@@ -65,6 +73,9 @@ interface AuthAPI {
 
 interface GitHubReposAPI {
   list: (query?: string) => Promise<GitHubRepo[]>
+  get: (owner: string, repo: string) => Promise<GitHubRepoDetails>
+  commitActivity: (owner: string, repo: string) => Promise<RepoCommitActivity>
+  dailyCommits: (owner: string, repo: string, since: string, until: string) => Promise<RepoDailyCommits>
   getContent: (owner: string, repo: string, path: string, ref: string) => Promise<string>
 }
 
@@ -124,6 +135,20 @@ interface GitHubCommitsAPI {
     basehead: string,
     options?: { page?: number; perPage?: number }
   ) => Promise<GitHubCommitComparison>
+  /**
+   * Streams the commit's raw unified diff, mirroring `pulls.streamDiff` —
+   * same chunk cadence, cancel function and too-large fallback signal.
+   */
+  streamDiff: (
+    owner: string,
+    repo: string,
+    ref: string,
+    callbacks: {
+      onChunk: (chunk: Uint8Array) => void
+      onEnd: () => void
+      onError: (message: string, tooLarge: boolean) => void
+    }
+  ) => () => void
   listBranchesForHead: (owner: string, repo: string, commitSha: string) => Promise<GitHubBranchShort[]>
   listPullRequests: (
     owner: string,
@@ -417,10 +442,17 @@ interface GitAPI {
 // ============================================================
 
 interface AgentAPI {
-  start: (cwd: string, prompt: string, files?: string[], appendSystemPrompt?: string) => Promise<{ sessionId: string }>
-  continue: (sessionId: string, cliSessionId: string, cwd: string, prompt: string, files?: string[]) => Promise<void>
+  start: (request: AgentStartRequest) => Promise<{ sessionId: string }>
+  send: (request: AgentSendRequest) => Promise<void>
   stop: (sessionId: string) => Promise<void>
-  onEvent: (callback: (data: AgentEvent) => void) => () => void
+  delete: (sessionId: string) => Promise<void>
+  list: (cwd: string) => Promise<AgentSessionSnapshot[]>
+  events: (sessionId: string) => Promise<{ events: AgentStreamEvent[]; nextSeq: number }>
+  respondPermission: (sessionId: string, requestId: string, response: AgentPermissionResponse) => Promise<void>
+  setPermissionMode: (sessionId: string, mode: AgentPermissionMode) => Promise<void>
+  setModel: (sessionId: string, model: string | null) => Promise<void>
+  doctor: () => Promise<{ found: boolean; path: string | null }>
+  onEvent: (callback: (data: AgentEvent & { seq: number }) => void) => () => void
 }
 
 // ============================================================

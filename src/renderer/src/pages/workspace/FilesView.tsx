@@ -60,16 +60,22 @@ export default function FilesView({ filePath, folderPath, reveal }: FilesViewPro
 
   // CodeView reconciles controlled `items` by reference, so rebuild the array
   // only when the file or its contents actually change — otherwise every
-  // unrelated re-render (theme, reveal, hover) would force a re-tokenize.
+  // unrelated re-render (theme, reveal, hover) would force a re-tokenize. The
+  // monotonic `version` makes CodeView re-sync the id-matched item; without it
+  // the reconciler keeps the old record and this reused view renders stale
+  // content when switching tabs or after disk edits.
   const itemsKey = `${filePath}|${dataUpdatedAt}`
-  const itemsRef = useRef<{ key: string; items: CodeViewFileItem[] } | null>(null)
+  const itemsRef = useRef<{ key: string; version: number; items: CodeViewFileItem[] } | null>(null)
   if (!itemsRef.current || itemsRef.current.key !== itemsKey) {
+    const version = (itemsRef.current?.version ?? 0) + 1
     itemsRef.current = {
       key: itemsKey,
+      version,
       items: [
         {
           id: FILE_ITEM_ID,
           type: 'file',
+          version,
           file: { name: filePath, contents: fileContents ?? '', lang: getLanguageFromPath(filePath) }
         }
       ]
@@ -124,16 +130,11 @@ export default function FilesView({ filePath, folderPath, reveal }: FilesViewPro
             <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>
           </div>
         ) : (
-          // Highlight on the main thread: the shared worker pool (added for the
-          // PR diff viewer) only applies highlights on its diff path, so routing
-          // single-file views through it leaves them as plain text. One file at a
-          // time is cheap to tokenize on the main thread.
           <CodeView
             ref={viewerRef}
             items={itemsRef.current.items}
             selectedLines={selectedLines}
             options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }}
-            disableWorkerPool
             className="h-full min-h-0 w-full overflow-x-clip overflow-y-auto [overflow-anchor:none]"
           />
         )}

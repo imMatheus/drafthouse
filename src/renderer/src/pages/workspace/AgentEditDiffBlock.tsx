@@ -1,6 +1,6 @@
-import { MultiFileDiff, type FileContents } from '@pierre/diffs/react'
 import { useTheme } from '../../hooks/useTheme'
 import { BASE_DIFF_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { DiffContentsBlock } from '../../components/CodeViewBlock'
 
 interface AgentEditDiffBlockProps {
   filePath: string
@@ -8,31 +8,39 @@ interface AgentEditDiffBlockProps {
   newString: string
   /** Label shown in the header. Defaults to "Edit". */
   toolLabel?: string
+  /** Set when the edit's tool result reported a failure. */
+  errorText?: string
 }
 
 export default function AgentEditDiffBlock({
   filePath,
   oldString,
   newString,
-  toolLabel = 'Edit'
+  toolLabel = 'Edit',
+  errorText
 }: AgentEditDiffBlockProps) {
   const { theme } = useTheme()
   const fileName = filePath.split('/').pop() ?? filePath
   const lang = getLanguageFromPath(filePath)
-
-  const oldFile: FileContents = { name: filePath, contents: oldString, lang }
-  const newFile: FileContents = { name: filePath, contents: newString, lang }
 
   const { addedCount, removedCount } = countLineChanges(oldString, newString)
 
   return (
     <div className="border-border bg-surface my-2 overflow-hidden rounded-md border">
       <div className="border-border flex items-center gap-2 border-b px-3 py-2">
-        <span className="bg-success size-2 rounded-full" />
+        <span
+          className={errorText === undefined ? 'bg-success size-2 rounded-full' : 'bg-danger size-2 rounded-full'}
+        />
         <span className="text-foreground text-xs font-medium">
           {toolLabel}(<span className="text-foreground-muted">{fileName}</span>)
         </span>
       </div>
+
+      {errorText !== undefined && (
+        <div className="border-border bg-danger/5 border-b px-3 py-1.5">
+          <p className="text-danger text-[11px] break-all whitespace-pre-wrap">{errorText.slice(0, 400)}</p>
+        </div>
+      )}
 
       <div className="border-border text-foreground-subtle border-b px-3 py-1.5 text-[11px]">
         {addedCount > 0 && (
@@ -50,9 +58,11 @@ export default function AgentEditDiffBlock({
         )}
       </div>
 
-      <MultiFileDiff
-        oldFile={oldFile}
-        newFile={newFile}
+      <DiffContentsBlock
+        filePath={filePath}
+        oldContents={oldString}
+        newContents={newString}
+        lang={lang}
         options={{ ...BASE_DIFF_OPTIONS, themeType: theme, diffStyle: 'unified', disableFileHeader: true }}
       />
     </div>

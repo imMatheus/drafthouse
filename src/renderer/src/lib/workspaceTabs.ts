@@ -16,6 +16,10 @@ export type WorkspaceTab =
       kind: 'welcome'
     }
   | {
+      id: 'dashboard'
+      kind: 'dashboard'
+    }
+  | {
       id: `file:${string}`
       kind: 'file'
       path: string
@@ -83,6 +87,13 @@ export function createWelcomeTab(): WorkspaceTab {
   return {
     id: 'welcome',
     kind: 'welcome'
+  }
+}
+
+export function createDashboardTab(): WorkspaceTab {
+  return {
+    id: 'dashboard',
+    kind: 'dashboard'
   }
 }
 

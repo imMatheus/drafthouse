@@ -1,41 +1,13 @@
-import { useDeferredValue, useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  FileDiff,
-  FileMinus,
-  FilePlus,
-  Search,
-  X
-} from 'lucide-react'
+import { Check, Copy, ExternalLink } from 'lucide-react'
 import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
-import type {
-  AgentSessionMeta,
-  GitHubCommit,
-  PullRequestFile,
-  PullRequestReviewDraftComment
-} from '../../../../shared/types'
+import type { GitHubCommit } from '../../../../shared/types'
 import CommitActorStack, { formatCommitActorNames, getCommitActors } from '../../components/CommitActorStack'
-import { FolderIcon } from '../../components/FileIcon'
 import Tooltip from '../../components/Tooltip'
 import { LoadingView } from '../../components/Loading'
-import { cn } from '../../lib/cn'
-import { ChangedFileDiffCard } from './PRFilesTab'
-import PlaceholderView from './PlaceholderView'
+import { ChangedFilesViewer } from './PRFilesTab'
 import { DiffStat, formatAbsoluteDate, formatRelativeTime, getCommitBody, getCommitSubject } from './pullRequestShared'
-
-const EMPTY_FILES: PullRequestFile[] = []
-const EMPTY_SESSIONS: AgentSessionMeta[] = []
-const NOOP_COMMENT_TOGGLE = (_value: string | null): void => {}
-const NOOP_THREAD_REF = (_commentId: number, _element: HTMLElement | null): void => {}
-const NOOP_DRAFT_ADD = (_comment: PullRequestReviewDraftComment): void => {}
-const NOOP_DRAFT_REMOVE = (_index: number): void => {}
-const NOOP_ASYNC = async (): Promise<void> => {}
 
 interface CommitDetailViewProps {
   owner: string
@@ -44,12 +16,13 @@ interface CommitDetailViewProps {
   onTitleChange?: (title: string) => void
 }
 
+/**
+ * Commit tab: commit metadata header on top of the same streamed changed-files
+ * viewer the PR files tab uses (sidebar, virtualized diffs, expandable
+ * unchanged regions) — minus the review-only machinery.
+ */
 export default function CommitDetailView({ owner, repo, commitSha, onTitleChange }: CommitDetailViewProps) {
-  const [filterValue, setFilterValue] = useState('')
-  const [fileListCollapsed, setFileListCollapsed] = useState(false)
-  const [activeFilePath, setActiveFilePath] = useState<string | null>(null)
   const { copied: shaCopied, copy: copySha } = useCopyToClipboard()
-  const fileSectionRefs = useRef(new Map<string, HTMLElement>())
 
   const {
     data: commit,
@@ -63,68 +36,12 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
 
   const subject = commit ? getCommitSubject(commit.commit.message) : 'Untitled commit'
   const body = commit ? getCommitBody(commit.commit.message) : ''
-  const deferredFilterValue = useDeferredValue(filterValue)
-  const allFiles = commit?.files ?? EMPTY_FILES
-  const trimmedFilter = deferredFilterValue.trim().toLowerCase()
-  const filteredFiles =
-    trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
-  const fileTree = buildFileTree(filteredFiles)
 
   useEffect(() => {
     if (commit) {
       onTitleChange?.(subject)
     }
   }, [commit, onTitleChange, subject])
-
-  useEffect(() => {
-    setFilterValue('')
-    setActiveFilePath(null)
-  }, [commitSha, owner, repo])
-
-  useEffect(() => {
-    const filtered =
-      trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
-    if (filtered.length === 0) {
-      setActiveFilePath(null)
-      return
-    }
-
-    if (!activeFilePath || !filtered.some((file) => file.filename === activeFilePath)) {
-      setActiveFilePath(filtered[0]?.filename ?? null)
-    }
-  }, [activeFilePath, allFiles, trimmedFilter])
-
-  useEffect(() => {
-    const filtered =
-      trimmedFilter === '' ? allFiles : allFiles.filter((file) => file.filename.toLowerCase().includes(trimmedFilter))
-    if (filtered.length === 0) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visibleEntries = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)
-
-        if (visibleEntries[0]?.target instanceof HTMLElement) {
-          const nextPath = visibleEntries[0].target.dataset.filePath
-          if (nextPath) setActiveFilePath(nextPath)
-        }
-      },
-      { threshold: [0.1, 0.35, 0.6], rootMargin: '-15% 0px -55% 0px' }
-    )
-
-    for (const file of filtered) {
-      const element = fileSectionRefs.current.get(file.filename)
-      if (element) observer.observe(element)
-    }
-
-    return () => observer.disconnect()
-  }, [allFiles, trimmedFilter])
-
-  const handleScrollToFile = (path: string): void => {
-    setActiveFilePath(path)
-    fileSectionRefs.current.get(path)?.scrollIntoView({ behavior: 'instant', block: 'start' })
-  }
 
   if (isLoading) {
     return <LoadingView label="Loading commit..." />
@@ -180,9 +97,6 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
               </button>
             </Tooltip>
             {stats ? <DiffStat additions={stats.additions} deletions={stats.deletions} /> : null}
-            <span className="text-foreground-subtle text-xs">
-              {allFiles.length} file{allFiles.length !== 1 ? 's' : ''}
-            </span>
           </div>
         </div>
 
@@ -203,293 +117,15 @@ export default function CommitDetailView({ owner, repo, commitSha, onTitleChange
         </div>
       ) : null}
 
-      {allFiles.length === 0 ? (
-        <div className="mt-6">
-          <PlaceholderView
-            title="Files changed"
-            description="GitHub did not return any changed files for this commit."
-          />
-        </div>
-      ) : (
-        <div className="mt-6 flex gap-2">
-          <div className="sticky top-1 hidden h-[calc(100vh-11rem)] shrink-0 lg:flex">
-            {fileListCollapsed ? (
-              <Tooltip label="Show file list" side="right">
-                <button
-                  type="button"
-                  onClick={() => setFileListCollapsed(false)}
-                  className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 -translate-x-1.5 items-center justify-center self-start rounded transition-colors"
-                  aria-label="Show file list"
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </Tooltip>
-            ) : null}
-
-            <aside
-              className={cn(
-                'flex flex-col overflow-hidden transition-all duration-200',
-                fileListCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'
-              )}
-            >
-              <div className="flex items-center gap-2 px-2 py-2">
-                <Search size={14} className="text-foreground-subtle shrink-0" />
-                <input
-                  value={filterValue}
-                  onChange={(event) => setFilterValue(event.target.value)}
-                  placeholder="Filter files..."
-                  className="text-foreground placeholder:text-foreground-subtle w-full bg-transparent text-sm focus:outline-none"
-                />
-                {filterValue ? (
-                  <button
-                    type="button"
-                    onClick={() => setFilterValue('')}
-                    className="text-foreground-subtle hover:text-foreground shrink-0"
-                    aria-label="Clear file filter"
-                  >
-                    <X size={14} />
-                  </button>
-                ) : null}
-                <Tooltip label="Hide file list" side="top">
-                  <button
-                    type="button"
-                    onClick={() => setFileListCollapsed(true)}
-                    className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex size-6 shrink-0 items-center justify-center rounded transition-colors"
-                    aria-label="Hide file list"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>
-                </Tooltip>
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                {filteredFiles.length === 0 ? (
-                  <div className="text-foreground-muted px-3 py-4 text-xs">No files match this filter.</div>
-                ) : (
-                  <FileTree tree={fileTree} activeFilePath={activeFilePath} onSelectFile={handleScrollToFile} />
-                )}
-              </div>
-            </aside>
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-col gap-5">
-              {filteredFiles.map((file) => (
-                <section
-                  key={file.filename}
-                  ref={(element) => {
-                    if (element) fileSectionRefs.current.set(file.filename, element)
-                    else fileSectionRefs.current.delete(file.filename)
-                  }}
-                  data-file-path={file.filename}
-                  className="border-border bg-surface overflow-hidden rounded-xl border"
-                >
-                  <ChangedFileDiffCard
-                    owner={owner}
-                    repo={repo}
-                    number={0}
-                    commitId={commit.sha}
-                    file={file}
-                    auth={null}
-                    fileThreads={[]}
-                    fileDrafts={[]}
-                    openCommentKey={null}
-                    onOpenComment={NOOP_COMMENT_TOGGLE}
-                    agentSessions={EMPTY_SESSIONS}
-                    fileInlineSessions={EMPTY_SESSIONS}
-                    onAddDraftComment={NOOP_DRAFT_ADD}
-                    onRemoveDraftComment={NOOP_DRAFT_REMOVE}
-                    onInlineCommentPosted={NOOP_ASYNC}
-                    allowCommenting={false}
-                    threadRef={NOOP_THREAD_REF}
-                  />
-                </section>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface FileTreeNode {
-  name: string
-  path: string
-  children: FileTreeNode[]
-  file: PullRequestFile | null
-}
-
-function buildFileTree(files: PullRequestFile[]): FileTreeNode[] {
-  const root: FileTreeNode = { name: '', path: '', children: [], file: null }
-
-  for (const file of files) {
-    const parts = file.filename.split('/')
-    let current = root
-
-    for (let index = 0; index < parts.length; index++) {
-      const part = parts[index]!
-      const isFile = index === parts.length - 1
-
-      if (isFile) {
-        current.children.push({ name: part, path: file.filename, children: [], file })
-        continue
-      }
-
-      let folder = current.children.find((child) => child.file === null && child.name === part)
-      if (!folder) {
-        folder = { name: part, path: parts.slice(0, index + 1).join('/'), children: [], file: null }
-        current.children.push(folder)
-      }
-      current = folder
-    }
-  }
-
-  return collapseSingleChildFolders(root.children)
-}
-
-function collapseSingleChildFolders(nodes: FileTreeNode[]): FileTreeNode[] {
-  return nodes.map((node) => {
-    if (node.file) return node
-
-    let current = node
-    const segments = [current.name]
-
-    while (current.children.length === 1 && current.children[0]!.file === null) {
-      current = current.children[0]!
-      segments.push(current.name)
-    }
-
-    return { ...current, name: segments.join('/'), children: collapseSingleChildFolders(current.children) }
-  })
-}
-
-function FileTree({
-  tree,
-  activeFilePath,
-  onSelectFile
-}: {
-  tree: FileTreeNode[]
-  activeFilePath: string | null
-  onSelectFile: (path: string) => void
-}) {
-  return (
-    <div className="py-1">
-      {tree.map((node) =>
-        node.file ? (
-          <FileTreeFileButton
-            key={node.path}
-            file={node.file}
-            depth={0}
-            isActive={activeFilePath === node.path}
-            onClick={() => onSelectFile(node.path)}
-          />
-        ) : (
-          <FileTreeFolder
-            key={node.path}
-            node={node}
-            depth={0}
-            activeFilePath={activeFilePath}
-            onSelectFile={onSelectFile}
-          />
-        )
-      )}
-    </div>
-  )
-}
-
-function FileTreeFolder({
-  node,
-  depth,
-  activeFilePath,
-  onSelectFile
-}: {
-  node: FileTreeNode
-  depth: number
-  activeFilePath: string | null
-  onSelectFile: (path: string) => void
-}) {
-  const [isOpen, setIsOpen] = useState(true)
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="text-foreground hover:bg-surface-hover flex w-full items-center gap-1.5 py-1 text-left text-xs"
-        style={{ paddingLeft: 8 + depth * 16 }}
-      >
-        <ChevronDown
-          size={14}
-          className={cn('text-foreground-subtle shrink-0 transition-transform', !isOpen && '-rotate-90')}
+      <div className="mt-6">
+        <ChangedFilesViewer
+          owner={owner}
+          repo={repo}
+          source={{ kind: 'commit', sha: commitSha }}
+          headSha={commit.sha}
+          baseSha={commit.parents[0]?.sha ?? null}
         />
-        <FolderIcon name={node.name} open={isOpen} />
-        <span className="truncate font-medium">{node.name}</span>
-      </button>
-
-      {isOpen ? (
-        <div>
-          {node.children.map((child) =>
-            child.file ? (
-              <FileTreeFileButton
-                key={child.path}
-                file={child.file}
-                depth={depth + 1}
-                isActive={activeFilePath === child.path}
-                onClick={() => onSelectFile(child.path)}
-              />
-            ) : (
-              <FileTreeFolder
-                key={child.path}
-                node={child}
-                depth={depth + 1}
-                activeFilePath={activeFilePath}
-                onSelectFile={onSelectFile}
-              />
-            )
-          )}
-        </div>
-      ) : null}
+      </div>
     </div>
   )
-}
-
-function FileTreeFileButton({
-  file,
-  depth,
-  isActive,
-  onClick
-}: {
-  file: PullRequestFile
-  depth: number
-  isActive: boolean
-  onClick: () => void
-}) {
-  const name = file.filename.split('/').pop() ?? file.filename
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex w-full items-center gap-1.5 py-1 pr-3 text-left text-xs transition-colors',
-        isActive ? 'bg-surface-hover text-foreground' : 'text-foreground hover:bg-surface-hover'
-      )}
-      style={{ paddingLeft: 8 + depth * 16 + 20 }}
-    >
-      <FileStatusIcon status={file.status} />
-      <span className="min-w-0 flex-1 truncate">{name}</span>
-    </button>
-  )
-}
-
-function FileStatusIcon({ status }: { status: string }) {
-  switch (status) {
-    case 'added':
-      return <FilePlus size={14} className="text-success shrink-0" />
-    case 'removed':
-      return <FileMinus size={14} className="text-danger shrink-0" />
-    default:
-      return <FileDiff size={14} className="text-foreground-subtle shrink-0" />
-  }
 }

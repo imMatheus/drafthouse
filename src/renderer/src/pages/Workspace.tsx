@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Files, GitBranch, GitGraph, Search, Terminal } from 'lucide-react'
+import { Files, GitBranch, GitGraph, LayoutDashboard, Search, Terminal } from 'lucide-react'
 import type {
   AgentContext,
+  AgentPermissionMode,
   AgentSessionMeta,
+  AgentStartOptions,
   GitChangedFile,
   GitRepoInfo,
   PullRequestDetail
@@ -26,6 +28,7 @@ import type { WorkspaceSession } from '../lib/workspaceSession'
 import {
   createAgentTab,
   createCommitTab,
+  createDashboardTab,
   createDiffTab,
   createFileTab,
   createPullRequestFileTab,
@@ -56,6 +59,7 @@ import {
 } from '../lib/editorLayout'
 import AgentSessionTab from './workspace/AgentSessionTab'
 import SettingsView from './workspace/SettingsView'
+import DashboardView from './workspace/DashboardView'
 import DiffView from './workspace/DiffView'
 import FilesView, { type FileReveal } from './workspace/FilesView'
 import PlaceholderView from './workspace/PlaceholderView'
@@ -64,11 +68,15 @@ import PullRequestFileView from './workspace/PullRequestFileView'
 import CommitDetailView from './workspace/CommitDetailView'
 import WelcomeView from './workspace/WelcomeView'
 import AsciiArt from '../components/AsciiArt'
-import { WorkspaceContextProvider } from '../contexts/WorkspaceContext'
+import {
+  WorkspaceContextProvider,
+  type QueuedAgentPrompt,
+  type WorkspaceAgentActions
+} from '../contexts/WorkspaceContext'
 import WorkerPoolProvider from '../components/WorkerPoolProvider'
 import { AgentSessionsProvider, AgentSessionsStore } from '../contexts/AgentSessionsContext'
 import { LoadingView } from '../components/Loading'
-import { appendOrReplaceAssistant, mergePartialMessage } from '../lib/agentStream'
+import { useSettings } from '../hooks/useSettings'
 
 function mergePRsIntoContext(
   existing: AgentContext | undefined,
@@ -143,6 +151,46 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   if (agentSessionsStoreRef.current === null) agentSessionsStoreRef.current = new AgentSessionsStore()
   const agentSessionsStore = agentSessionsStoreRef.current
   const [activeAgentSessionId, setActiveAgentSessionId] = useState<string | null>(null)
+  const { settings } = useSettings()
+
+  // Follow-ups submitted while a turn was still running. Held here — not yet
+  // sent to the CLI — so they render above the prompt bar and can be
+  // cancelled; one is sent each time a running turn completes successfully.
+  // The ref mirrors the state so the IPC event handler (subscribed once)
+  // always reads the current queue instead of a stale closure.
+  const [queuedAgentPrompts, setQueuedAgentPromptsState] = useState<Record<string, QueuedAgentPrompt[]>>({})
+  const queuedAgentPromptsRef = useRef<Record<string, QueuedAgentPrompt[]>>({})
+  const updateQueuedPrompts = (
+    updater: (prev: Record<string, QueuedAgentPrompt[]>) => Record<string, QueuedAgentPrompt[]>
+  ): void => {
+    queuedAgentPromptsRef.current = updater(queuedAgentPromptsRef.current)
+    setQueuedAgentPromptsState(queuedAgentPromptsRef.current)
+  }
+
+  const sendPromptToSession = (sessionId: string, item: QueuedAgentPrompt): void => {
+    setSessionMetas((prev) =>
+      prev.map((s) => {
+        if (s.id !== sessionId) return s
+        return { ...s, status: 'running' as const, context: mergePRsIntoContext(s.context, item.mentionedPRs) }
+      })
+    )
+    window.api.agent
+      .send({ sessionId, prompt: item.prompt, cliPrompt: item.cliPrompt, files: item.files })
+      .catch((error: unknown) => console.error('Failed to send agent message', error))
+  }
+
+  const flushNextQueuedPrompt = (sessionId: string): void => {
+    const queue = queuedAgentPromptsRef.current[sessionId]
+    if (!queue || queue.length === 0) return
+    const [head, ...rest] = queue
+    updateQueuedPrompts((prev) => {
+      const next = { ...prev }
+      if (rest.length > 0) next[sessionId] = rest
+      else delete next[sessionId]
+      return next
+    })
+    sendPromptToSession(sessionId, head)
+  }
   const [activePalette, setActivePalette] = useState<'command' | 'file' | null>(null)
   const [searchFocusNonce, setSearchFocusNonce] = useState(0)
 
@@ -220,7 +268,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     if (canGoForward) navigateTo(navState.index + 1)
   }
 
-  const { data: gitInfo, isLoading: isLoadingGitInfo } = useQuery<GitRepoInfo | null, Error>({
+  const {
+    data: gitInfo,
+    isLoading: isLoadingGitInfo,
+    error: gitInfoError
+  } = useQuery<GitRepoInfo | null, Error>({
     queryKey: ['git-info', folderPath],
     queryFn: () => window.api.fs.getGitInfo(folderPath),
     retry: false
@@ -258,35 +310,78 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
   // Subscribe to agent events. Token events mutate the external events store
   // which notifies only the specific session's subscribers. Metadata updates
-  // (status / cliSessionId) happen on init / result only and go through
-  // React state so the session list / status chrome reflects the change.
+  // (status / cliSessionId / cost) happen on init / result / lifecycle only
+  // and go through React state so the session list & status chrome update.
   useEffect(() => {
-    return window.api.agent.onEvent(({ sessionId, event }) => {
-      agentSessionsStore.setEvents(sessionId, (prev) => {
-        if (event.type === 'stream_event') return mergePartialMessage(prev, event)
-        if (event.type === 'assistant') return appendOrReplaceAssistant(prev, event)
-        return [...prev, event]
-      })
+    return window.api.agent.onEvent(({ sessionId, seq, event }) => {
+      agentSessionsStore.ingest(sessionId, seq, event)
 
-      if (event.type === 'result' || (event.type === 'system' && event.subtype === 'init')) {
-        setSessionMetas((prev) =>
-          prev.map((s) => {
-            if (s.id !== sessionId) return s
-            let nextStatus = s.status
-            if (event.type === 'result') {
-              nextStatus = event.is_error ? 'error' : 'completed'
-            }
-            let cliSessionId = s.cliSessionId
-            if (event.type === 'system' && event.subtype === 'init' && 'session_id' in event) {
-              cliSessionId = event.session_id as string
-            }
-            if (nextStatus === s.status && cliSessionId === s.cliSessionId) return s
-            return { ...s, status: nextStatus, cliSessionId }
-          })
-        )
+      const affectsMeta =
+        (event.type === 'system' && event.subtype === 'init') ||
+        event.type === 'result' ||
+        (event.type === 'lifecycle' && (event.failedTurn === true || event.subtype !== 'exit')) ||
+        (event.type === 'user' && event.synthetic === true)
+      if (!affectsMeta) return
+
+      setSessionMetas((prev) =>
+        prev.map((s) => {
+          if (s.id !== sessionId) return s
+          const next: AgentSessionMeta = { ...s, lastActivityAt: Date.now() }
+          if (event.type === 'system' && event.subtype === 'init') {
+            if ('session_id' in event && typeof event.session_id === 'string') next.cliSessionId = event.session_id
+            if ('model' in event && typeof event.model === 'string') next.initModel = event.model
+          } else if (event.type === 'result') {
+            // A user-initiated stop can race the turn's own result — cancel wins.
+            next.status = event.is_error ? 'error' : s.status === 'cancelled' ? 'cancelled' : 'completed'
+            if (typeof event.total_cost_usd === 'number') next.totalCostUsd = event.total_cost_usd
+          } else if (event.type === 'lifecycle') {
+            next.status = 'error'
+          } else if (event.type === 'user') {
+            // A prompt echo means a turn started.
+            next.status = 'running'
+          }
+          return next
+        })
+      )
+
+      // A turn finished cleanly — fire the next queued follow-up, if any.
+      // Errored/stopped turns keep their queue so nothing sends into a broken
+      // session unreviewed; the queue resumes on the user's next send.
+      if (event.type === 'result' && !event.is_error) {
+        flushNextQueuedPrompt(sessionId)
       }
     })
   }, [agentSessionsStore])
+
+  // Hydrate persisted sessions for this workspace: metadata into React state,
+  // events into the store. Sessions started in this window are hydrated at
+  // start time; anything already hydrated is skipped.
+  useEffect(() => {
+    let cancelled = false
+    void window.api.agent
+      .list(folderPath)
+      .then(async (snapshots) => {
+        if (cancelled) return
+        setSessionMetas((prev) => {
+          const known = new Set(prev.map((s) => s.id))
+          const restored = snapshots.map((snapshot) => snapshot.meta).filter((meta) => !known.has(meta.id))
+          if (restored.length === 0) return prev
+          return [...prev, ...restored].sort((a, b) => a.startedAt - b.startedAt)
+        })
+        for (const snapshot of snapshots) {
+          if (agentSessionsStore.isHydrated(snapshot.meta.id)) continue
+          const { events, nextSeq } = await window.api.agent.events(snapshot.meta.id)
+          if (cancelled) return
+          agentSessionsStore.hydrate(snapshot.meta.id, events, nextSeq)
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to restore agent sessions', error)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [folderPath, agentSessionsStore])
 
   // Resolve which group new tabs should open into, falling back to the first
   // group if the active group id is somehow stale.
@@ -471,6 +566,17 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     openInActiveGroup(createPullRequestTab(number))
   }
 
+  // Same as openInActiveGroup, but also leaves the settings view if it's
+  // showing — the dashboard is reached from the activity bar, like settings.
+  const handleOpenDashboard = (): void => {
+    const targetGroupId = resolveActiveGroupId()
+    onUpdateSession({
+      activeView: 'workspace',
+      layout: replaceGroup(layout, targetGroupId, (group) => addTabToGroup(group, createDashboardTab())),
+      activeGroupId: targetGroupId
+    })
+  }
+
   const handleOpenPullRequestFile = (input: PullRequestFileTabInput): void => {
     openInActiveGroup(createPullRequestFileTab(input))
   }
@@ -547,6 +653,10 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
         e.preventDefault()
         handleToggleSidebar('explorer')
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === '5') {
+        e.preventDefault()
+        handleOpenDashboard()
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
         e.preventDefault()
         handleSplitGroup(activeGroupId)
@@ -565,17 +675,42 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     onUpdateSession({ activeView: activeView === 'settings' ? 'workspace' : 'settings' })
   }
 
-  const handleStartAgent = async (prompt: string, files?: string[], context?: AgentContext): Promise<void> => {
-    const { sessionId } = await window.api.agent.start(folderPath, prompt, files, context?.systemPromptSuffix)
+  const handleStartAgent = async (
+    prompt: string,
+    files?: string[],
+    context?: AgentContext,
+    options?: AgentStartOptions
+  ): Promise<void> => {
+    const permissionMode: AgentPermissionMode =
+      options?.permissionMode ?? (settings.agentFullAccess ? 'bypassPermissions' : 'default')
+    const model = options?.model ?? null
 
+    const { sessionId } = await window.api.agent.start({
+      cwd: folderPath,
+      prompt,
+      files,
+      context,
+      permissionMode,
+      model
+    })
+
+    // A brand-new session's canonical log starts empty, so hydrating with an
+    // empty snapshot just flushes the live events buffered since the start call.
+    agentSessionsStore.hydrate(sessionId, [], 0)
+
+    const now = Date.now()
     const newSession: AgentSessionMeta = {
       id: sessionId,
       prompt,
       status: 'running',
-      startedAt: Date.now(),
+      startedAt: now,
+      lastActivityAt: now,
       cliSessionId: null,
       files: files ?? [],
-      context
+      context,
+      permissionMode,
+      model,
+      cwd: folderPath
     }
 
     setSessionMetas((prev) => [...prev, newSession])
@@ -606,6 +741,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     })
   }
 
+  // Send a follow-up. While a turn is running (or earlier follow-ups are
+  // still waiting) the message is queued instead of sent, so it shows above
+  // the prompt bar where it can be reviewed and cancelled. The UI always
+  // shows the clean `prompt`; `cliPrompt` (when set) carries extra metadata
+  // like injected PR context that shouldn't clutter the bubble.
   const handleContinueAgent = async (
     agentSessionId: string,
     prompt: string,
@@ -613,41 +753,47 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     cliPrompt?: string,
     mentionedPRs?: PullRequestDetail[]
   ): Promise<void> => {
-    const existingSession = sessionMetas.find((s) => s.id === agentSessionId)
-    if (!existingSession?.cliSessionId) return
+    const item: QueuedAgentPrompt = { id: crypto.randomUUID(), prompt, files, cliPrompt, mentionedPRs }
+    const isRunning = sessionMetas.find((s) => s.id === agentSessionId)?.status === 'running'
+    const hasQueue = (queuedAgentPromptsRef.current[agentSessionId]?.length ?? 0) > 0
 
-    await window.api.agent.continue(
-      existingSession.id,
-      existingSession.cliSessionId,
-      folderPath,
-      cliPrompt ?? prompt,
-      files
-    )
+    if (isRunning || hasQueue) {
+      updateQueuedPrompts((prev) => ({
+        ...prev,
+        [agentSessionId]: [...(prev[agentSessionId] ?? []), item]
+      }))
+      // An idle session with leftovers (the turn errored or was stopped):
+      // this send restarts the queue from the front so order is preserved.
+      if (!isRunning) flushNextQueuedPrompt(agentSessionId)
+      return
+    }
 
-    // Mark session as running again and add a synthetic user message.
-    // The UI always shows the clean `prompt`; `cliPrompt` (when set) carries
-    // extra metadata like injected PR context that shouldn't clutter the bubble.
-    setSessionMetas((prev) =>
-      prev.map((s) => {
-        if (s.id !== agentSessionId) return s
-        return {
-          ...s,
-          status: 'running' as const,
-          context: mergePRsIntoContext(s.context, mentionedPRs)
-        }
-      })
-    )
-    agentSessionsStore.setEvents(agentSessionId, (prev) => [
-      ...prev,
-      {
-        type: 'user' as const,
-        message: {
-          role: 'user' as const,
-          content: [{ type: 'text' as const, text: prompt }]
-        },
-        session_id: existingSession.cliSessionId!
+    sendPromptToSession(agentSessionId, item)
+  }
+
+  const handleDeleteAgentSession = async (sessionId: string): Promise<void> => {
+    await window.api.agent.delete(sessionId)
+    setSessionMetas((prev) => prev.filter((s) => s.id !== sessionId))
+    agentSessionsStore.remove(sessionId)
+    updateQueuedPrompts((prev) => {
+      if (!(sessionId in prev)) return prev
+      const next = { ...prev }
+      delete next[sessionId]
+      return next
+    })
+    if (activeAgentSessionId === sessionId) setActiveAgentSessionId(null)
+
+    const tabId = getAgentTabId(sessionId)
+    let nextLayout = layout
+    for (const group of collectGroups(layout)) {
+      if (group.tabs.some((tab) => tab.id === tabId)) {
+        nextLayout = removeTabAndCollapse(nextLayout, group.id, tabId)
       }
-    ])
+    }
+    if (nextLayout !== layout) {
+      pruneNavHistory(nextLayout)
+      onUpdateSession({ layout: nextLayout, activeGroupId: firstGroupId(nextLayout) })
+    }
   }
 
   const handleSelectAgentSession = (sessionId: string): void => {
@@ -833,14 +979,73 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       active: sidebar.visible && sidebar.activePanel === 'search',
       onClick: () => handleToggleSidebar('search'),
       shortcut: ['⌘', '⇧', 'F']
+    },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      active: activeView === 'workspace' && activeTab?.kind === 'dashboard',
+      onClick: handleOpenDashboard,
+      shortcut: ['⌘', '5']
     }
   ]
 
   const projectName = getPathBasename(folderPath)
 
+  // Permission decisions flow straight to the main process; plan approval also
+  // flips the session out of plan mode into the configured execution mode.
+  const executionPermissionMode: AgentPermissionMode = settings.agentFullAccess ? 'bypassPermissions' : 'default'
+  const agentActions: WorkspaceAgentActions = {
+    respondPermission: (sessionId, requestId, behavior, options) => {
+      void window.api.agent.respondPermission(sessionId, requestId, { behavior, ...options })
+    },
+    approvePlan: (sessionId, requestId) => {
+      void window.api.agent.respondPermission(sessionId, requestId, { behavior: 'allow' })
+      void window.api.agent.setPermissionMode(sessionId, executionPermissionMode)
+      setSessionMetas((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, permissionMode: executionPermissionMode } : s))
+      )
+    },
+    rejectPlan: (sessionId, requestId) => {
+      void window.api.agent.respondPermission(sessionId, requestId, {
+        behavior: 'deny',
+        message: 'The user wants to keep planning — revise the plan based on their next message.'
+      })
+    },
+    setPermissionMode: (sessionId, mode) => {
+      void window.api.agent.setPermissionMode(sessionId, mode)
+      setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, permissionMode: mode } : s)))
+    },
+    setModel: (sessionId, model) => {
+      const previousModel = sessionMetas.find((s) => s.id === sessionId)?.model ?? null
+      setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, model } : s)))
+      window.api.agent.setModel(sessionId, model).catch((error: unknown) => {
+        console.error('Failed to switch model', error)
+        setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, model: previousModel } : s)))
+      })
+    },
+    cancelQueuedPrompt: (sessionId, promptId) => {
+      updateQueuedPrompts((prev) => {
+        const queue = prev[sessionId]
+        if (!queue) return prev
+        const remaining = queue.filter((q) => q.id !== promptId)
+        const next = { ...prev }
+        if (remaining.length > 0) next[sessionId] = remaining
+        else delete next[sessionId]
+        return next
+      })
+    }
+  }
+
   return (
     <WorkspaceContextProvider
-      value={{ gitInfo: gitInfo ?? null, folderPath, onOpenPullRequest: handleOpenPullRequest }}
+      value={{
+        gitInfo: gitInfo ?? null,
+        folderPath,
+        onOpenPullRequest: handleOpenPullRequest,
+        agentActions,
+        queuedAgentPrompts
+      }}
     >
       <AgentSessionsProvider store={agentSessionsStore}>
         <WorkerPoolProvider>
@@ -902,10 +1107,11 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
 
                   {sidebar.visible && sidebar.activePanel === 'agent' ? (
                     <AgentPanel
-                      sessions={sessionMetas}
+                      sessions={sessionMetas.filter((s) => !s.context?.inline)}
                       activeSessionId={activeAgentSessionId}
                       onSelectSession={handleSelectAgentSession}
                       onNewSession={handleNewAgentSession}
+                      onDeleteSession={(id) => void handleDeleteAgentSession(id)}
                       onSessionDragStart={(session) =>
                         handleExternalDragStart(
                           createAgentTab(
@@ -929,11 +1135,13 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                           activeTab: tab,
                           folderPath,
                           gitInfo,
+                          gitInfoError,
                           isLoadingGitInfo,
                           agentSessions: sessionMetas,
                           fileReveal:
                             pendingReveal && pendingReveal.tabId === tab?.id ? pendingReveal.reveal : undefined,
                           onOpenFile: handleOpenFile,
+                          onOpenPullRequest: handleOpenPullRequest,
                           onOpenPullRequestFile: handleOpenPullRequestFile,
                           onOpenCommit: handleOpenCommit,
                           onStartAgent: handleStartAgent,
@@ -956,7 +1164,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
               open={activePalette === 'command'}
               onOpenChange={(next) => setActivePalette(next ? 'command' : null)}
               gitInfo={gitInfo}
-              agentSessions={sessionMetas}
+              agentSessions={sessionMetas.filter((s) => !s.context?.inline)}
               onOpenPullRequest={handleOpenPullRequest}
               onSelectAgentSession={handleSelectAgentSession}
               onNewAgent={handleAgentActivityClick}
@@ -984,10 +1192,12 @@ function renderWorkspaceTabContent({
   activeTab,
   folderPath,
   gitInfo,
+  gitInfoError,
   isLoadingGitInfo,
   agentSessions,
   fileReveal,
   onOpenFile,
+  onOpenPullRequest,
   onOpenPullRequestFile,
   onOpenCommit,
   onStartAgent,
@@ -1002,13 +1212,15 @@ function renderWorkspaceTabContent({
   activeTab: WorkspaceTab | null
   folderPath: string
   gitInfo: GitRepoInfo | null | undefined
+  gitInfoError: Error | null
   isLoadingGitInfo: boolean
   agentSessions: AgentSessionMeta[]
   fileReveal: FileReveal | undefined
   onOpenFile: (path: string, line?: number) => void
+  onOpenPullRequest: (number: number) => void
   onOpenPullRequestFile: (input: PullRequestFileTabInput) => void
   onOpenCommit: (sha: string, title?: string) => void
-  onStartAgent: (prompt: string, files?: string[], context?: AgentContext) => Promise<void>
+  onStartAgent: (prompt: string, files?: string[], context?: AgentContext, options?: AgentStartOptions) => Promise<void>
   onContinueAgent: (
     sessionId: string,
     prompt: string,
@@ -1036,6 +1248,25 @@ function renderWorkspaceTabContent({
   switch (activeTab.kind) {
     case 'welcome':
       return <WelcomeView />
+    case 'dashboard':
+      if (isLoadingGitInfo) {
+        return <LoadingView label="Checking repository metadata..." />
+      }
+
+      if (gitInfo) {
+        return <DashboardView gitInfo={gitInfo} onOpenPullRequest={onOpenPullRequest} onOpenCommit={onOpenCommit} />
+      }
+
+      // A failed lookup is not the same as "this folder has no GitHub remote" —
+      // showing the no-repo state for an error would be a false negative.
+      return gitInfoError ? (
+        <PlaceholderView title="Repository metadata unavailable" description={gitInfoError.message} />
+      ) : (
+        <PlaceholderView
+          title="No GitHub repository"
+          description="This folder is not mapped to a GitHub repository, so there is no activity to show. Open a folder with a GitHub remote to see its dashboard."
+        />
+      )
     case 'file':
       return <FilesView filePath={activeTab.path} folderPath={folderPath} reveal={fileReveal} />
     case 'pull-request-file':
@@ -1096,8 +1327,11 @@ function renderWorkspaceTabContent({
     case 'agent': {
       const agentSession = agentSessions.find((s) => s.id === activeTab.sessionId) ?? null
       return (
+        // Keyed by session so drafts and view state never leak between tabs.
         <AgentSessionTab
+          key={activeTab.sessionId}
           session={agentSession}
+          isPlaceholderTab={activeTab.sessionId === 'new'}
           onStartSession={onStartAgent}
           onContinueSession={onContinueAgent}
           onStopSession={onStopAgent}
