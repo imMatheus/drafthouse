@@ -150,10 +150,7 @@ export default function DashboardView({ gitInfo, onOpenPullRequest, onOpenCommit
           <div className="min-w-0 flex-1">
             {selectedYear == null ? (
               activity.isLoading || activity.data?.pending ? (
-                <Loading
-                  size="sm"
-                  label={activity.data?.pending ? 'GitHub is computing activity stats…' : 'Loading…'}
-                />
+                <ActivityGridSkeleton />
               ) : activity.error ? (
                 <p className="text-foreground-muted text-xs">Couldn't load commit activity.</p>
               ) : activity.data && activity.data.weeks.length > 0 ? (
@@ -162,7 +159,7 @@ export default function DashboardView({ gitInfo, onOpenPullRequest, onOpenCommit
                 <p className="text-foreground-muted text-xs">No commit activity yet.</p>
               )
             ) : yearActivity.isLoading ? (
-              <Loading size="sm" label="Counting commits…" />
+              <ActivityGridSkeleton />
             ) : yearActivity.error ? (
               <p className="text-foreground-muted text-xs">Couldn't load commit activity.</p>
             ) : yearActivity.data ? (
@@ -466,6 +463,34 @@ function ActivityGrid({ weeks, year, truncated }: { weeks: ActivityWeek[]; year:
             <span className="bg-accent/85 size-2.5 rounded-[2px]" />
             <span className="bg-accent size-2.5 rounded-[2px]" />
             More
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Placeholder that mirrors ActivityGrid's layout while commit data loads.
+const SKELETON_WEEKS = 52
+
+function ActivityGridSkeleton() {
+  return (
+    <div className="animate-pulse">
+      <div className="bg-foreground/10 mb-3 h-3 w-40 rounded" />
+      <div className="overflow-x-auto">
+        <div className="inline-flex flex-col">
+          <div className="ml-8 h-4" />
+          <div className="flex">
+            <div className="mr-1 w-7" />
+            <div className="flex gap-[3px]">
+              {Array.from({ length: SKELETON_WEEKS }, (_, weekIndex) => (
+                <div key={weekIndex} className="flex flex-col gap-[3px]">
+                  {Array.from({ length: 7 }, (_, dayIndex) => (
+                    <div key={dayIndex} className="bg-foreground/5 size-2.5 rounded-[2px]" />
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

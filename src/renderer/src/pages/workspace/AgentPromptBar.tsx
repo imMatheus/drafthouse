@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { ArrowUp, Check, ChevronDown, Cpu, FileText, GitPullRequest, ListTodo, Plus, Square, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, FileText, GitPullRequest, ListTodo, Plus, Square, X } from 'lucide-react'
 import type { GitRepoInfo, PullRequest, PullRequestDetail } from '../../../../shared/types'
 import { cn } from '../../lib/cn'
 import {
@@ -505,7 +505,6 @@ function ModelMenu({
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors">
-          <Cpu size={11} className="shrink-0" />
           <span className="max-w-[160px] truncate">{selectedOption?.label ?? selectedId ?? 'Model'}</span>
           <ChevronDown size={10} className="shrink-0" />
         </button>

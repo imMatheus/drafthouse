@@ -20,44 +20,44 @@ body {
 :root,
 .dark {
   --color-background: rgb(12, 12, 12);
-  --color-surface: rgb(18, 18, 18);
-  --color-surface-hover: rgb(22, 22, 22);
+  --color-surface: rgb(24, 24, 24);
+  --color-surface-hover: rgb(31, 31, 31);
   --color-foreground: rgb(226, 225, 219);
-  --color-foreground-muted: rgb(195, 194, 184);
-  --color-foreground-subtle: rgb(124, 123, 116);
-  --color-border: rgb(32, 32, 32);
-  --color-interactive: rgb(47, 47, 47);
-  --color-interactive-hover: rgb(43, 41, 35);
+  --color-foreground-muted: rgb(182, 181, 172);
+  --color-foreground-subtle: rgb(136, 135, 127);
+  --color-border: rgb(41, 41, 41);
+  --color-interactive: rgb(52, 52, 52);
+  --color-interactive-hover: rgb(64, 64, 64);
   --color-accent: rgb(67, 151, 248);
   --color-accent-hover: rgb(87, 171, 255);
-  --color-accent-bg: rgb(18, 26, 36);
+  --color-accent-bg: rgb(23, 33, 48);
   --color-accent-foreground: #ffffff;
   --color-success: rgb(102, 201, 95);
-  --color-success-foreground: #ffffff;
-  --color-danger: rgb(227, 66, 88);
+  --color-success-foreground: rgb(10, 28, 12);
+  --color-danger: rgb(231, 76, 96);
   --color-danger-foreground: #ffffff;
   --color-purple: rgb(180, 142, 255);
 }
 
 .light {
   --color-background: rgb(253, 253, 252);
-  --color-surface: rgb(243, 243, 242);
-  --color-surface-hover: rgb(229, 229, 228);
-  --color-foreground: rgb(60, 60, 57);
-  --color-foreground-muted: rgb(122, 121, 112);
-  --color-foreground-subtle: rgb(165, 164, 158);
-  --color-border: rgb(234, 234, 233);
-  --color-interactive: rgb(237, 237, 234);
-  --color-interactive-hover: rgb(226, 225, 220);
+  --color-surface: rgb(241, 241, 239);
+  --color-surface-hover: rgb(231, 231, 228);
+  --color-foreground: rgb(38, 38, 35);
+  --color-foreground-muted: rgb(96, 95, 88);
+  --color-foreground-subtle: rgb(122, 121, 113);
+  --color-border: rgb(224, 223, 220);
+  --color-interactive: rgb(229, 229, 225);
+  --color-interactive-hover: rgb(217, 216, 212);
   --color-accent: rgb(43, 101, 197);
-  --color-accent-hover: rgb(48, 111, 207);
-  --color-accent-bg: rgb(238, 243, 250);
+  --color-accent-hover: rgb(37, 90, 178);
+  --color-accent-bg: rgb(229, 238, 251);
   --color-accent-foreground: #ffffff;
-  --color-success: #16a34a;
+  --color-success: rgb(18, 121, 58);
   --color-success-foreground: #ffffff;
-  --color-danger: #dc2626;
+  --color-danger: rgb(207, 34, 46);
   --color-danger-foreground: #ffffff;
-  --color-purple: rgb(130, 80, 223);
+  --color-purple: rgb(122, 72, 214);
 }
 
 @keyframes check-in {
