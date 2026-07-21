@@ -5,29 +5,17 @@ import { unlinkSync, statSync } from 'fs'
 import { requireAllowedDirectory } from './fs'
 import type { GitChangedFile, GitBranchInfo, GitLogEntry, GitStatusCode } from '../shared/types'
 
-export type GitErrorKind =
-  | 'timeout'
-  | 'not-a-repo'
-  | 'missing-ref'
-  | 'fetch-failed'
-  | 'git-not-found'
-  | 'origin-mismatch'
-  | 'refs-unavailable'
-  | 'unknown'
+type GitErrorKind = 'timeout' | 'not-a-repo' | 'missing-ref' | 'fetch-failed' | 'git-not-found' | 'unknown'
 
 /**
- * Typed error for git failures. The `kind` discriminant lets the renderer
- * decide between silent REST fallback and surfacing a CTA to the user.
- *
- * Electron's IPC boundary strips custom Error properties during rejection
- * serialization, so we also prefix the message with a `[GitError:<kind>]`
- * sentinel and parse it back on the renderer side (see `readGitErrorKind`
- * in PRFilesTab.tsx).
+ * Typed error for git failures. The `kind` discriminant classifies failures
+ * within the main process; note it does not survive Electron's IPC rejection
+ * serialization, so the renderer only ever sees the message.
  */
-export class GitError extends Error {
+class GitError extends Error {
   kind: GitErrorKind
   constructor(kind: GitErrorKind, message: string) {
-    super(`[GitError:${kind}] ${message}`)
+    super(message)
     this.name = 'GitError'
     this.kind = kind
   }
@@ -48,7 +36,7 @@ const GIT_ENV = {
   SSH_ASKPASS: 'echo'
 }
 
-export function git(cwd: string, args: string[], opts: GitOptions = {}): Promise<string> {
+function git(cwd: string, args: string[], opts: GitOptions = {}): Promise<string> {
   const { timeoutMs = 15_000, signal } = opts
   return new Promise((resolve, reject) => {
     const child = execFile(

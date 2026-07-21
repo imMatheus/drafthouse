@@ -460,16 +460,6 @@ export interface PullRequestFile {
   previous_filename?: string
 }
 
-export type GitErrorKind =
-  | 'timeout'
-  | 'not-a-repo'
-  | 'missing-ref'
-  | 'fetch-failed'
-  | 'git-not-found'
-  | 'origin-mismatch'
-  | 'refs-unavailable'
-  | 'unknown'
-
 export type PullRequestMergeMethod = 'merge' | 'squash' | 'rebase'
 
 export interface PullRequestMergeResult {

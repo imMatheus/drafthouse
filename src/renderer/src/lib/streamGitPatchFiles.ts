@@ -49,16 +49,6 @@ export async function streamGitPatchFiles(
   }
 }
 
-export function getStreamedPatchMetadata(fileText: string): string | undefined {
-  const diffBoundaryIndex = findNextGitFileBoundary(fileText, 0)
-  if (diffBoundaryIndex == null || diffBoundaryIndex <= 0) {
-    return undefined
-  }
-
-  const metadata = fileText.slice(0, diffBoundaryIndex)
-  return COMMIT_HASH_METADATA_PATTERN.test(metadata) ? metadata : undefined
-}
-
 interface GitPatchFileStreamFinishResult {
   fallbackPatchContent?: string
   fileText?: string

@@ -158,7 +158,7 @@ export function createCommitTab(sha: string, title?: string): WorkspaceTab {
   }
 }
 
-export function getCommitTabId(sha: string): `commit:${string}` {
+function getCommitTabId(sha: string): `commit:${string}` {
   return `commit:${sha}`
 }
 
@@ -171,7 +171,7 @@ export function createDiffTab(path: string, staged: boolean): WorkspaceTab {
   }
 }
 
-export function getDiffTabId(path: string, staged: boolean): `diff:${string}` {
+function getDiffTabId(path: string, staged: boolean): `diff:${string}` {
   return `diff:${staged ? 'staged' : 'unstaged'}:${path}`
 }
 

@@ -13,7 +13,6 @@ interface AgentConversationProps {
 
 export default function AgentConversation({ session }: AgentConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
   const events = useAgentSessionEvents(session.id)
 
@@ -38,7 +37,6 @@ export default function AgentConversation({ session }: AgentConversationProps) {
 
   return (
     <div
-      ref={scrollContainerRef}
       onScroll={(e) => {
         const el = e.currentTarget
         isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80

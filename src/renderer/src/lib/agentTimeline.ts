@@ -6,7 +6,7 @@ import type {
 } from '../../../shared/types'
 
 /** Tool calls rendered as first-class response content (diff blocks). */
-export const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit'])
+const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit'])
 
 // ============================================================
 // Timeline shapes
