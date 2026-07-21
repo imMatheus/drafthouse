@@ -5,7 +5,7 @@ import { PatchCodeBlock } from '../../components/CodeViewBlock'
 import type { PullRequestReviewComment } from '../../../../shared/types'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_DIFF_OPTIONS, wrapGitPatch } from '../../lib/diffs'
+import { BASE_DIFF_OPTIONS, codeViewItemMetrics, wrapGitPatch } from '../../lib/diffs'
 import ReactionBar from '../../components/ReactionBar'
 import CommentActionsMenu from '../../components/CommentActionsMenu'
 import CommentBodyEditor from '../../components/CommentBodyEditor'
@@ -264,7 +264,8 @@ function ReviewDiffHunkPreview({ comment }: { comment: PullRequestReviewComment 
           ...BASE_DIFF_OPTIONS,
           themeType: theme,
           diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
-          disableFileHeader: true
+          disableFileHeader: true,
+          itemMetrics: codeViewItemMetrics(settings.codeFontSize)
         }}
       />
     </div>

@@ -5,7 +5,8 @@ import rehypeRaw from 'rehype-raw'
 import type { FileContents } from '@pierre/diffs'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_CODE_OPTIONS, syntheticFilenameForLang } from '../../lib/diffs'
+import { useSettings } from '../../hooks/useSettings'
+import { BASE_CODE_OPTIONS, codeViewItemMetrics, syntheticFilenameForLang } from '../../lib/diffs'
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
 import { FileCodeBlock } from '../../components/CodeViewBlock'
 import PRPill, { parsePRUrl } from '../../components/PRPill'
@@ -18,6 +19,7 @@ interface MarkdownBodyProps {
 
 function CodeBlock({ className, children }: { className?: string; children?: ReactNode }) {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const code = String(children).replace(/\n$/, '')
   const lang = className?.replace('language-', '') ?? 'text'
 
@@ -35,7 +37,8 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
           ...BASE_CODE_OPTIONS,
           themeType: theme,
           disableFileHeader: true,
-          disableLineNumbers: true
+          disableLineNumbers: true,
+          itemMetrics: codeViewItemMetrics(settings.codeFontSize)
         }}
       />
     </div>

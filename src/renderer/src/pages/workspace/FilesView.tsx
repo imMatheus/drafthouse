@@ -4,7 +4,8 @@ import { ChevronRight } from 'lucide-react'
 import { CodeView, type CodeViewFileItem, type CodeViewHandle } from '@pierre/diffs/react'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_CODE_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { useSettings } from '../../hooks/useSettings'
+import { BASE_CODE_OPTIONS, codeViewItemMetrics, getLanguageFromPath } from '../../lib/diffs'
 import { LoadingView } from '../../components/Loading'
 
 /** A request to scroll to (and highlight) a 1-based line, e.g. from a search hit. */
@@ -25,6 +26,7 @@ const FILE_ITEM_ID = 'file'
 
 export default function FilesView({ filePath, folderPath, reveal }: FilesViewProps) {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const queryClient = useQueryClient()
   const viewerRef = useRef<CodeViewHandle<undefined> | null>(null)
   // Track the last reveal we acted on so disk-edit re-renders (which change the
@@ -134,7 +136,12 @@ export default function FilesView({ filePath, folderPath, reveal }: FilesViewPro
             ref={viewerRef}
             items={itemsRef.current.items}
             selectedLines={selectedLines}
-            options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }}
+            options={{
+              ...BASE_CODE_OPTIONS,
+              themeType: theme,
+              disableFileHeader: true,
+              itemMetrics: codeViewItemMetrics(settings.codeFontSize)
+            }}
             className="h-full min-h-0 w-full overflow-x-clip overflow-y-auto [overflow-anchor:none]"
           />
         )}

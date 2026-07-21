@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ExternalLink } from 'lucide-react'
 import { useSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_DIFF_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { BASE_DIFF_OPTIONS, codeViewItemMetrics, getLanguageFromPath } from '../../lib/diffs'
 import { DiffContentsBlock } from '../../components/CodeViewBlock'
 import { LoadingView } from '../../components/Loading'
 
@@ -103,7 +103,8 @@ export default function DiffView({ filePath, folderPath, staged, onOpenFile }: D
               ...BASE_DIFF_OPTIONS,
               themeType: theme,
               diffStyle: settings.diffViewMode === 'split' ? 'split' : 'unified',
-              disableFileHeader: true
+              disableFileHeader: true,
+              itemMetrics: codeViewItemMetrics(settings.codeFontSize)
             }}
             className="h-full min-h-0 w-full overflow-x-clip overflow-y-auto [overflow-anchor:none]"
           />

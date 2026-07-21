@@ -1,5 +1,6 @@
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_DIFF_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { useSettings } from '../../hooks/useSettings'
+import { BASE_DIFF_OPTIONS, codeViewItemMetrics, getLanguageFromPath } from '../../lib/diffs'
 import { DiffContentsBlock } from '../../components/CodeViewBlock'
 
 interface AgentEditDiffBlockProps {
@@ -20,6 +21,7 @@ export default function AgentEditDiffBlock({
   errorText
 }: AgentEditDiffBlockProps) {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const fileName = filePath.split('/').pop() ?? filePath
   const lang = getLanguageFromPath(filePath)
 
@@ -63,7 +65,13 @@ export default function AgentEditDiffBlock({
         oldContents={oldString}
         newContents={newString}
         lang={lang}
-        options={{ ...BASE_DIFF_OPTIONS, themeType: theme, diffStyle: 'unified', disableFileHeader: true }}
+        options={{
+          ...BASE_DIFF_OPTIONS,
+          themeType: theme,
+          diffStyle: 'unified',
+          disableFileHeader: true,
+          itemMetrics: codeViewItemMetrics(settings.codeFontSize)
+        }}
       />
     </div>
   )

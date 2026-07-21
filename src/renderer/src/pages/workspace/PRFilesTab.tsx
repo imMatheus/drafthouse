@@ -56,9 +56,9 @@ import type { FixWithClaudeInput } from '../../lib/agentContext'
 import type { PullRequestFileTabInput } from '../../lib/workspaceTabs'
 import Tooltip from '../../components/Tooltip'
 import { cn } from '../../lib/cn'
-import { codeLineHeight, useSettings, type DiffIndicatorStyle, type UserSettings } from '../../hooks/useSettings'
+import { useSettings, type DiffIndicatorStyle, type UserSettings } from '../../hooks/useSettings'
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_DIFF_OPTIONS } from '../../lib/diffs'
+import { BASE_DIFF_OPTIONS, codeViewItemMetrics } from '../../lib/diffs'
 import type { PrDiffDiffStats, PrDiffFileMeta } from '../../lib/prDiffAccumulator'
 import { useDiffStream, type DiffStreamSource, type PrDiffLoadState } from './useDiffStream'
 import MarkdownBody from './MarkdownBody'
@@ -1057,7 +1057,7 @@ export function ChangedFilesViewer({
         // The font size itself is applied via the inherited `--diffs-font-size`
         // CSS variable (see SettingsProvider); feed the virtualizer the matching
         // line height so its pre-measurement scroll estimates stay accurate.
-        itemMetrics: { lineHeight: codeLineHeight(settings.codeFontSize) },
+        itemMetrics: codeViewItemMetrics(settings.codeFontSize),
         // Collapse unchanged runs into expandable "N unmodified lines" bars
         // (keeping GitHub's 3 lines of context around each change) rather than
         // dumping the whole file. The bars only become *clickable* once a file

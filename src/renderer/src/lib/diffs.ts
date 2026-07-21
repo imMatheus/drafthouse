@@ -1,5 +1,6 @@
 import type { BaseCodeOptions, BaseDiffOptions, SupportedLanguages, ThemesType } from '@pierre/diffs'
 import type { PullRequestFile } from '../../../shared/types'
+import { codeLineHeight } from '../hooks/useSettings'
 
 export const DIFFS_THEMES: ThemesType = {
   dark: 'pierre-dark',
@@ -147,6 +148,29 @@ export const BASE_DIFF_OPTIONS: Omit<BaseDiffOptions, 'hunkSeparators'> = {
 export const BASE_CODE_OPTIONS: BaseCodeOptions = {
   theme: DIFFS_THEMES,
   overflow: 'wrap'
+}
+
+/**
+ * Virtualizer metrics matching the rendered line height for a given code font
+ * size. Every CodeView must pass this as `itemMetrics`: the font size arrives
+ * via the `--diffs-line-height` CSS variable, but the virtualizer sizes and
+ * places its render window from `itemMetrics.lineHeight` (default 20px). When
+ * the real line height is smaller than the metric, the window's start line
+ * lands past the viewport top and the first lines of a file never render.
+ *
+ * Returns a cached object per size — CodeView compares options shallowly, so
+ * an inline `{ lineHeight }` literal would register as an options change on
+ * every render and force needless re-renders.
+ */
+const ITEM_METRICS_BY_FONT_SIZE = new Map<number, { lineHeight: number }>()
+
+export function codeViewItemMetrics(codeFontSize: number): { lineHeight: number } {
+  let metrics = ITEM_METRICS_BY_FONT_SIZE.get(codeFontSize)
+  if (!metrics) {
+    metrics = { lineHeight: codeLineHeight(codeFontSize) }
+    ITEM_METRICS_BY_FONT_SIZE.set(codeFontSize, metrics)
+  }
+  return metrics
 }
 
 /**

@@ -4,7 +4,8 @@ import { ChevronRight, GitPullRequest } from 'lucide-react'
 import type { FileContents } from '@pierre/diffs'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
-import { BASE_CODE_OPTIONS, getLanguageFromPath } from '../../lib/diffs'
+import { useSettings } from '../../hooks/useSettings'
+import { BASE_CODE_OPTIONS, codeViewItemMetrics, getLanguageFromPath } from '../../lib/diffs'
 import { FileCodeBlock } from '../../components/CodeViewBlock'
 import { LoadingView } from '../../components/Loading'
 
@@ -18,6 +19,7 @@ interface PullRequestFileViewProps {
 
 export default function PullRequestFileView({ owner, repo, number, filePath, gitRef }: PullRequestFileViewProps) {
   const { theme } = useTheme()
+  const { settings } = useSettings()
   const {
     data: fileContents,
     isLoading,
@@ -67,7 +69,15 @@ export default function PullRequestFileView({ owner, repo, number, filePath, git
             <p className="text-foreground-muted mt-1 text-sm">{error.message}</p>
           </div>
         ) : (
-          <FileCodeBlock file={file} options={{ ...BASE_CODE_OPTIONS, themeType: theme, disableFileHeader: true }} />
+          <FileCodeBlock
+            file={file}
+            options={{
+              ...BASE_CODE_OPTIONS,
+              themeType: theme,
+              disableFileHeader: true,
+              itemMetrics: codeViewItemMetrics(settings.codeFontSize)
+            }}
+          />
         )}
       </div>
     </div>
