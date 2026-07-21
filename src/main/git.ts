@@ -87,33 +87,27 @@ function parseStatusCode(char: string): GitStatusCode | ' ' {
 }
 
 async function gitStatus(cwd: string): Promise<GitChangedFile[]> {
-  const output = await git(cwd, ['status', '--porcelain=v1', '-uall'])
-  if (!output.trim()) return []
+  // -z: NUL-separated entries with no path quoting. Without it, paths with
+  // non-ASCII characters arrive C-quoted with octal escapes (core.quotePath
+  // defaults on) and filenames containing " -> " misparse as renames.
+  const output = await git(cwd, ['status', '--porcelain=v1', '-z', '-uall'])
 
   const files: GitChangedFile[] = []
+  const fields = output.split('\0')
 
-  for (const line of output.split('\n')) {
-    if (line.length < 3) continue
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i]
+    if (entry.length < 3) continue
 
-    const indexStatus = parseStatusCode(line[0])
-    const workTreeStatus = parseStatusCode(line[1])
-    const rest = line.slice(3)
+    const indexStatus = parseStatusCode(entry[0])
+    const workTreeStatus = parseStatusCode(entry[1])
+    const path = entry.slice(3)
 
-    // Handle renames: "R  old -> new"
-    const renameMatch = rest.match(/^(.+?) -> (.+)$/)
-    if (renameMatch) {
-      files.push({
-        path: renameMatch[2],
-        oldPath: renameMatch[1],
-        indexStatus,
-        workTreeStatus
-      })
+    // Renames/copies emit the origin path as the following NUL field.
+    if (entry[0] === 'R' || entry[0] === 'C' || entry[1] === 'R' || entry[1] === 'C') {
+      files.push({ path, oldPath: fields[++i], indexStatus, workTreeStatus })
     } else {
-      files.push({
-        path: rest,
-        indexStatus,
-        workTreeStatus
-      })
+      files.push({ path, indexStatus, workTreeStatus })
     }
   }
 
@@ -186,15 +180,20 @@ async function gitUnstageAll(cwd: string): Promise<void> {
 }
 
 async function gitDiscard(cwd: string, filePaths: string[]): Promise<void> {
-  // Separate tracked and untracked files
-  const statusOutput = await git(cwd, ['status', '--porcelain=v1', '--', ...filePaths])
+  // Separate tracked and untracked files. -z for unquoted NUL-separated
+  // paths — see gitStatus.
+  const statusOutput = await git(cwd, ['status', '--porcelain=v1', '-z', '--', ...filePaths])
   const tracked: string[] = []
   const untracked: string[] = []
 
-  for (const line of statusOutput.split('\n')) {
-    if (line.length < 3) continue
-    const path = line.slice(3).replace(/ -> .+$/, '')
-    if (line.startsWith('??')) {
+  const fields = statusOutput.split('\0')
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i]
+    if (entry.length < 3) continue
+    const path = entry.slice(3)
+    // Skip a rename/copy entry's origin-path field; discard the current name.
+    if (entry[0] === 'R' || entry[0] === 'C' || entry[1] === 'R' || entry[1] === 'C') i++
+    if (entry.startsWith('??')) {
       untracked.push(path)
     } else {
       tracked.push(path)

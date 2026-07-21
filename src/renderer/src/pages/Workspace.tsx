@@ -176,7 +176,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     )
     window.api.agent
       .send({ sessionId, prompt: item.prompt, cliPrompt: item.cliPrompt, files: item.files })
-      .catch((error: unknown) => console.error('Failed to send agent message', error))
+      .catch((error: unknown) => {
+        console.error('Failed to send agent message', error)
+        // Roll back the optimistic status — no result event will ever arrive,
+        // and a phantom 'running' turn blocks every later submit behind it.
+        setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, status: 'error' as const } : s)))
+      })
   }
 
   const flushNextQueuedPrompt = (sessionId: string): void => {

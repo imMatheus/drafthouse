@@ -482,28 +482,56 @@ export function registerFsHandlers(): void {
       existing.refCount += 1
       return
     }
-    const watcher = watch(resolved, (eventType) => {
-      if (eventType !== 'change') return
-      const entry = map!.get(resolved)
-      if (!entry) return
-      // Coalesce rapid bursts (some editors emit several `change` events
-      // for one save). 50 ms is below human perception but well above the
-      // typical multi-event burst.
-      if (entry.debounce !== null) clearTimeout(entry.debounce)
-      entry.debounce = setTimeout(() => {
-        entry.debounce = null
-        if (sender.isDestroyed()) return
-        sender.send('fs:file-changed', resolved)
-      }, 50)
-    })
-    map.set(resolved, { watcher, refCount: 1, debounce: null })
+    // Editors that save atomically (vim, VS Code) replace the file via
+    // rename, which leaves the watch bound to a dead inode — re-arm on the
+    // path when that happens. The error listener matters too: an FSWatcher
+    // error with no listener is an uncaught exception in the main process.
+    const armWatcher = (): FSWatcher => {
+      const watcher = watch(resolved, (eventType) => {
+        const entry = map!.get(resolved)
+        if (!entry) return
+        if (eventType === 'rename') {
+          entry.watcher.close()
+          try {
+            entry.watcher = armWatcher()
+          } catch {
+            // The replacement isn't on disk (yet); the entry stays so unwatch
+            // still cleans up.
+            return
+          }
+        }
+        // Coalesce rapid bursts (some editors emit several `change` events
+        // for one save). 50 ms is below human perception but well above the
+        // typical multi-event burst.
+        if (entry.debounce !== null) clearTimeout(entry.debounce)
+        entry.debounce = setTimeout(() => {
+          entry.debounce = null
+          if (sender.isDestroyed()) return
+          sender.send('fs:file-changed', resolved)
+        }, 50)
+      })
+      watcher.on('error', (err) => {
+        console.error(`[fs] watcher error for ${resolved}:`, err)
+      })
+      return watcher
+    }
+    map.set(resolved, { watcher: armWatcher(), refCount: 1, debounce: null })
   })
 
   ipcMain.handle('fs:unwatch-file', (event, filePath: string) => {
     const sender = event.sender
-    const resolved = requireAllowedFile(sender, filePath)
     const map = fileWatchersByWebContents.get(sender)
     if (!map) return
+    // Resolve leniently: requireAllowedFile realpaths, which throws once the
+    // file is deleted — and would leak the watcher forever. The lookup only
+    // reaches this sender's own watchers, so the sandbox check isn't
+    // load-bearing here.
+    let resolved = filePath
+    try {
+      resolved = requireAllowedFile(sender, filePath)
+    } catch {
+      // Fall through with the raw path; renderer paths are already resolved.
+    }
     const entry = map.get(resolved)
     if (!entry) return
     entry.refCount -= 1

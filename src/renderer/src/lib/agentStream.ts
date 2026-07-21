@@ -43,6 +43,28 @@ function finalizeBlocks(content: AgentContentBlock[]): AgentContentBlock[] {
   })
 }
 
+/**
+ * Finalize any message whose `message_stop` will never arrive — the child was
+ * killed or interrupted mid-message, so the event would otherwise render as
+ * streaming forever and swallow later finals for the same message id. Called
+ * when a turn-ending event lands; mirrors the `message_stop` finalization.
+ */
+export function finalizeDanglingStreams(events: AgentStreamEvent[]): AgentStreamEvent[] {
+  let next: AgentStreamEvent[] | null = null
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i]
+    if (!isStreamingAssistant(event)) continue
+    if (next === null) next = [...events]
+    next[i] = {
+      ...event,
+      streaming: undefined,
+      streamed: true,
+      message: { ...event.message, content: finalizeBlocks(event.message.content) }
+    }
+  }
+  return next ?? events
+}
+
 export function mergePartialMessage(
   events: AgentStreamEvent[],
   partial: AgentStreamPartialMessage

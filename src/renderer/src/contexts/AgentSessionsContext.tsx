@@ -1,6 +1,6 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react'
 import type { AgentStreamEvent } from '../../../shared/types'
-import { appendAssistantEvent, mergePartialMessage } from '../lib/agentStream'
+import { appendAssistantEvent, finalizeDanglingStreams, mergePartialMessage } from '../lib/agentStream'
 
 type Listener = () => void
 
@@ -9,6 +9,11 @@ const EMPTY_EVENTS: AgentStreamEvent[] = []
 function reduceEvent(events: AgentStreamEvent[], event: AgentStreamEvent): AgentStreamEvent[] {
   if (event.type === 'stream_event') return mergePartialMessage(events, event)
   if (event.type === 'assistant') return appendAssistantEvent(events, event)
+  if (event.type === 'result' || event.type === 'lifecycle') {
+    // The turn is over — nothing can still be streaming. Interrupts and child
+    // deaths skip message_stop, which would leave a message streaming forever.
+    return [...finalizeDanglingStreams(events), event]
+  }
   return [...events, event]
 }
 

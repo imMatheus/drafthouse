@@ -34,7 +34,12 @@ function startDiffStream(startChannel: string, startArgs: unknown[], callbacks: 
   ipcRenderer.on('github:pull-diff-chunk', onChunk)
   ipcRenderer.on('github:pull-diff-end', onEnd)
   ipcRenderer.on('github:pull-diff-error', onError)
-  void ipcRenderer.invoke(startChannel, streamId, ...startArgs)
+  // A rejected start would otherwise strand the listeners above and leave the
+  // viewer waiting forever — no end/error event would ever arrive.
+  ipcRenderer.invoke(startChannel, streamId, ...startArgs).catch((error: unknown) => {
+    cleanup()
+    callbacks.onError(error instanceof Error ? error.message : String(error), false)
+  })
   return () => {
     cleanup()
     void ipcRenderer.invoke('github:pulls:cancel-diff', streamId)

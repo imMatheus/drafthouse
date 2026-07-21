@@ -29,7 +29,6 @@ function send(sender: WebContents, channel: string, payload: unknown): void {
 
 /** Streams `url` (served with the diff media type) to the renderer. */
 async function streamDiff(event: IpcMainInvokeEvent, streamId: string, url: string, label: string): Promise<void> {
-  const token = requireAuth()
   const sender = event.sender
 
   // Replace any stale controller for this id (renderer reuses ids on retry).
@@ -42,6 +41,11 @@ async function streamDiff(event: IpcMainInvokeEvent, streamId: string, url: stri
   }
 
   try {
+    // Inside the try so a missing/expired auth reports on the error channel
+    // like any other failure instead of rejecting the invoke, which the
+    // renderer fires without awaiting.
+    const token = requireAuth()
+
     const response = await fetch(url, {
       headers: getGitHubHeaders(token, { Accept: 'application/vnd.github.v3.diff' }),
       signal: controller.signal
@@ -85,7 +89,12 @@ async function streamDiff(event: IpcMainInvokeEvent, streamId: string, url: stri
     if (controller.signal.aborted) return
     fail(error instanceof Error ? error.message : `Failed to load the diff for ${label}.`)
   } finally {
-    activeStreams.delete(streamId)
+    // A retry reuses the streamId and replaces the controller before this
+    // invocation unwinds — only the current owner may delete, or the stale
+    // invocation would evict the live stream and make cancel a no-op.
+    if (activeStreams.get(streamId) === controller) {
+      activeStreams.delete(streamId)
+    }
   }
 }
 

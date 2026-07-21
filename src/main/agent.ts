@@ -873,10 +873,19 @@ function respondToPermission(sessionId: string, requestId: string, response: Age
 async function setSessionPermissionMode(sessionId: string, mode: AgentPermissionMode): Promise<void> {
   const session = sessions.get(sessionId)
   if (!session) return
+  const previousMode = session.meta.permissionMode
   session.meta.permissionMode = mode
   scheduleSave(session)
   if (session.child) {
-    await sendControlRequest(session, { subtype: 'set_permission_mode', mode })
+    try {
+      await sendControlRequest(session, { subtype: 'set_permission_mode', mode })
+    } catch (err) {
+      // The CLI rejected the mode — don't let it stick and silently apply on
+      // the next respawn while the renderer shows an error.
+      session.meta.permissionMode = previousMode
+      scheduleSave(session)
+      throw err
+    }
   }
 }
 
@@ -920,6 +929,9 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agent:delete', (_event, sessionId: string) => {
+    // The id feeds a filesystem path (sessionFile) — reject anything that
+    // isn't a UUID so "../../x" can't escape the sessions directory.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) return
     deleteSession(sessionId)
   })
 
