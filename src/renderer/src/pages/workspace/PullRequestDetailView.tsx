@@ -1020,7 +1020,7 @@ function PRDescriptionCard({ pr, owner, repo }: { pr: PullRequestDetail; owner: 
           <button
             onClick={() => void handleSave()}
             disabled={isSaving}
-            className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
+            className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-4 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
@@ -1152,6 +1152,7 @@ function CommentBox({
           <ClaudeMentionTextarea
             value={body}
             onChange={setBody}
+            textareaRef={textareaRef}
             placeholder="Add your comment here..."
             className="min-h-[140px]"
             menuLabel="Ask about this PR"
@@ -1550,7 +1551,7 @@ function MergedBranchSwitchBanner({
           onClick={handleSwitch}
           disabled={status === 'switching' || status === 'done'}
           className={cn(
-            'text-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,transform] active:scale-[0.96] disabled:active:scale-100',
+            'text-success-foreground inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-[background-color,transform] active:scale-[0.96] disabled:active:scale-100',
             status === 'switching' ? 'bg-success/70' : 'bg-success hover:bg-success/80'
           )}
         >

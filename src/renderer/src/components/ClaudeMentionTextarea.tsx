@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent } from 'react'
+import { useRef, type KeyboardEvent, type RefObject } from 'react'
 import { cn } from '../lib/cn'
 import claudeLogoUrl from '../assets/claude.png'
 
@@ -14,6 +14,8 @@ interface ClaudeMentionTextareaProps {
   enabled?: boolean
   /** Called when Cmd/Ctrl+Enter is pressed (and the mention menu is not open) */
   onSubmit?: () => void
+  /** Bind the inner textarea, e.g. for a MarkdownToolbar that edits its selection */
+  textareaRef?: RefObject<HTMLTextAreaElement | null>
 }
 
 export default function ClaudeMentionTextarea({
@@ -24,9 +26,11 @@ export default function ClaudeMentionTextarea({
   rows,
   menuLabel = 'Ask Claude',
   enabled = true,
-  onSubmit
+  onSubmit,
+  textareaRef: externalTextareaRef
 }: ClaudeMentionTextareaProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const innerTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const textareaRef = externalTextareaRef ?? innerTextareaRef
 
   const hasClaudePrefix = enabled && /^@claude(?:\s|$)/i.test(value.trim())
 

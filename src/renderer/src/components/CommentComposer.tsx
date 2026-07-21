@@ -62,7 +62,7 @@ export default function CommentComposer({
           type="button"
           onClick={onSubmit}
           disabled={!value.trim() || isSubmitting}
-          className="bg-accent text-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isSubmitting ? submittingLabel : submitLabel}
         </button>

@@ -20,7 +20,7 @@ export default function Login() {
       ) : (
         <button
           onClick={login}
-          className="bg-accent text-foreground hover:bg-accent-hover rounded-lg px-5 py-2.5 font-medium"
+          className="bg-accent text-accent-foreground hover:bg-accent-hover rounded-lg px-5 py-2.5 font-medium"
         >
           Sign in with GitHub
         </button>
