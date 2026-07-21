@@ -17,6 +17,7 @@ import type {
   AgentStreamPermissionRequest,
   AgentStreamPermissionResolved
 } from '../shared/types'
+import { requireAllowedDirectory } from './fs'
 
 // ============================================================
 // Claude binary + PATH resolution
@@ -435,6 +436,14 @@ function ensureChild(session: ManagedSession): ChildProcess | null {
       session.stderrTail.splice(0, session.stderrTail.length - STDERR_TAIL_LINES)
     }
     console.error(`[agent:${session.meta.id}] stderr:`, chunk.toString())
+  })
+
+  // Pipe errors (EPIPE from a dying child) are emitted asynchronously on the
+  // stream; without a listener they crash the main process. writeToChild's
+  // try/catch only covers synchronous write failures, and the exit handler
+  // already does the recovery.
+  child.stdin?.on('error', (err) => {
+    console.error(`[agent:${session.meta.id}] stdin error:`, err)
   })
 
   child.on('error', (err) => {
@@ -896,6 +905,9 @@ async function setSessionModel(sessionId: string, model: string | null): Promise
 
 export function registerAgentHandlers(): void {
   ipcMain.handle('agent:start', (event, request: AgentStartRequest) => {
+    // The agent child runs with --dangerously-skip-permissions, so hold its
+    // cwd to the same sandbox every fs:/git: handler enforces.
+    requireAllowedDirectory(event.sender, request.cwd)
     return startSession(event.sender, request)
   })
 

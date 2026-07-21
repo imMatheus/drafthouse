@@ -53,6 +53,9 @@ export default function SourceControlPanel({
   const [stagedOpen, setStagedOpen] = useState(true)
   const [changesOpen, setChangesOpen] = useState(true)
   const [isCreatePROpen, setIsCreatePROpen] = useState(false)
+  // Discarding reverts edits and deletes untracked files — never run it
+  // straight off a hover icon; arm this and confirm through the dialog.
+  const [pendingDiscard, setPendingDiscard] = useState<string[] | 'all' | null>(null)
   const queryClient = useQueryClient()
 
   const { data: status } = useQuery<GitChangedFile[]>({
@@ -366,13 +369,41 @@ export default function SourceControlPanel({
             bulkActionTitle="Stage All"
             actionIcon={<Plus size={12} />}
             actionTitle="Stage"
-            onDiscard={handleDiscard}
-            onDiscardAll={handleDiscardAll}
+            onDiscard={(paths) => setPendingDiscard(paths)}
+            onDiscardAll={() => setPendingDiscard('all')}
           />
         ) : null}
 
         {files.length === 0 ? <p className="text-foreground-subtle px-4 py-4 text-xs">No changes detected</p> : null}
       </div>
+
+      {/* Discard confirmation */}
+      {pendingDiscard ? (
+        <DiscardConfirmDialog
+          title={
+            pendingDiscard === 'all'
+              ? 'Discard all changes?'
+              : `Discard changes to ${
+                  pendingDiscard.length === 1 ? getPathBasename(pendingDiscard[0]) : `${pendingDiscard.length} files`
+                }?`
+          }
+          description={
+            pendingDiscard === 'all'
+              ? `Unstaged edits in ${changedFiles.length} ${changedFiles.length === 1 ? 'file' : 'files'} will be reverted and untracked files deleted. This cannot be undone.`
+              : 'Unstaged edits will be reverted. If the file is untracked, it will be deleted. This cannot be undone.'
+          }
+          onCancel={() => setPendingDiscard(null)}
+          onConfirm={() => {
+            const target = pendingDiscard
+            setPendingDiscard(null)
+            if (target === 'all') {
+              void handleDiscardAll()
+            } else {
+              void handleDiscard(target)
+            }
+          }}
+        />
+      ) : null}
 
       {/* Create PR Dialog */}
       {canCreatePR ? (
@@ -391,6 +422,61 @@ export default function SourceControlPanel({
           }}
         />
       ) : null}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────
+// Discard confirmation dialog
+// ────────────────────────────────────────────────────────────
+
+function DiscardConfirmDialog({
+  title,
+  description,
+  onCancel,
+  onConfirm
+}: {
+  title: string
+  description: string
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
+
+  return (
+    <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center px-4" onClick={onCancel}>
+      <div
+        role="alertdialog"
+        aria-label={title}
+        className="border-border bg-surface w-full max-w-sm rounded-2xl border p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-foreground text-sm font-semibold">{title}</h2>
+        <p className="text-foreground-muted mt-1.5 text-xs leading-relaxed">{description}</p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            autoFocus
+            onClick={onCancel}
+            className="bg-interactive text-foreground hover:bg-interactive-hover rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="bg-danger text-danger-foreground rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90"
+          >
+            Discard
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

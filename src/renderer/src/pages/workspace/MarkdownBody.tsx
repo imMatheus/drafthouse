@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import type { FileContents } from '@pierre/diffs'
 import { cn } from '../../lib/cn'
 import { useTheme } from '../../hooks/useTheme'
@@ -46,7 +47,9 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
 }
 
 const remarkPlugins = [remarkGfm]
-const rehypePlugins = [rehypeRaw]
+// Bodies come from arbitrary GitHub users and rehypeRaw turns their HTML
+// live — the sanitizer (GitHub schema) must run after it.
+const rehypePlugins = [rehypeRaw, rehypeSanitize]
 
 function MarkdownLink({ href, children }: { href?: string; children?: ReactNode }) {
   const ctx = useWorkspaceContext()
