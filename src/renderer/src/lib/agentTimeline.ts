@@ -290,7 +290,22 @@ function parseQuestions(input: Record<string, unknown>): TimelineQuestion[] | nu
 // Builder
 // ============================================================
 
+// The store replaces the events array wholesale on every update (never an
+// in-place mutation), so the array reference is a complete cache key. This
+// keeps renders that didn't change events — scrolling, selection, parent
+// state — from paying for a full rebuild, and lets every consumer of the same
+// session share one build. WeakMap entries die with their events array.
+const timelineCache = new WeakMap<AgentStreamEvent[], AgentTimeline>()
+
 export function buildAgentTimeline(events: AgentStreamEvent[]): AgentTimeline {
+  const cached = timelineCache.get(events)
+  if (cached) return cached
+  const timeline = buildAgentTimelineUncached(events)
+  timelineCache.set(events, timeline)
+  return timeline
+}
+
+function buildAgentTimelineUncached(events: AgentStreamEvent[]): AgentTimeline {
   // Pass 1: pair tool results and group sub-agent events under their parent.
   const resultsByToolUseId = new Map<string, TimelineToolResult>()
   const childrenByParent = new Map<string, AgentStreamEvent[]>()

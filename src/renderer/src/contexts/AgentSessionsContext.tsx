@@ -20,11 +20,13 @@ interface SessionEventsState {
 }
 
 /**
- * Mutable per-session events store. Lives outside React state so every
- * streaming token is an O(1) update that only notifies the components
- * actually reading *that specific* session's events. React syncs via
- * `useSyncExternalStore`, which is the canonical primitive for bridging
- * mutable stores into the render tree.
+ * Mutable per-session events store. Lives outside React state so a streaming
+ * token only notifies the components actually reading *that specific*
+ * session's events. Each update replaces the events array wholesale (a
+ * shallow copy — never an in-place mutation), so the array reference doubles
+ * as a change marker for downstream caches like `buildAgentTimeline`'s. React
+ * syncs via `useSyncExternalStore`, which is the canonical primitive for
+ * bridging mutable stores into the render tree.
  *
  * The main process owns the canonical event log. Sessions must be hydrated
  * (via `hydrate`, fed from `agent:events`) before live events apply; anything
@@ -54,7 +56,10 @@ export class AgentSessionsStore {
   ingest(sessionId: string, seq: number, event: AgentStreamEvent): void {
     const state = this.stateFor(sessionId)
     if (!state.hydrated) {
-      state.buffered.push({ seq, event })
+      // Stream partials are never replayed by hydrate (the canonical snapshot
+      // carries their final events), so buffering them is unbounded growth for
+      // sessions that may never hydrate — e.g. another folder's live sessions.
+      if (seq !== -1) state.buffered.push({ seq, event })
       return
     }
     state.events = reduceEvent(state.events, event)
@@ -88,6 +93,7 @@ export class AgentSessionsStore {
   /** Drop a deleted session's events. */
   remove(sessionId: string): void {
     this.states.delete(sessionId)
+    this.subscribeFns.delete(sessionId)
     this.notify(sessionId)
   }
 
@@ -97,16 +103,31 @@ export class AgentSessionsStore {
     for (const listener of set) listener()
   }
 
-  subscribe = (sessionId: string, listener: Listener): (() => void) => {
-    let set = this.listeners.get(sessionId)
-    if (!set) {
-      set = new Set()
-      this.listeners.set(sessionId, set)
+  // useSyncExternalStore tears down and re-adds its listener whenever the
+  // subscribe function's identity changes — during streaming that would be
+  // once per token per consumer — so hand out one cached fn per session.
+  private subscribeFns = new Map<string, (listener: Listener) => () => void>()
+
+  subscribeTo(sessionId: string): (listener: Listener) => () => void {
+    let subscribe = this.subscribeFns.get(sessionId)
+    if (!subscribe) {
+      subscribe = (listener: Listener) => {
+        let set = this.listeners.get(sessionId)
+        if (!set) {
+          set = new Set()
+          this.listeners.set(sessionId, set)
+        }
+        set.add(listener)
+        return () => {
+          set.delete(listener)
+          if (set.size === 0 && this.listeners.get(sessionId) === set) {
+            this.listeners.delete(sessionId)
+          }
+        }
+      }
+      this.subscribeFns.set(sessionId, subscribe)
     }
-    set.add(listener)
-    return () => {
-      set?.delete(listener)
-    }
+    return subscribe
   }
 }
 
@@ -116,10 +137,11 @@ export function AgentSessionsProvider({ store, children }: { store: AgentSession
   return <AgentSessionsContext.Provider value={store}>{children}</AgentSessionsContext.Provider>
 }
 
+const noopSubscribe = (): (() => void) => () => {}
+
 export function useAgentSessionEvents(sessionId: string): AgentStreamEvent[] {
   const store = useContext(AgentSessionsContext)
-  return useSyncExternalStore(
-    (listener) => (store ? store.subscribe(sessionId, listener) : () => {}),
-    () => (store ? store.getEvents(sessionId) : EMPTY_EVENTS)
+  return useSyncExternalStore(store ? store.subscribeTo(sessionId) : noopSubscribe, () =>
+    store ? store.getEvents(sessionId) : EMPTY_EVENTS
   )
 }

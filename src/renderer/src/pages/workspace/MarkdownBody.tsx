@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
@@ -91,7 +91,7 @@ const markdownComponents = {
   a: MarkdownLink
 }
 
-export default function MarkdownBody({ children, className, compact }: MarkdownBodyProps) {
+function MarkdownBody({ children, className, compact }: MarkdownBodyProps) {
   return (
     <div
       className={cn(
@@ -108,3 +108,9 @@ export default function MarkdownBody({ children, className, compact }: MarkdownB
     </div>
   )
 }
+
+// The remark/rehype parse is by far the most expensive render in the agent
+// timeline, and every streamed token re-renders the whole transcript. Props
+// are all primitives, so memo skips the re-parse for every message whose text
+// didn't change.
+export default memo(MarkdownBody)
