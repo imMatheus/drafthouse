@@ -1,4 +1,4 @@
-import { Ban, Check, Plus, Trash2, X } from 'lucide-react'
+import { Ban, Plus, Terminal, Trash2, X } from 'lucide-react'
 import { cn } from '../lib/cn'
 import type { AgentSessionMeta } from '../../../shared/types'
 import AgentSpinner from '../pages/workspace/AgentSpinner'
@@ -20,7 +20,7 @@ function StatusIndicator({ status }: { status: AgentSessionMeta['status'] }) {
   }
 
   if (status === 'completed') {
-    return <Check size={12} className="text-success shrink-0" />
+    return <Terminal size={12} className="text-accent shrink-0" />
   }
 
   if (status === 'interrupted') {

@@ -2,6 +2,7 @@ import { type ReactNode, useState } from 'react'
 import { cn } from '../lib/cn'
 import type { DropPosition, EditorGroup } from '../lib/editorLayout'
 import type { WorkspaceTab } from '../lib/workspaceTabs'
+import type { AgentSessionStatus } from '../../../shared/types'
 import WorkspaceTabBar from './WorkspaceTabBar'
 
 // Where a drag lands. The thing being dragged (a tab moved between groups, or a
@@ -29,6 +30,7 @@ interface EditorGroupViewProps {
   isActiveGroup: boolean
   // True while any drag (internal tab or external sidebar item) is in progress.
   dragActive: boolean
+  agentSessionStatuses: Record<string, AgentSessionStatus>
   handlers: EditorGroupHandlers
   renderContent: (tab: WorkspaceTab | null) => ReactNode
 }
@@ -37,6 +39,7 @@ export default function EditorGroupView({
   group,
   isActiveGroup,
   dragActive,
+  agentSessionStatuses,
   handlers,
   renderContent
 }: EditorGroupViewProps) {
@@ -66,6 +69,7 @@ export default function EditorGroupView({
         activeTabId={group.activeTabId}
         isActiveGroup={isActiveGroup}
         isDragActive={dragActive}
+        agentSessionStatuses={agentSessionStatuses}
         onSelectTab={(tabId) => handlers.onSelectTab(group.id, tabId)}
         onCloseTab={(tabId) => handlers.onCloseTab(group.id, tabId)}
         onTabDragStart={(tab) => handlers.onTabDragStart(tab, group.id)}

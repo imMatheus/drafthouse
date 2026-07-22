@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import type { AgentPermissionMode, GitRepoInfo, PullRequestDetail } from '../../../shared/types'
+import type { AgentEffortLevel, AgentPermissionMode, GitRepoInfo, PullRequestDetail } from '../../../shared/types'
 
 /**
  * A follow-up submitted while a turn was still running. Held in the renderer
@@ -31,6 +31,7 @@ export interface WorkspaceAgentActions {
   rejectPlan: (sessionId: string, requestId: string) => void
   setPermissionMode: (sessionId: string, mode: AgentPermissionMode) => void
   setModel: (sessionId: string, model: string | null) => void
+  setEffort: (sessionId: string, effort: AgentEffortLevel | null) => void
   cancelQueuedPrompt: (sessionId: string, promptId: string) => void
 }
 

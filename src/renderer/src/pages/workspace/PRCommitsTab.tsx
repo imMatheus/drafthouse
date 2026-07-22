@@ -1,12 +1,28 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCheck, ChevronLeft, ChevronRight, Copy, ExternalLink, GitCommit } from 'lucide-react'
+import {
+  Building2,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  GitCommit,
+  MapPin,
+  Users
+} from 'lucide-react'
 import { cn } from '../../lib/cn'
-import type { PaginatedPullRequestCommits, PullRequestCommit, PullRequestCommitAuthors } from '../../../../shared/types'
+import type {
+  GitHubUserProfile,
+  PaginatedPullRequestCommits,
+  PullRequestCommit,
+  PullRequestCommitAuthors
+} from '../../../../shared/types'
 import PlaceholderView from './PlaceholderView'
 import Tooltip from '../../components/Tooltip'
 import Loading from '../../components/Loading'
-import CommitActorStack, { formatCommitActorNames, getCommitActors } from '../../components/CommitActorStack'
+import CommitActorStack, { getCommitActors, type CommitActor } from '../../components/CommitActorStack'
+import * as HoverCard from '../../components/HoverCard'
 import { formatAbsoluteDate, formatRelativeTime, getCommitBody, getCommitSubject } from './pullRequestShared'
 import { useCopyToClipboard } from '../../hooks/useCopyToClipboard'
 
@@ -234,17 +250,30 @@ function CommitRow({
   const { copied: isCopied, copy: copySha } = useCopyToClipboard()
 
   return (
-    <div className={cn('px-4 py-2.5', !isLast && 'border-border border-b')}>
+    <div
+      role="link"
+      tabIndex={0}
+      aria-label={`Open commit ${subject}`}
+      onClick={(event) => {
+        if (event.target instanceof Element && event.target.closest('a, button')) return
+        onOpenCommit(commit.sha, subject)
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
+        event.preventDefault()
+        onOpenCommit(commit.sha, subject)
+      }}
+      className={cn(
+        'group hover:bg-surface-hover focus-visible:bg-surface-hover cursor-pointer px-4 py-2.5 transition-colors outline-none',
+        !isLast && 'border-border border-b'
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onOpenCommit(commit.sha, subject)}
-              className="text-foreground hover:text-accent min-w-0 flex-1 truncate text-left text-sm font-medium transition-colors"
-            >
+            <span className="text-foreground group-hover:text-accent group-focus-visible:text-accent min-w-0 flex-1 truncate text-left text-sm font-medium transition-colors">
               {subject}
-            </button>
+            </span>
             {isMergeCommit ? (
               <span className="bg-purple/10 text-purple rounded-full px-1.5 py-0.5 text-[10px] font-medium">Merge</span>
             ) : null}
@@ -255,8 +284,7 @@ function CommitRow({
           <div className="text-foreground-muted mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
             <CommitActorStack actors={actors} />
             <span>
-              <span className="text-foreground font-medium">{formatCommitActorNames(actors)}</span> committed{' '}
-              {authoredLabel}
+              <CommitActorNames actors={actors} /> committed {authoredLabel}
             </span>
             {commitDate != null ? (
               <span className="text-foreground-subtle">&middot; {formatAbsoluteDate(commitDate)}</span>
@@ -292,6 +320,114 @@ function CommitRow({
         </div>
       </div>
     </div>
+  )
+}
+
+function CommitActorNames({ actors }: { actors: CommitActor[] }) {
+  if (actors.length === 0) return <span className="text-foreground font-medium">Unknown author</span>
+
+  return (
+    <span className="text-foreground font-medium">
+      {actors.map((actor, index) => {
+        const separator =
+          index === 0 ? '' : index === actors.length - 1 ? (actors.length === 2 ? ' and ' : ', and ') : ', '
+        return (
+          <span key={`${actor.name}-${actor.login ?? actor.email ?? index}`}>
+            {separator}
+            <CommitActorHoverCard actor={actor} />
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
+function CommitActorHoverCard({ actor }: { actor: CommitActor }) {
+  const [open, setOpen] = useState(false)
+  const [shouldLoadProfile, setShouldLoadProfile] = useState(false)
+  const { data: profile } = useQuery<GitHubUserProfile, Error>({
+    queryKey: ['github-user-profile', actor.login],
+    queryFn: () => window.api.github.users.get(actor.login!),
+    enabled: shouldLoadProfile && actor.login != null,
+    retry: false,
+    staleTime: 5 * 60 * 1000
+  })
+
+  if (!actor.login) return <span>{actor.name}</span>
+
+  const profileUrl = profile?.html_url ?? `https://github.com/${encodeURIComponent(actor.login)}`
+  const displayName = profile?.name ?? actor.name
+  const avatarUrl = profile?.avatar_url ?? actor.avatarUrl
+
+  return (
+    <HoverCard.Root open={open} onOpenChange={setOpen} openDelay={1200} closeDelay={150}>
+      <HoverCard.Trigger asChild>
+        <a
+          href={profileUrl}
+          target="_blank"
+          rel="noreferrer"
+          onPointerEnter={() => setShouldLoadProfile(true)}
+          onFocus={() => setShouldLoadProfile(true)}
+          className="decoration-border hover:text-accent underline underline-offset-2 transition-colors"
+        >
+          {actor.name}
+        </a>
+      </HoverCard.Trigger>
+      <HoverCard.Content>
+        <div className="flex gap-3">
+          <div className="bg-interactive flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={displayName} className="image-outline size-full rounded-full object-cover" />
+            ) : (
+              <GitCommit size={18} className="text-foreground-muted" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-foreground truncate text-sm font-semibold">{displayName}</p>
+            <p className="text-foreground-muted truncate text-xs">@{actor.login}</p>
+          </div>
+        </div>
+
+        {profile?.bio ? (
+          <p className="text-foreground-muted mt-3 text-xs leading-relaxed text-pretty">{profile.bio}</p>
+        ) : null}
+
+        {profile?.company || profile?.location || profile ? (
+          <div className="text-foreground-muted mt-3 flex flex-col gap-1.5 text-xs">
+            {profile.company ? (
+              <span className="flex items-center gap-2">
+                <Building2 size={13} className="text-foreground-subtle shrink-0" />
+                <span className="truncate">{profile.company}</span>
+              </span>
+            ) : null}
+            {profile.location ? (
+              <span className="flex items-center gap-2">
+                <MapPin size={13} className="text-foreground-subtle shrink-0" />
+                <span className="truncate">{profile.location}</span>
+              </span>
+            ) : null}
+            {profile ? (
+              <span className="flex items-center gap-2">
+                <Users size={13} className="text-foreground-subtle shrink-0" />
+                <span className="tabular-nums">
+                  {profile.followers.toLocaleString()} follower{profile.followers === 1 ? '' : 's'}
+                </span>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <a
+          href={profileUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="bg-interactive text-foreground hover:bg-interactive-hover mt-3 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96]"
+        >
+          View GitHub profile
+          <ExternalLink size={12} />
+        </a>
+      </HoverCard.Content>
+    </HoverCard.Root>
   )
 }
 

@@ -57,14 +57,19 @@ export class AgentSessionsStore {
     return this.states.get(sessionId)?.hydrated === true
   }
 
-  /** Feed one live event from the IPC stream. `seq` is -1 for stream partials. */
+  /**
+   * Feed one live event from the IPC stream. Canonical events carry their log
+   * index as `seq`; stream partials carry the canonical position they sit
+   * after (`events.length` at emit time — see pushPartial in main).
+   */
   ingest(sessionId: string, seq: number, event: AgentStreamEvent): void {
     const state = this.stateFor(sessionId)
     if (!state.hydrated) {
-      // Stream partials are never replayed by hydrate (the canonical snapshot
-      // carries their final events), so buffering them is unbounded growth for
-      // sessions that may never hydrate — e.g. another folder's live sessions.
-      if (seq !== -1) state.buffered.push({ seq, event })
+      // Buffer until the canonical snapshot lands, partials included — that's
+      // what lets a hydration that races a live stream keep the in-flight
+      // message rendering. The buffer stays short-lived because the Workspace
+      // listener requests hydration for any session it sees events for.
+      state.buffered.push({ seq, event })
       return
     }
     state.events = reduceEvent(state.events, event)
@@ -72,9 +77,10 @@ export class AgentSessionsStore {
   }
 
   /**
-   * Install the canonical snapshot from the main process, then replay any
-   * buffered live events that happened after it. Buffered stream partials are
-   * dropped — their message's final events carry the same content.
+   * Install the canonical snapshot from the main process, then replay the
+   * buffered live events that postdate it (seq >= nextSeq). Older buffered
+   * entries are dropped: canonical ones are already in the snapshot, and a
+   * partial's content is carried by its message's final events.
    */
   hydrate(sessionId: string, canonical: AgentStreamEvent[], nextSeq: number): void {
     const state = this.stateFor(sessionId)

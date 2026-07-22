@@ -33,7 +33,7 @@ body {
   --color-accent-bg: rgb(23, 33, 48);
   --color-accent-foreground: #ffffff;
   --color-success: rgb(102, 201, 95);
-  --color-success-foreground: rgb(10, 28, 12);
+  --color-success-foreground: #ffffff;
   --color-danger: rgb(231, 76, 96);
   --color-danger-foreground: #ffffff;
   --color-purple: rgb(180, 142, 255);
@@ -121,6 +121,43 @@ body {
 
 .animate-card-in {
   animation: card-in 300ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* Streaming-status label: a soft highlight sweeps across the text while the
+   agent works (claude.ai-style shimmer). Painted via background-clip so the
+   glyphs themselves carry the gradient. */
+@keyframes text-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+.text-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-foreground-subtle) 40%,
+    var(--color-foreground) 50%,
+    var(--color-foreground-subtle) 60%
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 2.4s linear infinite;
+}
+
+/* Live thought stream under a step-group header: cap the height, keep the
+   newest text (the tail) in view, and fade the clipped top edge. */
+.thinking-tail {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: 8rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0, black 2rem);
 }
 
 @theme {

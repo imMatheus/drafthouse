@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import {
+  Ban,
   GitCommit,
   GitMerge,
   GitPullRequest,
@@ -16,6 +17,8 @@ import { getPathBasename } from '../lib/path'
 import { FileIcon } from './FileIcon'
 import Tooltip from './Tooltip'
 import type { WorkspaceTab } from '../lib/workspaceTabs'
+import type { AgentSessionStatus } from '../../../shared/types'
+import AgentSpinner from '../pages/workspace/AgentSpinner'
 
 interface WorkspaceTabBarProps {
   tabs: WorkspaceTab[]
@@ -23,6 +26,8 @@ interface WorkspaceTabBarProps {
   isActiveGroup: boolean
   // True while any tab (in this or another group) is being dragged.
   isDragActive: boolean
+  // Session status per agent session id, so agent tabs mirror the sidebar state.
+  agentSessionStatuses: Record<string, AgentSessionStatus>
   onSelectTab: (tabId: WorkspaceTab['id']) => void
   onCloseTab: (tabId: WorkspaceTab['id']) => void
   onTabDragStart: (tab: WorkspaceTab) => void
@@ -37,6 +42,7 @@ export default function WorkspaceTabBar({
   activeTabId,
   isActiveGroup,
   isDragActive,
+  agentSessionStatuses,
   onSelectTab,
   onCloseTab,
   onTabDragStart,
@@ -68,7 +74,7 @@ export default function WorkspaceTabBar({
           }}
         >
           {tabs.map((tab, index) => {
-            const { icon, label } = getWorkspaceTabPresentation(tab)
+            const { icon, label } = getWorkspaceTabPresentation(tab, agentSessionStatuses)
             const isActive = tab.id === activeTabId
             const showBar = isDragActive && dropIndex === index
 
@@ -176,7 +182,23 @@ function PrStateIcon({ prState }: { prState: string | undefined }): React.JSX.El
   }
 }
 
-function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; label: string } {
+function AgentTabIcon({ status }: { status: AgentSessionStatus | undefined }): React.JSX.Element {
+  if (status === 'running') {
+    return <AgentSpinner />
+  }
+  if (status === 'interrupted') {
+    return <Ban size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-foreground-subtle" />
+  }
+  if (status === 'error' || status === 'cancelled') {
+    return <X size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-foreground-subtle" />
+  }
+  return <Terminal size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-accent" />
+}
+
+function getWorkspaceTabPresentation(
+  tab: WorkspaceTab,
+  agentSessionStatuses: Record<string, AgentSessionStatus>
+): { icon: ReactNode; label: string } {
   switch (tab.kind) {
     case 'welcome':
       return {
@@ -205,7 +227,7 @@ function getWorkspaceTabPresentation(tab: WorkspaceTab): { icon: ReactNode; labe
       }
     case 'agent':
       return {
-        icon: <Terminal size={TAB_ICON_SIZE} strokeWidth={TAB_ICON_STROKE} className="text-accent" />,
+        icon: <AgentTabIcon status={agentSessionStatuses[tab.sessionId]} />,
         label: tab.title
       }
     case 'pull-request':

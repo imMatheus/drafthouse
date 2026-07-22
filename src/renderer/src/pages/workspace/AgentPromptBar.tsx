@@ -1,8 +1,25 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type DragEvent, type KeyboardEvent } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type KeyboardEvent
+} from 'react'
 import { useQueries } from '@tanstack/react-query'
-import { ArrowUp, Check, ChevronDown, FileText, GitPullRequest, ListTodo, Plus, Square, X } from 'lucide-react'
-import type { GitRepoInfo, PullRequest, PullRequestDetail } from '../../../../shared/types'
+import { ArrowUp, Check, ChevronDown, FileText, GitPullRequest, Plus, Square, X } from 'lucide-react'
+import type {
+  AgentEffortLevel,
+  AgentPermissionMode,
+  GitRepoInfo,
+  PullRequest,
+  PullRequestDetail
+} from '../../../../shared/types'
 import { cn } from '../../lib/cn'
+import { friendlyModelLabel, normalizeModelId } from '../../lib/models'
+import { useAgentSessionEvents } from '../../contexts/AgentSessionsContext'
 import {
   extractMentionedPRNumbers,
   findActiveMention,
@@ -19,12 +36,30 @@ import * as DropdownMenu from '../../components/DropdownMenu'
 import QueuedPromptList from '../../components/QueuedPromptList'
 import type { QueuedAgentPrompt } from '../../contexts/WorkspaceContext'
 
-export type AgentPromptMode = 'agent' | 'plan'
-
 interface ModelOption {
   value: string
   label: string
 }
+
+/** Menu order mirrors Claude Code desktop; digits 1–5 select while the menu is open. */
+const MODE_OPTIONS: { value: AgentPermissionMode; label: string }[] = [
+  { value: 'default', label: 'Manual' },
+  { value: 'acceptEdits', label: 'Accept edits' },
+  { value: 'plan', label: 'Plan' },
+  { value: 'auto', label: 'Auto' },
+  { value: 'bypassPermissions', label: 'Bypass permissions' }
+]
+
+const EFFORT_OPTIONS: { value: AgentEffortLevel; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'xhigh', label: 'Extra' },
+  { value: 'max', label: 'Max' }
+]
+
+/** What the CLI runs at when no --effort is passed. */
+const DEFAULT_EFFORT: AgentEffortLevel = 'high'
 
 const PRIMARY_MODELS: ModelOption[] = [
   { value: 'claude-fable-5', label: 'Fable 5' },
@@ -41,11 +76,6 @@ const MORE_MODELS: ModelOption[] = [
 
 const ALL_MODELS = [...PRIMARY_MODELS, ...MORE_MODELS]
 
-/** Date suffixes differ between the ids we send and what the CLI reports back. */
-function normalizeModelId(id: string): string {
-  return id.replace(/-\d{8}$/, '')
-}
-
 function findModelOption(id: string | null | undefined): ModelOption | null {
   if (!id) return null
   const normalized = normalizeModelId(id)
@@ -59,12 +89,17 @@ interface AgentPromptBarProps {
   gitInfo?: GitRepoInfo | null
   text: string
   onTextChange: (text: string) => void
-  mode: AgentPromptMode
-  onModeChange: (mode: AgentPromptMode) => void
+  mode: AgentPermissionMode
+  onModeChange: (mode: AgentPermissionMode) => void
   model: string | null
   onModelChange: (model: string | null) => void
   /** Model the CLI reported for the session; shown when no override is picked. */
   detectedModel?: string | null
+  /** Reasoning effort override; null follows the CLI default. */
+  effort?: AgentEffortLevel | null
+  onEffortChange?: (effort: AgentEffortLevel) => void
+  /** When set, a context-window meter for this session renders in the control row. */
+  sessionId?: string
   /** Follow-ups waiting for the running turn to finish; shown above the bar. */
   queued?: QueuedAgentPrompt[]
   onCancelQueued?: (promptId: string) => void
@@ -87,6 +122,9 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
     model,
     onModelChange,
     detectedModel,
+    effort,
+    onEffortChange,
+    sessionId,
     queued,
     onCancelQueued
   },
@@ -306,7 +344,7 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
       )}
       <div
         className={cn(
-          'border-border bg-surface relative mx-auto max-w-3xl rounded-xl border transition-colors',
+          'border-border bg-surface relative mx-auto max-w-3xl rounded-2xl border shadow-lg transition-colors',
           isDragOver && 'border-accent bg-surface-hover'
         )}
         onDragOver={handleDragOver}
@@ -394,7 +432,7 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
                   ? 'Drop files here...'
                   : isRunning
                     ? 'Queue a follow-up — sends when this turn finishes...'
-                    : 'Reply...'
+                    : 'Reply to Claude...'
               }
               rows={1}
               className={cn(
@@ -404,64 +442,56 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
             />
           </div>
 
+          {/* claude.ai button behavior: while streaming the primary control is
+              Stop; typing a queued follow-up brings the accent Send back and
+              demotes Stop to a secondary bordered button. */}
           {isRunning && (
-            <Tooltip label="Stop agent" shortcut={['Esc']} side="top">
+            <Tooltip label="Stop" shortcut={['Esc']} side="top">
               <button
                 onClick={onStop}
-                className="bg-danger text-danger-foreground flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-90"
-                aria-label="Stop agent"
+                className={cn(
+                  'flex size-7 shrink-0 items-center justify-center rounded-lg transition-[background-color,color,transform] active:scale-[0.96]',
+                  canSubmit
+                    ? 'border-border text-foreground-muted hover:bg-surface-hover hover:text-foreground border'
+                    : 'bg-accent text-accent-foreground hover:bg-accent-hover'
+                )}
+                aria-label="Stop"
               >
-                <Square size={14} />
+                <Square size={11} fill="currentColor" />
               </button>
             </Tooltip>
           )}
-          <Tooltip
-            label={canSubmit ? (isRunning ? 'Queue message' : 'Send') : 'Type a message to send'}
-            shortcut={canSubmit ? ['↵'] : undefined}
-            side="top"
-          >
-            <button
-              onClick={() => void handleSubmit()}
-              disabled={!canSubmit}
-              className="bg-foreground text-background flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:opacity-80 disabled:opacity-30"
-              aria-label="Send"
+          {(!isRunning || canSubmit) && (
+            <Tooltip
+              label={canSubmit ? (isRunning ? 'Queue message' : 'Send') : 'Type a message to send'}
+              shortcut={canSubmit ? ['↵'] : undefined}
+              side="top"
             >
-              <ArrowUp size={14} strokeWidth={2.5} />
-            </button>
-          </Tooltip>
+              <button
+                onClick={() => void handleSubmit()}
+                disabled={!canSubmit}
+                className="bg-accent text-accent-foreground hover:bg-accent-hover flex size-7 shrink-0 items-center justify-center rounded-lg transition-[background-color,color,transform,opacity] active:scale-[0.96] disabled:opacity-30"
+                aria-label="Send"
+              >
+                <ArrowUp size={14} strokeWidth={2.5} />
+              </button>
+            </Tooltip>
+          )}
         </div>
 
-        {/* Mode + model controls */}
+        {/* Control row: mode on the left; model, effort and context on the right */}
         <div className="flex items-center gap-1.5 px-3 pb-2">
-          <div className="bg-interactive flex items-center rounded-md p-0.5">
-            <button
-              onClick={() => onModeChange('agent')}
-              className={cn(
-                'rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
-                mode === 'agent'
-                  ? 'bg-surface text-foreground shadow-sm'
-                  : 'text-foreground-subtle hover:text-foreground'
-              )}
-            >
-              Agent
-            </button>
-            <button
-              onClick={() => onModeChange('plan')}
-              className={cn(
-                'flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors',
-                mode === 'plan' ? 'bg-surface text-accent shadow-sm' : 'text-foreground-subtle hover:text-foreground'
-              )}
-            >
-              <ListTodo size={11} className="shrink-0" />
-              Plan
-            </button>
-          </div>
-
-          <ModelMenu model={model} detectedModel={detectedModel} onModelChange={onModelChange} />
+          <ModeMenu mode={mode} onModeChange={onModeChange} />
 
           {mode === 'plan' && (
             <span className="text-foreground-subtle text-[11px]">Claude proposes a plan before making changes</span>
           )}
+
+          <div className="ml-auto flex items-center gap-1">
+            <ModelMenu model={model} detectedModel={detectedModel} onModelChange={onModelChange} />
+            {onEffortChange && <EffortMenu effort={effort ?? null} onEffortChange={onEffortChange} />}
+            {sessionId && <ContextMeter sessionId={sessionId} modelId={model ?? detectedModel ?? null} />}
+          </div>
         </div>
 
         {showMentionMenu && (
@@ -489,6 +519,61 @@ const AgentPromptBar = forwardRef<AgentPromptBarHandle, AgentPromptBarProps>(fun
 
 export default AgentPromptBar
 
+/** Shared chip styling for the control-row triggers (mode / model / effort). */
+const CONTROL_CHIP_CLASS =
+  'text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors'
+
+/** Right-hand slot of a menu row: a checkmark when selected, a digit hint otherwise. */
+function MenuItemHint({ selected, hint }: { selected: boolean; hint?: number }) {
+  if (selected) return <Check size={12} className="text-foreground shrink-0" />
+  if (hint === undefined) return null
+  return <span className="text-foreground-subtle shrink-0 text-[10px] tabular-nums">{hint}</span>
+}
+
+function ModeMenu({
+  mode,
+  onModeChange
+}: {
+  mode: AgentPermissionMode
+  onModeChange: (mode: AgentPermissionMode) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const selected = MODE_OPTIONS.find((option) => option.value === mode)
+
+  return (
+    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+      <DropdownMenu.Trigger asChild>
+        <button
+          className={cn(
+            'bg-interactive flex items-center rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
+            mode === 'plan' ? 'text-accent' : 'text-foreground-muted hover:text-foreground'
+          )}
+        >
+          {selected?.label ?? mode}
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content
+        align="start"
+        className="min-w-[13rem]"
+        onKeyDown={(e) => {
+          if (!/^[1-5]$/.test(e.key)) return
+          e.preventDefault()
+          onModeChange(MODE_OPTIONS[Number(e.key) - 1].value)
+          setOpen(false)
+        }}
+      >
+        <DropdownMenu.Label>Mode</DropdownMenu.Label>
+        {MODE_OPTIONS.map((option, index) => (
+          <DropdownMenu.Item key={option.value} onSelect={() => onModeChange(option.value)} className="gap-2">
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>
+            <MenuItemHint selected={option.value === mode} hint={index + 1} />
+          </DropdownMenu.Item>
+        ))}
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  )
+}
+
 function ModelMenu({
   model,
   detectedModel,
@@ -498,24 +583,39 @@ function ModelMenu({
   detectedModel?: string | null
   onModelChange: (model: string | null) => void
 }) {
+  const [open, setOpen] = useState(false)
   const selectedId = model ?? detectedModel ?? null
   const selectedOption = findModelOption(selectedId)
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
       <DropdownMenu.Trigger asChild>
-        <button className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors">
-          <span className="max-w-[160px] truncate">{selectedOption?.label ?? selectedId ?? 'Model'}</span>
+        <button className={CONTROL_CHIP_CLASS}>
+          <span className="max-w-[160px] truncate">
+            {selectedOption?.label ?? (selectedId ? friendlyModelLabel(selectedId) : 'Model')}
+          </span>
           <ChevronDown size={10} className="shrink-0" />
         </button>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content align="start" className="min-w-[11rem]">
+      <DropdownMenu.Content
+        align="end"
+        className="min-w-[11rem]"
+        onKeyDown={(e) => {
+          if (!/^[1-9]$/.test(e.key)) return
+          const option = PRIMARY_MODELS[Number(e.key) - 1]
+          if (!option) return
+          e.preventDefault()
+          onModelChange(option.value)
+          setOpen(false)
+        }}
+      >
         <DropdownMenu.Label>Models</DropdownMenu.Label>
-        {PRIMARY_MODELS.map((option) => (
+        {PRIMARY_MODELS.map((option, index) => (
           <ModelMenuItem
             key={option.value}
             option={option}
             selected={selectedOption?.value === option.value}
+            hint={index + 1}
             onSelect={() => onModelChange(option.value)}
           />
         ))}
@@ -541,17 +641,155 @@ function ModelMenu({
 function ModelMenuItem({
   option,
   selected,
+  hint,
   onSelect
 }: {
   option: ModelOption
   selected: boolean
+  hint?: number
   onSelect: () => void
 }) {
   return (
     <DropdownMenu.Item onSelect={onSelect} className="gap-2">
       <span className="min-w-0 flex-1 truncate">{option.label}</span>
-      {selected && <Check size={12} className="text-foreground shrink-0" />}
+      <MenuItemHint selected={selected} hint={hint} />
     </DropdownMenu.Item>
+  )
+}
+
+function EffortMenu({
+  effort,
+  onEffortChange
+}: {
+  effort: AgentEffortLevel | null
+  onEffortChange: (effort: AgentEffortLevel) => void
+}) {
+  const current = effort ?? DEFAULT_EFFORT
+  const currentOption = EFFORT_OPTIONS.find((option) => option.value === current)
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button className={CONTROL_CHIP_CLASS} aria-label="Reasoning effort">
+          {currentOption?.label ?? 'Effort'}
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content align="end" className="w-60 px-3 py-2.5">
+        <div className="text-foreground text-xs">
+          <span className="text-foreground-muted">Effort</span>{' '}
+          <span className="font-medium">{currentOption?.label}</span>
+          {effort === null && <span className="text-foreground-subtle"> · default</span>}
+        </div>
+        <div className="text-foreground-subtle mt-2 flex items-center justify-between text-[11px]">
+          <span>Faster</span>
+          <span>Smarter</span>
+        </div>
+        <div className="bg-interactive mt-1.5 mb-0.5 flex items-center justify-between rounded-full px-1 py-0.5">
+          {EFFORT_OPTIONS.map((option) => {
+            const active = option.value === current
+            return (
+              <button
+                key={option.value}
+                onClick={() => onEffortChange(option.value)}
+                aria-label={`Effort: ${option.label}`}
+                title={option.label}
+                className="group flex h-6 w-8 items-center justify-center"
+              >
+                <span
+                  className={cn(
+                    'rounded-full transition-[width,height,background-color] duration-150',
+                    active
+                      ? 'bg-foreground size-4 shadow-sm'
+                      : cn(
+                          'size-1.5 group-hover:size-2.5',
+                          option.value === 'max' ? 'bg-purple/80' : 'bg-foreground-subtle/60'
+                        )
+                  )}
+                />
+              </button>
+            )
+          })}
+        </div>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  )
+}
+
+// ============================================================
+// Context window meter
+// ============================================================
+
+/** 1M-context model ids carry a "[1m]" suffix; everything else is 200k. */
+function contextLimitForModel(modelId: string | null): number {
+  return modelId?.includes('[1m]') ? 1_000_000 : 200_000
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
+  return `${n}`
+}
+
+/**
+ * Live context-window usage for the session: the prompt size of the latest
+ * main-thread assistant message (input + cache reads/writes + output). Only
+ * this component subscribes to the event stream, so per-token updates
+ * re-render the meter alone, not the whole prompt bar.
+ */
+function ContextMeter({ sessionId, modelId }: { sessionId: string; modelId: string | null }) {
+  const events = useAgentSessionEvents(sessionId)
+
+  let tokens = 0
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i]
+    if (event.type !== 'assistant' || (event.parent_tool_use_id ?? null) !== null) continue
+    const usage = event.message.usage
+    if (!usage) continue
+    tokens =
+      usage.input_tokens +
+      (usage.cache_read_input_tokens ?? 0) +
+      (usage.cache_creation_input_tokens ?? 0) +
+      usage.output_tokens
+    break
+  }
+
+  const limit = contextLimitForModel(modelId)
+  const pct = Math.min(100, Math.round((tokens / limit) * 100))
+
+  return (
+    <DropdownMenu.Root>
+      <Tooltip label="Context window" side="top">
+        <DropdownMenu.Trigger asChild>
+          <button
+            className="hover:bg-surface-hover flex size-6 items-center justify-center rounded-md transition-colors"
+            aria-label="Context window usage"
+          >
+            <span
+              className="viewed-progress-ring relative size-3.5 rounded-full"
+              style={
+                {
+                  '--viewed-progress': `${pct}%`,
+                  '--viewed-progress-fill': 'var(--color-accent)'
+                } as CSSProperties
+              }
+            >
+              <span className="bg-surface absolute inset-[2.5px] rounded-full" />
+            </span>
+          </button>
+        </DropdownMenu.Trigger>
+      </Tooltip>
+      <DropdownMenu.Content align="end" className="w-64 px-3 py-2.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-foreground-muted text-xs">Context window</span>
+          <span className="text-foreground text-xs tabular-nums">
+            {formatTokens(tokens)} / {formatTokens(limit)} ({pct}%)
+          </span>
+        </div>
+        <div className="bg-interactive mt-2 h-1 overflow-hidden rounded-full">
+          <div className="bg-accent h-full rounded-full transition-[width]" style={{ width: `${pct}%` }} />
+        </div>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   )
 }
 

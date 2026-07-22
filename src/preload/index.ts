@@ -58,6 +58,9 @@ const api = {
     }
   },
   github: {
+    users: {
+      get: (username: string): Promise<unknown> => ipcRenderer.invoke('github:users:get', username)
+    },
     repos: {
       list: (query?: string): Promise<unknown> => ipcRenderer.invoke('github:repos:list', query),
       get: (owner: string, repo: string): Promise<unknown> => ipcRenderer.invoke('github:repos:get', owner, repo),
@@ -382,6 +385,8 @@ const api = {
       ipcRenderer.invoke('agent:set-permission-mode', sessionId, mode),
     setModel: (sessionId: string, model: string | null): Promise<unknown> =>
       ipcRenderer.invoke('agent:set-model', sessionId, model),
+    setEffort: (sessionId: string, effort: string | null): Promise<unknown> =>
+      ipcRenderer.invoke('agent:set-effort', sessionId, effort),
     doctor: (): Promise<unknown> => ipcRenderer.invoke('agent:doctor'),
     onEvent: (callback: (data: { sessionId: string; seq: number; event: unknown }) => void): (() => void) => {
       const listener = (_event: IpcRendererEvent, data: { sessionId: string; seq: number; event: unknown }): void =>

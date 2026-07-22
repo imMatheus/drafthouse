@@ -318,8 +318,27 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
   // (status / cliSessionId / cost) happen on init / result / lifecycle only
   // and go through React state so the session list & status chrome update.
   useEffect(() => {
+    // Sessions this workspace never listed (another folder's live sessions,
+    // or events landing before the restore effect finishes) would otherwise
+    // buffer their stream in the store forever. Hydrate any session we see
+    // events for so buffers drain; hydrate() is idempotent so this can race
+    // the restore effect and session start safely.
+    const hydrationRequested = new Set<string>()
+    const requestHydration = (sessionId: string): void => {
+      if (agentSessionsStore.isHydrated(sessionId) || hydrationRequested.has(sessionId)) return
+      hydrationRequested.add(sessionId)
+      window.api.agent
+        .events(sessionId)
+        .then(({ events, nextSeq }) => agentSessionsStore.hydrate(sessionId, events, nextSeq))
+        .catch((error: unknown) => {
+          hydrationRequested.delete(sessionId)
+          console.error('Failed to hydrate agent session', error)
+        })
+    }
+
     return window.api.agent.onEvent(({ sessionId, seq, event }) => {
       agentSessionsStore.ingest(sessionId, seq, event)
+      requestHydration(sessionId)
 
       const affectsMeta =
         (event.type === 'system' && event.subtype === 'init') ||
@@ -337,7 +356,9 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
             if ('model' in event && typeof event.model === 'string') next.initModel = event.model
           } else if (event.type === 'result') {
             // A user-initiated stop can race the turn's own result — cancel wins.
-            next.status = event.is_error ? 'error' : s.status === 'cancelled' ? 'cancelled' : 'completed'
+            // Interrupted turns surface as is_error results, so the cancelled
+            // check must come first (mirrors handleChildLine in main).
+            next.status = s.status === 'cancelled' ? 'cancelled' : event.is_error ? 'error' : 'completed'
             if (typeof event.total_cost_usd === 'number') next.totalCostUsd = event.total_cost_usd
           } else if (event.type === 'lifecycle') {
             next.status = 'error'
@@ -689,6 +710,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
     const permissionMode: AgentPermissionMode =
       options?.permissionMode ?? (settings.agentFullAccess ? 'bypassPermissions' : 'default')
     const model = options?.model ?? null
+    const effort = options?.effort ?? null
 
     const { sessionId } = await window.api.agent.start({
       cwd: folderPath,
@@ -696,7 +718,8 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       files,
       context,
       permissionMode,
-      model
+      model,
+      effort
     })
 
     // A brand-new session's canonical log starts empty, so hydrating with an
@@ -715,6 +738,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       context,
       permissionMode,
       model,
+      effort,
       cwd: folderPath
     }
 
@@ -1018,8 +1042,14 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       })
     },
     setPermissionMode: (sessionId, mode) => {
-      void window.api.agent.setPermissionMode(sessionId, mode)
+      const previousMode = sessionMetas.find((s) => s.id === sessionId)?.permissionMode
       setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, permissionMode: mode } : s)))
+      window.api.agent.setPermissionMode(sessionId, mode).catch((error: unknown) => {
+        console.error('Failed to switch permission mode', error)
+        if (previousMode) {
+          setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, permissionMode: previousMode } : s)))
+        }
+      })
     },
     setModel: (sessionId, model) => {
       const previousModel = sessionMetas.find((s) => s.id === sessionId)?.model ?? null
@@ -1027,6 +1057,12 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
       window.api.agent.setModel(sessionId, model).catch((error: unknown) => {
         console.error('Failed to switch model', error)
         setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, model: previousModel } : s)))
+      })
+    },
+    setEffort: (sessionId, effort) => {
+      setSessionMetas((prev) => prev.map((s) => (s.id === sessionId ? { ...s, effort } : s)))
+      window.api.agent.setEffort(sessionId, effort).catch((error: unknown) => {
+        console.error('Failed to switch effort level', error)
       })
     },
     cancelQueuedPrompt: (sessionId, promptId) => {
@@ -1134,6 +1170,7 @@ export default function Workspace({ session, onCloseWorkspace, onUpdateSession }
                       node={layout}
                       activeGroupId={activeGroupId}
                       dragActive={pendingDrag !== null}
+                      agentSessionStatuses={Object.fromEntries(sessionMetas.map((s) => [s.id, s.status]))}
                       handlers={editorHandlers}
                       renderContent={(tab) =>
                         renderWorkspaceTabContent({

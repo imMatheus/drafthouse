@@ -228,6 +228,16 @@ function parseCliMetaUserMessage(text: string): { notice: string | null; isError
   return null
 }
 
+/**
+ * On interrupt the CLI synthesizes user-role marker messages for the next API
+ * call. They're not something the user typed — rendering them as prompt
+ * bubbles would fake a user turn; the session's "Stopped" row covers it.
+ */
+function isInterruptMarker(text: string): boolean {
+  const trimmed = text.trim()
+  return trimmed === '[Request interrupted by user]' || trimmed === '[Request interrupted by user for tool use]'
+}
+
 function textOfUserContent(content: AgentContentBlock[] | string): string | null {
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return null
@@ -400,6 +410,7 @@ function buildAgentTimelineUncached(events: AgentStreamEvent[]): AgentTimeline {
         if ((event.parent_tool_use_id ?? null) !== null) break
         const text = textOfUserContent(event.message.content)
         if (text !== null && text.trim().length > 0) {
+          if (isInterruptMarker(text)) break
           const meta = parseCliMetaUserMessage(text)
           if (meta) {
             if (meta.notice) {

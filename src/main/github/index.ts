@@ -11,6 +11,7 @@ import { registerReactionsHandlers } from './reactions'
 import { registerReviewRequestsHandlers } from './review-requests'
 import { registerReviewsHandlers } from './reviews'
 import { registerReposHandlers } from './repos'
+import { registerUsersHandlers } from './users'
 
 export function registerGitHubHandlers(): void {
   registerReposHandlers()
@@ -26,4 +27,5 @@ export function registerGitHubHandlers(): void {
   registerReactionsHandlers()
   registerReviewRequestsHandlers()
   registerReviewsHandlers()
+  registerUsersHandlers()
 }

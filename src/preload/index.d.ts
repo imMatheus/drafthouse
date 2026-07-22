@@ -1,5 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type {
+  AgentEffortLevel,
   AgentEvent,
   AgentPermissionMode,
   AgentPermissionResponse,
@@ -10,6 +11,7 @@ import type {
   AuthData,
   FileEntry,
   GitHubRepo,
+  GitHubUserProfile,
   GitRepoInfo,
   SearchOptions,
   SearchResults,
@@ -77,6 +79,10 @@ interface GitHubReposAPI {
   commitActivity: (owner: string, repo: string) => Promise<RepoCommitActivity>
   dailyCommits: (owner: string, repo: string, since: string, until: string) => Promise<RepoDailyCommits>
   getContent: (owner: string, repo: string, path: string, ref: string) => Promise<string>
+}
+
+interface GitHubUsersAPI {
+  get: (username: string) => Promise<GitHubUserProfile>
 }
 
 interface GitHubBranchesAPI {
@@ -396,6 +402,7 @@ interface GitHubReactionsAPI {
 }
 
 interface GitHubAPI {
+  users: GitHubUsersAPI
   repos: GitHubReposAPI
   branches: GitHubBranchesAPI
   collaborators: GitHubCollaboratorsAPI
@@ -451,6 +458,7 @@ interface AgentAPI {
   respondPermission: (sessionId: string, requestId: string, response: AgentPermissionResponse) => Promise<void>
   setPermissionMode: (sessionId: string, mode: AgentPermissionMode) => Promise<void>
   setModel: (sessionId: string, model: string | null) => Promise<void>
+  setEffort: (sessionId: string, effort: AgentEffortLevel | null) => Promise<void>
   doctor: () => Promise<{ found: boolean; path: string | null }>
   onEvent: (callback: (data: AgentEvent & { seq: number }) => void) => () => void
 }

@@ -1299,7 +1299,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
         : null
 
   return (
-    <div className="border-border bg-surface mt-4 rounded-lg border p-4">
+    <div className="mt-4">
       <div className="flex flex-wrap items-center gap-3">
         {state === 'open' ? (
           <>
@@ -1307,21 +1307,15 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
               <button
                 onClick={handleMerge}
                 disabled={isSubmitting || pr.mergeable === null || mergeDisabledReason !== null}
-                className="bg-success text-success-foreground hover:bg-success/80 rounded-l-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+                className="bg-success text-success-foreground hover:bg-success/80 inline-flex h-8 items-center justify-center gap-1.5 rounded-l-md px-4 text-xs leading-none font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               >
-                <span className="inline-flex items-center gap-1.5">
-                  <GitMerge size={14} />
-                  {isSubmitting
-                    ? 'Merging...'
-                    : pr.mergeable === null
-                      ? 'Checking...'
-                      : getMergeButtonLabel(mergeMethod)}
-                </span>
+                <GitMerge size={14} />
+                {isSubmitting ? 'Merging...' : pr.mergeable === null ? 'Checking...' : getMergeButtonLabel(mergeMethod)}
               </button>
               <button
                 onClick={() => setIsMergeMethodOpen(!isMergeMethodOpen)}
                 disabled={isSubmitting}
-                className="border-success/30 bg-success text-success-foreground hover:bg-success/80 rounded-r-md border-l px-2 py-2 transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+                className="border-success/30 bg-success text-success-foreground hover:bg-success/80 inline-flex h-8 items-center justify-center rounded-r-md border-l px-2 transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
               >
                 <ChevronDown size={14} />
               </button>
@@ -1364,7 +1358,7 @@ function PRActionBar({ pr, owner, repo }: { pr: PullRequestDetail; owner: string
             <button
               onClick={handleConvertToDraft}
               disabled={isSubmitting}
-              className="text-foreground-muted hover:text-foreground rounded-md px-4 py-2 text-xs font-medium transition-[color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+              className="text-foreground-muted hover:bg-interactive hover:text-foreground rounded-md px-4 py-2 text-xs font-medium transition-[background-color,color,transform] active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
             >
               Convert to draft
             </button>

@@ -122,7 +122,7 @@ export default function InlineAgentResponseCard({
           <button
             onClick={submitFollowUp}
             disabled={!followUp.trim()}
-            className="bg-foreground text-background flex size-6 shrink-0 items-center justify-center rounded-md transition-colors hover:opacity-80 disabled:opacity-30"
+            className="bg-accent text-accent-foreground hover:bg-accent-hover flex size-6 shrink-0 items-center justify-center rounded-md transition-[background-color,transform,opacity] active:scale-[0.96] disabled:opacity-30"
             aria-label="Send follow-up"
           >
             <ArrowUp size={12} strokeWidth={2.5} />

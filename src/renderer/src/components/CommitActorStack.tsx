@@ -5,6 +5,8 @@ import type { GitHubCommit, PullRequestCommit, PullRequestCommitAuthors } from '
 export interface CommitActor {
   name: string
   avatarUrl: string | null
+  login: string | null
+  email: string | null
 }
 
 interface CommitActorStackProps {
@@ -65,22 +67,30 @@ export function getCommitActors(
   if (graphqlAuthors && graphqlAuthors.length > 0) {
     return graphqlAuthors.map((a) => ({
       name: a.login ?? a.name,
-      avatarUrl: a.avatarUrl
+      avatarUrl: a.avatarUrl,
+      login: a.login,
+      email: a.email
     }))
   }
 
   const entries: Array<CommitActor | null> = [
     {
       name: commit.author?.login ?? commit.commit.author?.name ?? '',
-      avatarUrl: commit.author?.avatar_url ?? null
+      avatarUrl: commit.author?.avatar_url ?? null,
+      login: commit.author?.login ?? null,
+      email: commit.commit.author?.email ?? null
     },
     {
       name: commit.committer?.login ?? commit.commit.committer?.name ?? '',
-      avatarUrl: commit.committer?.avatar_url ?? null
+      avatarUrl: commit.committer?.avatar_url ?? null,
+      login: commit.committer?.login ?? null,
+      email: commit.commit.committer?.email ?? null
     },
     ...parseCoAuthors(commit.commit.message).map(({ name, email }) => ({
       name,
-      avatarUrl: avatarFromEmail(email)
+      avatarUrl: avatarFromEmail(email),
+      login: loginFromEmail(email),
+      email
     }))
   ]
 
@@ -120,4 +130,12 @@ function avatarFromEmail(email: string | null): string | null {
   const noreplyLegacy = email.match(/^([^@+]+)@users\.noreply\.github\.com$/i)
   if (noreplyLegacy) return `https://github.com/${noreplyLegacy[1]}.png?size=80`
   return null
+}
+
+function loginFromEmail(email: string | null): string | null {
+  if (!email) return null
+  const noreplyWithId = email.match(/^\d+\+([^@]+)@users\.noreply\.github\.com$/i)
+  if (noreplyWithId) return noreplyWithId[1] ?? null
+  const noreplyLegacy = email.match(/^([^@+]+)@users\.noreply\.github\.com$/i)
+  return noreplyLegacy?.[1] ?? null
 }

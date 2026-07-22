@@ -12,8 +12,8 @@ interface LoadingProps {
 }
 
 const INDICATOR_SIZE: Record<LoadingSize, string> = {
-  sm: 'w-2.5 text-xs',
-  md: 'w-3 text-sm',
+  sm: 'size-2.5 text-xs',
+  md: 'size-3 text-sm',
   lg: 'w-10 text-5xl'
 }
 
@@ -42,7 +42,15 @@ export function LoadingIndicator({ size = 'md' }: { size?: LoadingSize }) {
   return (
     <span
       aria-hidden
-      className={cn('text-accent inline-flex shrink-0 justify-center leading-none', INDICATOR_SIZE[size])}
+      // leading-none must come after the text-* size: tailwind-merge drops an
+      // earlier leading-* when a later text-* follows (text-* sets line-height
+      // in Tailwind v4), which left the glyph's 20px line box overflowing the
+      // fixed square and made the indicator taller than sibling icons.
+      className={cn(
+        'text-accent inline-flex shrink-0 items-center justify-center',
+        INDICATOR_SIZE[size],
+        'leading-none'
+      )}
     >
       {FRAMES[frame]}
     </span>

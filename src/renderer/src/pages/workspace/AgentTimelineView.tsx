@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Ban,
   Bot,
   Brain,
   Check,
   ChevronRight,
+  Copy,
   FileText,
   Globe,
   ListTodo,
@@ -16,6 +17,7 @@ import {
   X
 } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { friendlyModelLabel } from '../../lib/models'
 import type { AgentContext, AgentSessionMeta } from '../../../../shared/types'
 import {
   buildAgentTimeline,
@@ -39,6 +41,7 @@ import AgentSpinner from './AgentSpinner'
 import MarkdownBody from './MarkdownBody'
 import HighlightedMentionText from '../../components/HighlightedMentionText'
 import MessagePRMentions from '../../components/MessagePRMentions'
+import Tooltip from '../../components/Tooltip'
 
 interface AgentTimelineViewProps {
   session: AgentSessionMeta
@@ -60,6 +63,14 @@ export default function AgentTimelineView({
   const isRunning = session.status === 'running'
   const lastTurnIndex = timeline.turns.length - 1
 
+  // While the model is actively thinking, the step group already renders a
+  // shimmering "Thinking…" header with the live thought stream — a second
+  // "Thinking..." indicator row under it would be pure duplication.
+  const lastTurn = timeline.turns[lastTurnIndex]
+  const lastItem = lastTurn?.items[lastTurn.items.length - 1]
+  const lastStep = lastItem?.kind === 'steps' ? lastItem.steps[lastItem.steps.length - 1] : undefined
+  const thinkingStreamVisible = lastStep?.kind === 'thinking' && lastStep.streaming
+
   return (
     <div>
       {timeline.turns.map((turn, turnIndex) => (
@@ -75,7 +86,7 @@ export default function AgentTimelineView({
         />
       ))}
 
-      {isRunning && !timeline.pendingPermission && (
+      {isRunning && !timeline.pendingPermission && !thinkingStreamVisible && (
         <LiveIndicator label={liveLabel(timeline)} since={session.lastActivityAt} />
       )}
 
@@ -119,8 +130,13 @@ function TurnBlock({
   isRunning: boolean
   allMentionedPRs?: AgentContext['prs']
 }) {
+  const turnRunning = isRunning && isLastTurn && turn.result === null
+  const responseText = collectResponseText(turn)
+  const canCopy = !turnRunning && responseText.length > 0
+  const stats = turn.result && !turn.result.isError && isLastTurn ? turn.result : null
+
   return (
-    <div>
+    <div className="group/turn">
       {turn.user && !hideUserMessage && (
         <UserBubble
           text={turn.user.text}
@@ -131,34 +147,92 @@ function TurnBlock({
       )}
 
       {turn.items.map((item, i) => (
-        <TimelineItemBlock
-          key={i}
-          item={item}
-          session={session}
-          compact={compact}
-          turnRunning={isRunning && isLastTurn && turn.result === null}
-        />
+        <TimelineItemBlock key={i} item={item} session={session} compact={compact} turnRunning={turnRunning} />
       ))}
 
-      {turn.result &&
-        (turn.result.isError ? (
-          <div className="border-danger/30 bg-danger/5 my-3 rounded-md border px-3 py-2">
-            <p className="text-danger text-xs font-medium">
-              {turn.result.subtype === 'error_max_turns' ? 'Stopped: maximum turns reached' : 'The agent hit an error'}
-            </p>
-            {turn.result.errorText && (
-              <pre className="text-danger/90 mt-1 text-xs break-all whitespace-pre-wrap">{turn.result.errorText}</pre>
-            )}
-          </div>
-        ) : isLastTurn ? (
-          <TurnStats
-            durationMs={turn.result.durationMs}
-            numTurns={turn.result.numTurns}
-            costUsd={turn.result.costUsd}
-            model={session.initModel}
-          />
-        ) : null)}
+      {turn.result?.isError && (
+        <div className="border-danger/30 bg-danger/5 my-3 rounded-md border px-3 py-2">
+          <p className="text-danger text-xs font-medium">
+            {turn.result.subtype === 'error_max_turns' ? 'Stopped: maximum turns reached' : 'The agent hit an error'}
+          </p>
+          {turn.result.errorText && (
+            <pre className="text-danger/90 mt-1 text-xs break-all whitespace-pre-wrap">{turn.result.errorText}</pre>
+          )}
+        </div>
+      )}
+
+      {/* Response footer: copy action + run stats. Always visible under the
+          latest response, hover-revealed on older turns (claude.ai style). */}
+      {(canCopy || stats) && (
+        <div
+          className={cn(
+            'mt-1 mb-3 flex items-center gap-3',
+            !isLastTurn && 'opacity-0 transition-opacity group-hover/turn:opacity-100'
+          )}
+        >
+          {canCopy && <CopyResponseButton text={responseText} />}
+          {stats && (
+            <TurnStats
+              durationMs={stats.durationMs}
+              numTurns={stats.numTurns}
+              costUsd={stats.costUsd}
+              model={session.initModel}
+            />
+          )}
+        </div>
+      )}
     </div>
+  )
+}
+
+function collectResponseText(turn: TimelineTurn): string {
+  const texts: string[] = []
+  for (const item of turn.items) {
+    if (item.kind === 'text') texts.push(item.text)
+  }
+  return texts.join('\n\n')
+}
+
+function CopyResponseButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const timeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
+    }
+  }, [])
+
+  const handleCopy = (): void => {
+    void navigator.clipboard.writeText(text)
+    setCopied(true)
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
+    timeoutRef.current = window.setTimeout(() => setCopied(false), 1600)
+  }
+
+  return (
+    <Tooltip label={copied ? 'Copied' : 'Copy response'} side="top">
+      <button
+        onClick={handleCopy}
+        className="text-foreground-subtle hover:bg-surface-hover hover:text-foreground relative flex size-7 items-center justify-center rounded-md transition-[background-color,color,transform] active:scale-[0.96]"
+        aria-label="Copy response"
+      >
+        <Copy
+          size={13}
+          className={cn(
+            'transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
+            copied ? 'scale-[0.25] opacity-0 blur-[4px]' : 'scale-100 opacity-100 blur-none'
+          )}
+        />
+        <Check
+          size={13}
+          className={cn(
+            'absolute transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
+            copied ? 'scale-100 opacity-100 blur-none' : 'scale-[0.25] opacity-0 blur-[4px]'
+          )}
+        />
+      </button>
+    </Tooltip>
   )
 }
 
@@ -174,13 +248,13 @@ function TurnStats({
   model: string | undefined
 }) {
   return (
-    <div className="text-foreground-subtle mt-2 mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+    <div className="text-foreground-subtle flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
       <span>{(durationMs / 1000).toFixed(1)}s</span>
       <span>
         {numTurns} turn{numTurns !== 1 ? 's' : ''}
       </span>
       {costUsd !== null && costUsd > 0 && <span>${costUsd.toFixed(costUsd < 0.1 ? 3 : 2)}</span>}
-      {model && <span>{model}</span>}
+      {model && <span>{friendlyModelLabel(model)}</span>}
     </div>
   )
 }
@@ -202,8 +276,10 @@ function TimelineItemBlock({
 }) {
   switch (item.kind) {
     case 'text':
+      // Assistant prose sits flush with the column, plain on the page
+      // background — no card chrome (claude.ai style).
       return (
-        <MarkdownBody className={compact ? 'p-2' : 'p-4'} compact={compact}>
+        <MarkdownBody className={compact ? 'p-2' : 'py-3'} compact={compact}>
           {item.text}
         </MarkdownBody>
       )
@@ -248,6 +324,12 @@ function EditBlock({ item }: { item: TimelineItemEdit }) {
 function StepGroupBlock({ steps, turnRunning }: { steps: TimelineStep[]; turnRunning: boolean }) {
   const [expanded, setExpanded] = useState(false)
 
+  // While the model is actively thinking (a streaming thinking step with
+  // nothing after it yet), surface the live thought under the header instead
+  // of hiding it behind the accordion — mirrors claude.ai's thinking stream.
+  const lastStep = steps[steps.length - 1]
+  const liveThinking = !expanded && turnRunning && lastStep?.kind === 'thinking' && lastStep.streaming ? lastStep : null
+
   return (
     <div className="my-2">
       <button
@@ -255,10 +337,20 @@ function StepGroupBlock({ steps, turnRunning }: { steps: TimelineStep[]; turnRun
         className="text-foreground-muted hover:bg-surface-hover hover:text-foreground flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs transition-colors"
       >
         <ChevronRight size={12} className={cn('shrink-0 transition-transform', expanded && 'rotate-90')} />
-        <span>
-          {steps.length} step{steps.length !== 1 ? 's' : ''}
-        </span>
+        {liveThinking ? (
+          <span className="text-shimmer">Thinking…</span>
+        ) : (
+          <span>
+            {steps.length} step{steps.length !== 1 ? 's' : ''}
+          </span>
+        )}
       </button>
+
+      {liveThinking && (
+        <div className="border-border thinking-tail mt-1 ml-1.5 border-l pl-3">
+          <p className="text-foreground-subtle text-xs whitespace-pre-wrap italic">{liveThinking.text}</p>
+        </div>
+      )}
 
       {expanded && (
         <div className="border-border mt-1 ml-1.5 flex flex-col gap-0.5 border-l pl-3">
@@ -779,7 +871,12 @@ export function UserBubble({
       )}
       {text.length > 0 && (
         <div
-          className={cn('bg-accent-bg text-accent max-w-[80%] rounded-2xl px-3 py-2', compact ? 'text-xs' : 'text-sm')}
+          className={cn(
+            // Bordered so the bubble reads both on the page background (chat
+            // tab) and inside bg-surface containers (inline cards).
+            'border-border bg-surface text-foreground max-w-[80%] rounded-2xl border px-4 py-2.5',
+            compact ? 'text-xs' : 'text-sm'
+          )}
         >
           <span className="whitespace-pre-wrap">
             <HighlightedMentionText text={text} />
@@ -829,7 +926,7 @@ function LiveIndicator({ label, since }: { label: string; since: number }) {
   return (
     <div className="text-accent flex items-center gap-2 py-1">
       <AgentSpinner />
-      <span className="text-foreground-muted truncate text-xs">{label}</span>
+      <span className="text-shimmer truncate text-xs">{label}</span>
       <ElapsedTimer since={since} />
     </div>
   )

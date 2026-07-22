@@ -168,8 +168,26 @@ export function appendAssistantEvent(events: AgentStreamEvent[], finalEvent: Age
       if (!sameParent(event.parent_tool_use_id, finalEvent.parent_tool_use_id)) continue
 
       if (event.streamed || event.streaming) {
-        // Already have richer content from the partial stream.
-        return events
+        // Already have richer content from the partial stream — except for a
+        // tool_use block whose input JSON never finished parsing (a dropped
+        // delta): there the final event's input is authoritative.
+        const finalToolBlocks = new Map<string, AgentContentBlock>()
+        for (const block of finalEvent.message.content) {
+          if (block.type === 'tool_use') finalToolBlocks.set(block.id, block)
+        }
+        let upgraded = false
+        const content = event.message.content.map((block) => {
+          if (block.type !== 'tool_use' || block.partialJson === undefined) return block
+          const finalBlock = finalToolBlocks.get(block.id)
+          if (!finalBlock) return block
+          upgraded = true
+          return finalBlock
+        })
+        if (!upgraded) return events
+
+        const next = [...events]
+        next[i] = { ...event, message: { ...event.message, content } }
+        return next
       }
 
       const next = [...events]

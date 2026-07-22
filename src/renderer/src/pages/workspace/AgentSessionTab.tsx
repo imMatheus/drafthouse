@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
   AgentContext,
+  AgentEffortLevel,
   AgentPermissionMode,
   AgentSessionMeta,
   AgentStartOptions,
@@ -12,7 +13,7 @@ import { useSettings } from '../../hooks/useSettings'
 import { useWorkspaceContext } from '../../contexts/WorkspaceContext'
 import AgentConversation from './AgentConversation'
 import AgentEmptyState from './AgentEmptyState'
-import AgentPromptBar, { type AgentPromptBarHandle, type AgentPromptMode } from './AgentPromptBar'
+import AgentPromptBar, { type AgentPromptBarHandle } from './AgentPromptBar'
 
 interface AgentSessionTabProps {
   session: AgentSessionMeta | null
@@ -44,9 +45,11 @@ export default function AgentSessionTab({
   gitInfo
 }: AgentSessionTabProps) {
   const [text, setText] = useState('')
-  // Mode/model for a not-yet-started session; existing sessions read from meta.
-  const [draftMode, setDraftMode] = useState<AgentPromptMode>('agent')
+  // Mode/model/effort for a not-yet-started session; existing sessions read
+  // from meta. A null draft mode follows the settings default until touched.
+  const [draftMode, setDraftMode] = useState<AgentPermissionMode | null>(null)
   const [draftModel, setDraftModel] = useState<string | null>(null)
+  const [draftEffort, setDraftEffort] = useState<AgentEffortLevel | null>(null)
   const promptBarRef = useRef<AgentPromptBarHandle>(null)
   const { settings } = useSettings()
   const workspace = useWorkspaceContext()
@@ -58,13 +61,14 @@ export default function AgentSessionTab({
     promptBarRef.current?.focus()
   }, [session?.id])
 
-  const executionMode: AgentPermissionMode = settings.agentFullAccess ? 'bypassPermissions' : 'default'
-  const mode: AgentPromptMode = session ? (session.permissionMode === 'plan' ? 'plan' : 'agent') : draftMode
+  const defaultMode: AgentPermissionMode = settings.agentFullAccess ? 'bypassPermissions' : 'default'
+  const mode: AgentPermissionMode = session ? session.permissionMode : (draftMode ?? defaultMode)
   const model = session ? session.model : draftModel
+  const effort = session ? (session.effort ?? null) : draftEffort
 
-  const handleModeChange = (next: AgentPromptMode): void => {
+  const handleModeChange = (next: AgentPermissionMode): void => {
     if (session) {
-      workspace?.agentActions.setPermissionMode(session.id, next === 'plan' ? 'plan' : executionMode)
+      workspace?.agentActions.setPermissionMode(session.id, next)
     } else {
       setDraftMode(next)
     }
@@ -75,6 +79,14 @@ export default function AgentSessionTab({
       workspace?.agentActions.setModel(session.id, next)
     } else {
       setDraftModel(next)
+    }
+  }
+
+  const handleEffortChange = (next: AgentEffortLevel): void => {
+    if (session) {
+      workspace?.agentActions.setEffort(session.id, next)
+    } else {
+      setDraftEffort(next)
     }
   }
 
@@ -93,8 +105,9 @@ export default function AgentSessionTab({
           ? buildPullRequestMentionsAgentContext({ owner: gitInfo.owner, repo: gitInfo.repo, prs: mentionedPRs })
           : null
       await onStartSession(prompt, files, context ?? undefined, {
-        permissionMode: draftMode === 'plan' ? 'plan' : undefined,
-        model: draftModel
+        permissionMode: draftMode ?? undefined,
+        model: draftModel,
+        effort: draftEffort
       })
     }
   }
@@ -136,6 +149,9 @@ export default function AgentSessionTab({
         model={model}
         onModelChange={handleModelChange}
         detectedModel={session?.initModel ?? null}
+        effort={effort}
+        onEffortChange={handleEffortChange}
+        sessionId={session?.id}
         queued={queued}
         onCancelQueued={session ? (id) => workspace?.agentActions.cancelQueuedPrompt(session.id, id) : undefined}
       />

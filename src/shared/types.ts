@@ -9,6 +9,14 @@ export interface GitHubUser {
   id: number
 }
 
+export interface GitHubUserProfile extends GitHubUser {
+  html_url: string
+  bio: string | null
+  company: string | null
+  location: string | null
+  followers: number
+}
+
 export interface AuthData {
   token: string
   scopes: string[]
@@ -615,8 +623,15 @@ export type AgentSessionStatus =
   /** Was running when the app quit or the process died between persisted turns */
   | 'interrupted'
 
-/** Permission modes understood by the claude CLI (--permission-mode / set_permission_mode). */
-export type AgentPermissionMode = 'bypassPermissions' | 'default' | 'acceptEdits' | 'plan'
+/**
+ * Permission modes understood by the claude CLI (--permission-mode /
+ * set_permission_mode). 'default' is the CLI's legacy alias for what its help
+ * now calls "manual" — kept as the wire value for persisted-session compat.
+ */
+export type AgentPermissionMode = 'bypassPermissions' | 'default' | 'acceptEdits' | 'plan' | 'auto'
+
+/** Reasoning effort levels understood by the claude CLI (--effort). */
+export type AgentEffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 // Content blocks within assistant messages
 export interface AgentContentBlockText {
@@ -695,6 +710,17 @@ export interface AgentStreamSystem {
   [key: string]: unknown
 }
 
+/**
+ * Per-message usage as reported by the API. The prompt (everything the model
+ * read) is input + both cache figures — that sum is the live context size.
+ */
+export interface AgentMessageUsage {
+  input_tokens: number
+  output_tokens: number
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
+}
+
 export interface AgentStreamAssistant {
   type: 'assistant'
   message: {
@@ -702,10 +728,7 @@ export interface AgentStreamAssistant {
     role: 'assistant'
     content: AgentContentBlock[]
     stop_reason?: string | null
-    usage?: {
-      input_tokens: number
-      output_tokens: number
-    }
+    usage?: AgentMessageUsage
   }
   /** Set on sub-agent (Task tool) messages; null/absent on the main thread. */
   parent_tool_use_id?: string | null
@@ -724,7 +747,7 @@ export type AgentPartialMessageSubEvent =
         role: 'assistant'
         content: AgentContentBlock[]
         stop_reason?: string | null
-        usage?: { input_tokens: number; output_tokens: number }
+        usage?: AgentMessageUsage
       }
     }
   | { type: 'content_block_start'; index: number; content_block: AgentContentBlock }
@@ -851,6 +874,8 @@ export interface AgentSessionMeta {
   model: string | null
   /** Model the CLI reported in its init event, e.g. "claude-opus-4-8". */
   initModel?: string
+  /** Reasoning effort override; null follows the CLI default. Applied at spawn (--effort). */
+  effort?: AgentEffortLevel | null
   totalCostUsd?: number
   cwd: string
 }
@@ -861,6 +886,7 @@ export interface AgentStartRequest {
   files?: string[]
   permissionMode: AgentPermissionMode
   model?: string | null
+  effort?: AgentEffortLevel | null
   context?: AgentContext
 }
 
@@ -868,6 +894,7 @@ export interface AgentStartRequest {
 export interface AgentStartOptions {
   permissionMode?: AgentPermissionMode
   model?: string | null
+  effort?: AgentEffortLevel | null
 }
 
 export interface AgentSendRequest {

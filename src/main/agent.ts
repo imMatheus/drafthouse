@@ -7,6 +7,7 @@ import { homedir } from 'os'
 import { join } from 'path'
 import type {
   AgentContentBlock,
+  AgentEffortLevel,
   AgentPermissionMode,
   AgentPermissionResponse,
   AgentSendRequest,
@@ -144,6 +145,11 @@ interface ManagedSession {
   turnActive: boolean
   /** Set when we intentionally kill the child (stop escalation, idle reap, delete). */
   expectExit: boolean
+  /**
+   * A spawn-time-only setting (--effort) changed mid-turn; reap the child when
+   * the turn ends so the next message resumes with the new flags.
+   */
+  respawnPending: boolean
   idleTimer: NodeJS.Timeout | null
   saveTimer: NodeJS.Timeout | null
 }
@@ -185,6 +191,26 @@ function saveSessionNow(session: ManagedSession): void {
   }
 }
 
+/**
+ * A session persisted while a permission prompt was still pending (quit or
+ * crash mid-prompt) restores with an unanswered card that no child can ever
+ * receive an answer for — respondToPermission would silently no-op. Deny the
+ * orphans in the log so the cards render as resolved.
+ */
+function resolveDanglingPermissions(events: AgentStreamEvent[]): void {
+  const resolved = new Set<string>()
+  const requested: string[] = []
+  for (const event of events) {
+    if (event.type === 'permission_resolved') resolved.add(event.requestId)
+    else if (event.type === 'permission_request') requested.push(event.requestId)
+  }
+  for (const requestId of requested) {
+    if (!resolved.has(requestId)) {
+      events.push({ type: 'permission_resolved', requestId, behavior: 'deny' })
+    }
+  }
+}
+
 /** Load every persisted session into memory once; running→interrupted on load. */
 function ensureDiskScanned(): void {
   if (diskScanned) return
@@ -203,6 +229,7 @@ function ensureDiskScanned(): void {
     if (persisted.meta.status === 'running') {
       persisted.meta.status = 'interrupted'
     }
+    resolveDanglingPermissions(persisted.events)
     sessions.set(sessionId, {
       meta: persisted.meta,
       events: persisted.events,
@@ -215,6 +242,7 @@ function ensureDiskScanned(): void {
       pendingPermissions: new Map(),
       turnActive: false,
       expectExit: false,
+      respawnPending: false,
       idleTimer: null,
       saveTimer: null
     })
@@ -366,6 +394,10 @@ function buildCliArgs(meta: AgentSessionMeta, firstSpawn: boolean): string[] {
 
   if (meta.model) {
     args.push('--model', meta.model)
+  }
+
+  if (meta.effort) {
+    args.push('--effort', meta.effort)
   }
 
   if (meta.cliSessionId) {
@@ -679,7 +711,14 @@ function handleChildLine(session: ManagedSession, line: string): void {
     if (session.meta.status !== 'cancelled') {
       session.meta.status = event.is_error ? 'error' : 'completed'
     }
-    startIdleTimer(session)
+    if (session.respawnPending) {
+      // A spawn-time setting changed mid-turn; reap now that the turn is over
+      // so the next message resumes under the new flags.
+      session.respawnPending = false
+      killChild(session)
+    } else {
+      startIdleTimer(session)
+    }
   }
 
   pushEvent(session, event)
@@ -709,6 +748,7 @@ async function startSession(webContents: WebContents, request: AgentStartRequest
     context: request.context,
     permissionMode: request.permissionMode,
     model: request.model ?? null,
+    effort: request.effort ?? null,
     cwd: request.cwd
   }
 
@@ -724,6 +764,7 @@ async function startSession(webContents: WebContents, request: AgentStartRequest
     pendingPermissions: new Map(),
     turnActive: false,
     expectExit: false,
+    respawnPending: false,
     idleTimer: null,
     saveTimer: null
   }
@@ -766,6 +807,15 @@ async function sendUserTurn(
   scheduleSave(session)
 
   const content = await buildUserContent(cliPrompt, files)
+
+  // A stop can land while attachments were being read — don't start a turn
+  // the user already cancelled. (Widened read: TS narrows status to 'running'
+  // from the assignment above and can't see stopSession mutating it mid-await.)
+  if ((session.meta.status as AgentSessionMeta['status']) === 'cancelled') {
+    session.turnActive = false
+    return
+  }
+
   const ok = writeToChild(session, { type: 'user', message: { role: 'user', content } })
   if (!ok) {
     session.turnActive = false
@@ -908,6 +958,27 @@ async function setSessionModel(sessionId: string, model: string | null): Promise
   }
 }
 
+const EFFORT_LEVELS = new Set<AgentEffortLevel>(['low', 'medium', 'high', 'xhigh', 'max'])
+
+/**
+ * Effort is a spawn-time-only flag (--effort) — the control protocol has no
+ * set_effort. Persist the new level and recycle the child at the next safe
+ * point; --resume makes the respawn invisible to the conversation.
+ */
+function setSessionEffort(sessionId: string, effort: AgentEffortLevel | null): void {
+  if (effort !== null && !EFFORT_LEVELS.has(effort)) return
+  const session = sessions.get(sessionId)
+  if (!session || session.meta.effort === effort) return
+  session.meta.effort = effort
+  scheduleSave(session)
+  if (!session.child) return
+  if (session.turnActive) {
+    session.respawnPending = true
+  } else {
+    killChild(session)
+  }
+}
+
 // ============================================================
 // IPC registration
 // ============================================================
@@ -952,6 +1023,10 @@ export function registerAgentHandlers(): void {
 
   ipcMain.handle('agent:set-permission-mode', (_event, sessionId: string, mode: AgentPermissionMode) => {
     return setSessionPermissionMode(sessionId, mode)
+  })
+
+  ipcMain.handle('agent:set-effort', (_event, sessionId: string, effort: AgentEffortLevel | null) => {
+    setSessionEffort(sessionId, effort)
   })
 
   ipcMain.handle('agent:set-model', (_event, sessionId: string, model: string | null) => {

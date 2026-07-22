@@ -2,12 +2,14 @@ import { Fragment, type ReactNode, useRef, useState } from 'react'
 import { cn } from '../lib/cn'
 import { MIN_SPLIT_FRACTION, type LayoutNode, type SplitNode } from '../lib/editorLayout'
 import type { WorkspaceTab } from '../lib/workspaceTabs'
+import type { AgentSessionStatus } from '../../../shared/types'
 import EditorGroupView, { type EditorGroupHandlers } from './EditorGroupView'
 
 interface EditorLayoutProps {
   node: LayoutNode
   activeGroupId: string
   dragActive: boolean
+  agentSessionStatuses: Record<string, AgentSessionStatus>
   handlers: EditorGroupHandlers
   renderContent: (tab: WorkspaceTab | null) => ReactNode
 }
@@ -21,6 +23,7 @@ export default function EditorLayout(props: EditorLayoutProps) {
         group={node.group}
         isActiveGroup={node.group.id === rest.activeGroupId}
         dragActive={rest.dragActive}
+        agentSessionStatuses={rest.agentSessionStatuses}
         handlers={rest.handlers}
         renderContent={rest.renderContent}
       />

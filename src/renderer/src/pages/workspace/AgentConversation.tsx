@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { FileCode, GitBranch } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowDown, FileCode, GitBranch } from 'lucide-react'
 import type { AgentContext, AgentSessionMeta } from '../../../../shared/types'
 import AgentTimelineView from './AgentTimelineView'
 import ErrorBoundary from '../../components/ErrorBoundary'
@@ -14,6 +14,9 @@ interface AgentConversationProps {
 export default function AgentConversation({ session }: AgentConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true)
+  // Mirrors the ref only at the 'left / returned to bottom' transitions, so
+  // scroll events during streaming don't re-render the conversation.
+  const [awayFromBottom, setAwayFromBottom] = useState(false)
   const events = useAgentSessionEvents(session.id)
 
   // Changes as streamed content grows (not only when new events are appended),
@@ -35,23 +38,43 @@ export default function AgentConversation({ session }: AgentConversationProps) {
     }
   }, [events.length, streamCharCount])
 
+  const jumpToBottom = (): void => {
+    isAtBottomRef.current = true
+    setAwayFromBottom(false)
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
-    <div
-      onScroll={(e) => {
-        const el = e.currentTarget
-        isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-      }}
-      className="flex-1 overflow-y-auto"
-    >
-      <div className="mx-auto max-w-3xl px-6 py-6">
-        {session.context ? <AgentContextBox context={session.context} /> : null}
+    <div className="relative min-h-0 flex-1">
+      <div
+        onScroll={(e) => {
+          const el = e.currentTarget
+          const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+          isAtBottomRef.current = atBottom
+          setAwayFromBottom(!atBottom)
+        }}
+        className="h-full overflow-y-auto"
+      >
+        <div className="mx-auto max-w-3xl px-6 py-6">
+          {session.context ? <AgentContextBox context={session.context} /> : null}
 
-        <ErrorBoundary label="Failed to render the conversation">
-          <AgentTimelineView session={session} events={events} allMentionedPRs={session.context?.prs} />
-        </ErrorBoundary>
+          <ErrorBoundary label="Failed to render the conversation">
+            <AgentTimelineView session={session} events={events} allMentionedPRs={session.context?.prs} />
+          </ErrorBoundary>
 
-        <div ref={bottomRef} />
+          <div ref={bottomRef} />
+        </div>
       </div>
+
+      {awayFromBottom && (
+        <button
+          onClick={jumpToBottom}
+          className="animate-card-in border-border bg-surface text-foreground-muted hover:bg-surface-hover hover:text-foreground absolute bottom-3 left-1/2 flex size-8 -translate-x-1/2 items-center justify-center rounded-full border shadow-lg transition-[background-color,color,transform] active:scale-[0.96]"
+          aria-label="Scroll to latest"
+        >
+          <ArrowDown size={14} />
+        </button>
+      )}
     </div>
   )
 }

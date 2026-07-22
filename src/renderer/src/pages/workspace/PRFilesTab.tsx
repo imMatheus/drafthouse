@@ -1058,6 +1058,9 @@ export function ChangedFilesViewer({
         // CSS variable (see SettingsProvider); feed the virtualizer the matching
         // line height so its pre-measurement scroll estimates stay accurate.
         itemMetrics: codeViewItemMetrics(settings.codeFontSize),
+        // Keep inter-file rhythm while letting the first file begin flush with
+        // the scroll viewport instead of inheriting CodeView's 8px top inset.
+        layout: DIFF_CODE_VIEW_LAYOUT,
         // Collapse unchanged runs into expandable "N unmodified lines" bars
         // (keeping GitHub's 3 lines of context around each change) rather than
         // dumping the whole file. The bars only become *clickable* once a file
@@ -1250,6 +1253,7 @@ export default function PRFilesTab({
 // don't render before highlighting is ready. Ported from diffshub's
 // useIsWorkerPoolReadyOrDisabled — returns true when there is no pool.
 const WORKER_READY_TIMEOUT_MS = 4000
+const DIFF_CODE_VIEW_LAYOUT = { paddingTop: 0, paddingBottom: 8, gap: 8 }
 
 function useWorkerReady(): boolean {
   const workerPool = useWorkerPool()
@@ -2644,7 +2648,7 @@ const FileTreeFileRow = memo(function FileTreeFileRow({
       )}
     >
       <FileStatusIcon status={file.status} />
-      <span className={cn('min-w-0 flex-1 truncate', fileStatusTextClass(file.status))}>{name}</span>
+      <span className="min-w-0 flex-1 truncate">{name}</span>
       {commentCount > 0 ? (
         <span className="text-foreground-subtle flex shrink-0 items-center gap-1">
           <MessageSquare size={12} />
@@ -2686,19 +2690,4 @@ function FileHeaderName({ name, previousName }: { name: string; previousName?: s
     )
   }
   return <span className="text-foreground min-w-0 truncate text-sm font-semibold">{name}</span>
-}
-
-// Tints a filename by its change status so the tree reads at a glance. Modified
-// files keep the default foreground.
-function fileStatusTextClass(status: string): string {
-  switch (status) {
-    case 'added':
-      return 'text-success'
-    case 'removed':
-      return 'text-danger'
-    case 'renamed':
-      return 'text-purple'
-    default:
-      return ''
-  }
 }
